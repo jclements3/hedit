@@ -171,6 +171,26 @@ front-end for the existing Python `paraguayan_core` (spine/WP/limaçon-sweep/win
 - Output goal: SVG (drawing) + DXF (2-D fab) + JSON (parametric truth driving the 3-D body
   and CF-strand braiding). DXF export and a WP editor are still to come.
 
+## Views, consoles, annotations (added later)
+
+- **3D view** (`enter3d`/`project3d`/`render3d`, `#stage3d`): orthographic 3D→2D
+  projection of the content (X right, Z up, Y depth; flat elements at Y=0), rotatable —
+  left-drag orbit, right/middle-drag pan, wheel zoom, Shift+left roll, double-click set
+  rotation center; Front/Side/Top/Iso presets (`set3dPreset`). Two SVG gotchas it works
+  around: size from the `.canvas-wrap` div (SVG `clientWidth` is flaky) and toggle via
+  `removeAttribute/setAttribute("hidden")` (SVG has no `.hidden` IDL prop).
+- **WP editor** (`openWpEditor`/`renderWpPlot`, `#wp-modal`): draggable f→r waterfall
+  plot (cubic smoothstep `s=t²(3−2t)`); double-click adds/removes nodes. WP lives in
+  `harpWP`, round-trips via Import/Export JSON, and is embedded in the autosave metadata.
+- **JS console (vim)** (`openJsEditor`/`runJsConsole`): a js-vim editor whose Run
+  direct-`eval`s code in hedit's scope (call `stringLines()`, `addPins()`, etc.); Ctrl+Z
+  reverts.
+- **Pins / sensor dots** (`addPins`/`addSensorDots`): `<circle data-role="pin">` per
+  string (30° up-left, 3 air-gaps from the top); natural/sharp/midi RGB dots at the
+  Paraguayan fractions (0.0561L/0.1091L/0.125L below the tip). Excluded from string ops.
+- **Fit both ends + shift** (`fitEndsCurve`, `shiftCurves`): fit bottoms OR tops; shift
+  the selected path/curve by an amount or by the air gap.
+
 ## Export & embedded editor
 
 - **DXF export** (`buildDXF`/`exportDXF`, header "DXF" button): samples content
