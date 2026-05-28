@@ -101,23 +101,50 @@
   #strings-table input.w-sm{width:44px}
   #strings-table input[type=color]{width:30px; height:22px; padding:0; border:1px solid var(--line); border-radius:4px; background:none; cursor:pointer}
   #strings-table .row-del{cursor:pointer; color:var(--close); background:none; border:none; font-size:15px; line-height:1}
+  /* header groups */
+  header .hgroup{display:flex; gap:6px}
+  header .divider{width:1px; align-self:stretch; background:var(--line); margin:0 6px}
+  button.danger:hover{border-color:var(--close); color:var(--close)}
+  /* collapsible section cards (props panels) */
+  .props{gap:8px}
+  details.sec{background:var(--panel2); border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:0 0 auto}
+  details.sec>summary{list-style:none; cursor:pointer; padding:7px 10px; font-size:11px; text-transform:uppercase;
+    letter-spacing:1px; color:var(--muted); display:flex; align-items:center; gap:7px; user-select:none}
+  details.sec>summary::-webkit-details-marker{display:none}
+  details.sec>summary::before{content:"\25B8"; font-size:9px; color:var(--muted)}
+  details.sec[open]>summary::before{content:"\25BE"}
+  details.sec.harp>summary{color:var(--accent2)}
+  details.sec>summary .step{display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px;
+    padding:0 4px; border-radius:8px; background:var(--line); color:var(--fg); font-size:9px; letter-spacing:0}
+  details.sec.harp[open]>summary .step{background:var(--accent2); color:#10131a}
+  .sec-body{padding:8px 10px 10px; display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line)}
+  .sec-body .seg{margin:0}
+  .btn-primary{background:var(--accent); color:#10131a; border-color:var(--accent); font-weight:600}
+  .btn-primary:hover{filter:brightness(1.08); border-color:var(--accent)}
 </style>
 </head>
 <body>
 <header>
   <div class="title">h<span>edit</span></div>
-  <button id="btn-new" title="New document">New</button>
-  <button id="btn-open" title="Open an SVG file">Open…</button>
-  <button id="btn-save" title="Save in place to the opened file, else prompt (Ctrl+S)">Save</button>
-  <button id="btn-save-as" title="Save to a new file / location (Ctrl+Shift+S)">Save As…</button>
+  <div class="hgroup">
+    <button id="btn-new" title="New document">New</button>
+    <button id="btn-open" title="Open an SVG file">Open…</button>
+    <button id="btn-save" title="Save in place to the opened file, else prompt (Ctrl+S)">Save</button>
+    <button id="btn-save-as" title="Save to a new file / location (Ctrl+Shift+S)">Save As…</button>
+  </div>
   <input type="file" id="file-input" accept=".svg,image/svg+xml" hidden>
   <input type="file" id="json-input" accept=".json,application/json" hidden>
   <span class="filename" id="filename">untitled.svg</span>
   <div class="spacer"></div>
-  <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
-  <button id="btn-redo" title="Redo (Ctrl+Y)">Redo</button>
-  <button id="btn-fit" title="Fit to view (0)">Fit</button>
-  <button id="btn-delete" title="Delete selection (Del)">Delete</button>
+  <div class="hgroup">
+    <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
+    <button id="btn-redo" title="Redo (Ctrl+Y)">Redo</button>
+  </div>
+  <div class="divider"></div>
+  <div class="hgroup">
+    <button id="btn-fit" title="Fit &amp; center everything (F or 0)">Fit</button>
+    <button id="btn-delete" class="danger" title="Delete selection (Del)">Delete</button>
+  </div>
 </header>
 
 <main>
@@ -145,82 +172,98 @@
   </div>
 
   <div class="props props-left">
-    <div>
-      <h3 class="harp">Harp curves (DP/BP/SP/WP)</h3>
-      <div class="seg">
-        <button id="harp-import-btn" title="Import a Paraguayan-format harp JSON (DP/BP/SP rails + WP)">Import JSON</button>
-        <button id="harp-export-btn" title="Export DP/BP/SP/WP as paraguayan_overrides.json (drop-in)">Export JSON</button>
+    <details class="sec harp" open>
+      <summary><span class="step">JSON</span> Harp file (DP/BP/SP/WP)</summary>
+      <div class="sec-body">
+        <div class="seg">
+          <button id="harp-import-btn" title="Import a Paraguayan-format harp JSON (DP/BP/SP rails + WP)">Import</button>
+          <button id="harp-export-btn" title="Export DP/BP/SP/WP as paraguayan_overrides.json (drop-in)">Export</button>
+        </div>
       </div>
-    </div>
+    </details>
 
-    <div>
-      <h3 class="harp">Strings (harp)</h3>
-      <div class="row">
-        <button id="string-selectall" style="flex:1" title="Select every string (line) as a group">Select all strings</button>
+    <details class="sec harp" open>
+      <summary><span class="step">1</span> Strings</summary>
+      <div class="sec-body">
+        <button id="string-table-btn" class="btn-primary" title="Open the string specification table (note, length, diameter, tension, core/wrap)">Edit specs…</button>
+        <button id="string-selectall" title="Select every string (line) as a group">Select all strings</button>
+        <div class="row"><label id="sel-count">No selection</label></div>
       </div>
-      <div class="row" style="margin-top:8px">
-        <label title="Rotate all strings together about their center. The whole S-axis/length frame turns rigidly, so the parallel air-gap relationship is preserved.">Rotate group (°)</label>
-        <input type="number" id="string-rot" step="1" value="15">
-      </div>
-      <div class="seg" style="margin-top:6px">
-        <button id="string-rot-ccw" title="Rotate counter-clockwise by the angle">⟲ CCW</button>
-        <button id="string-rot-cw" title="Rotate clockwise by the angle">CW ⟳</button>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <button id="s-axis-btn" style="flex:1" title="Draw a faint reference line (the S axis) through the string centers along the spacing direction. It is not a string and rotates with the strings.">Set S axis</button>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <label title="Edge-to-edge air gap between adjacent strings, in SVG units">Air gap</label>
-        <input type="number" id="string-gap" step="0.1" value="13">
-      </div>
-      <div class="seg" style="margin-top:6px">
-        <button id="string-gap-btn" title="Make every string line vertical and space them with a constant edge-to-edge air gap (accounts for each string's diameter)">Parallel air-gap</button>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <button id="string-table-btn" style="flex:1" title="Edit the string specification table">Edit specs…</button>
-      </div>
-      <div class="row" style="margin-top:8px"><label>Align (vertical only)</label></div>
-      <div class="seg">
-        <button id="align-top" title="Align all string tops; lengths & air gap preserved">Top</button>
-        <button id="align-middle" title="Center strings vertically; lengths & air gap preserved">Middle</button>
-        <button id="align-bottom" title="Align all string bottoms; lengths & air gap preserved">Bottom</button>
-      </div>
-      <div class="seg" style="margin-top:6px">
-        <button id="align-curve-top" title="Align string TOP ends to a selected path/curve">Tops on curve</button>
-        <button id="align-curve-bottom" title="Align string BOTTOM ends to a selected path/curve">Bottoms on curve</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <label title="Maximum number of on-curve nodes in the fitted curve (endpoints are pinned to the first/last string bottoms)">Fit max nodes</label>
-        <input type="number" id="fit-nodes" min="2" step="1" value="8">
-      </div>
-      <div class="seg" style="margin-top:6px">
-        <button id="fit-bottoms-btn" title="Fit a cubic-Bezier curve (Schneider) through the string bottom ends, capped at Max nodes with fixed endpoints. Draws it as a red reference path and node-edits it, ready for 'Bottoms on curve'.">Fit bottoms → curve</button>
-        <button id="clear-curve-btn" title="Delete the fitted bottom curve(s)">Clear curve</button>
-      </div>
-      <div class="row" style="margin-top:8px"><label>Coordinate frame</label></div>
-      <div class="seg">
-        <button id="xz-btn" title="Put the whole harp in a right-handed +X/+Z frame: +X right, +Z up, Y into the page; origin at the bounding-box bottom-left, all coordinates positive. Renders upright (flip for display).">Orient +X/+Z (RH)</button>
-      </div>
-    </div>
+    </details>
 
-    <div>
-      <h3>Arrange &amp; distribute</h3>
-      <div class="row">
-        <label>Gap</label>
-        <input type="number" id="distribute-gap" step="1" value="10" title="Air gap between objects, in SVG units">
+    <details class="sec harp" open>
+      <summary><span class="step">2</span> Spacing</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="Edge-to-edge air gap between adjacent strings, in SVG units (mm)">Air gap</label>
+          <input type="number" id="string-gap" step="0.1" value="13">
+        </div>
+        <button id="string-gap-btn" class="btn-primary" title="Make every string vertical and space them with a constant edge-to-edge air gap (accounts for each string's diameter)">Apply parallel air-gap</button>
       </div>
-      <div class="row" style="margin-top:6px">
-        <label title="Measure edges including stroke width, so the gap is the real visible space between painted edges">Air gap (incl. stroke)</label>
-        <input type="checkbox" id="distribute-stroke" checked>
+    </details>
+
+    <details class="sec harp" open>
+      <summary><span class="step">3</span> Align string ends</summary>
+      <div class="sec-body">
+        <div class="row"><label>Level (lengths &amp; gap kept)</label></div>
+        <div class="seg">
+          <button id="align-top" title="Align all string tops">Top</button>
+          <button id="align-middle" title="Center strings vertically">Middle</button>
+          <button id="align-bottom" title="Align all string bottoms">Bottom</button>
+        </div>
+        <div class="row"><label>Onto the selected curve</label></div>
+        <div class="seg">
+          <button id="align-curve-top" title="Align string TOP ends to a selected path/curve">Tops</button>
+          <button id="align-curve-bottom" title="Align string BOTTOM ends to a selected path/curve">Bottoms</button>
+        </div>
       </div>
-      <div class="seg" style="margin-top:6px">
-        <button id="dist-h" title="Distribute left-to-right with the gap above (H)">Distribute →</button>
-        <button id="dist-v" title="Distribute top-to-bottom with the gap above (Shift+H / V)">Distribute ↓</button>
+    </details>
+
+    <details class="sec harp" open>
+      <summary><span class="step">4</span> Fit curve to ends</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="Maximum on-curve nodes in the fit (endpoints pinned to the first/last bottom)">Max nodes</label>
+          <input type="number" id="fit-nodes" min="2" step="1" value="8">
+        </div>
+        <button id="fit-bottoms-btn" class="btn-primary" title="Fit a cubic-Bezier curve (Schneider) through the string bottoms, capped at Max nodes with fixed endpoints; draws it and opens it for node editing">Fit bottoms → curve</button>
+        <button id="clear-curve-btn" class="danger" title="Delete the fitted bottom curve(s)">Clear fitted curve</button>
       </div>
-      <div class="row" style="margin-top:6px">
-        <label id="sel-count">No selection</label>
+    </details>
+
+    <details class="sec harp">
+      <summary><span class="step">5</span> Transform</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="Rotate all strings (and the S axis) rigidly about their center; air gap preserved">Rotate (°)</label>
+          <input type="number" id="string-rot" step="1" value="15">
+        </div>
+        <div class="seg">
+          <button id="string-rot-ccw" title="Rotate counter-clockwise">⟲ CCW</button>
+          <button id="string-rot-cw" title="Rotate clockwise">CW ⟳</button>
+        </div>
+        <button id="s-axis-btn" title="Draw the S axis: a faint reference line through the string centers along the spacing direction; it rotates with the strings">Set S axis</button>
+        <button id="xz-btn" title="Put the harp in a right-handed +X/+Z frame: +X right, +Z up, Y into the page; origin at the bbox bottom-left, all coords positive; renders upright">Orient +X/+Z (RH)</button>
       </div>
-    </div>
+    </details>
+
+    <details class="sec">
+      <summary><span class="step">+</span> Arrange (any objects)</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="Air gap between objects, in SVG units">Gap</label>
+          <input type="number" id="distribute-gap" step="1" value="10">
+        </div>
+        <div class="row">
+          <label title="Measure edges including stroke width, so the gap is the real visible space">Incl. stroke</label>
+          <input type="checkbox" id="distribute-stroke" checked>
+        </div>
+        <div class="seg">
+          <button id="dist-h" title="Distribute left-to-right with the gap (H)">Distribute →</button>
+          <button id="dist-v" title="Distribute top-to-bottom with the gap (Shift+H)">Distribute ↓</button>
+        </div>
+      </div>
+    </details>
   </div>
 
   <div class="canvas-wrap">
@@ -228,62 +271,66 @@
   </div>
 
   <div class="props">
-    <div>
-      <h3>Style</h3>
-      <div class="row">
-        <label>Fill</label>
-        <div class="checkrow">
-          <input type="checkbox" id="fill-on" checked>
-          <input type="color" id="fill-color" value="#6ea8fe">
+    <details class="sec" open>
+      <summary>Style (selection)</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label>Fill</label>
+          <div class="checkrow">
+            <input type="checkbox" id="fill-on" title="Fill on/off" checked>
+            <input type="color" id="fill-color" value="#6ea8fe">
+          </div>
+        </div>
+        <div class="row">
+          <label>Stroke</label>
+          <div class="checkrow">
+            <input type="checkbox" id="stroke-on" title="Stroke on/off" checked>
+            <input type="color" id="stroke-color" value="#10131a">
+          </div>
+        </div>
+        <div class="row">
+          <label>Width</label>
+          <input type="number" id="stroke-width" min="0" step="0.5" value="2">
         </div>
       </div>
-      <div class="row" style="margin-top:6px">
-        <label>Stroke</label>
-        <div class="checkrow">
-          <input type="checkbox" id="stroke-on" checked>
-          <input type="color" id="stroke-color" value="#10131a">
+    </details>
+
+    <details class="sec" open>
+      <summary>Node (with N tool)</summary>
+      <div class="sec-body">
+        <div class="seg">
+          <button id="node-corner" title="Cusp / corner node (independent handles)">Corner</button>
+          <button id="node-smooth" title="Symmetric smooth node (collinear handles)">Smooth</button>
+        </div>
+        <button id="node-delete" class="danger" title="Delete the selected node (Del)">Delete node</button>
+      </div>
+    </details>
+
+    <details class="sec" open>
+      <summary>View</summary>
+      <div class="sec-body">
+        <div class="seg">
+          <button id="zoom-out" title="Zoom out">−</button>
+          <button id="zoom-in" title="Zoom in">+</button>
+          <button id="zoom-fit" title="Fit &amp; center everything (F)">Fit</button>
+        </div>
+        <div class="row"><label>Zoom</label><span id="zoom-label">100%</span></div>
+        <div class="row">
+          <label title="Editor canvas color (not saved in the SVG)">Canvas</label>
+          <input type="color" id="canvas-bg" value="#3a3d4d">
+        </div>
+        <div class="seg">
+          <button id="bg-checker" title="Transparency checkerboard">Checker</button>
+          <button id="bg-dark" title="Dark slate">Dark</button>
+          <button id="bg-paper" title="Soft paper">Paper</button>
         </div>
       </div>
-      <div class="row" style="margin-top:6px">
-        <label>Width</label>
-        <input type="number" id="stroke-width" min="0" step="0.5" value="2">
-      </div>
-    </div>
+    </details>
 
-    <div>
-      <h3>Selected node</h3>
-      <div class="seg">
-        <button id="node-corner" title="Cusp / corner node">Corner</button>
-        <button id="node-smooth" title="Symmetric smooth node">Smooth</button>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <button id="node-delete" style="flex:1" title="Delete node (Del)">Delete node</button>
-      </div>
-    </div>
-
-    <div>
-      <h3>View</h3>
-      <div class="seg">
-        <button id="zoom-out">−</button>
-        <button id="zoom-in">+</button>
-        <button id="zoom-fit">Fit</button>
-      </div>
-      <div class="row" style="margin-top:6px"><label>Zoom</label><span id="zoom-label">100%</span></div>
-      <div class="row" style="margin-top:8px">
-        <label title="Editor canvas color (not saved in the SVG)">Canvas</label>
-        <input type="color" id="canvas-bg" value="#3a3d4d">
-      </div>
-      <div class="seg" style="margin-top:6px">
-        <button id="bg-checker" title="Transparency checkerboard">Checker</button>
-        <button id="bg-dark" title="Dark slate">Dark</button>
-        <button id="bg-paper" title="Soft paper">Paper</button>
-      </div>
-    </div>
-
-    <div>
-      <h3>Help</h3>
-      <div class="hint" id="hint"></div>
-    </div>
+    <details class="sec">
+      <summary>Help</summary>
+      <div class="sec-body"><div class="hint" id="hint"></div></div>
+    </details>
   </div>
 </main>
 
