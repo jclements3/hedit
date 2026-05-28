@@ -200,6 +200,17 @@
     <div>
       <h3>Strings (harp)</h3>
       <div class="row">
+        <button id="string-selectall" style="flex:1" title="Select every string (line) as a group">Select all strings</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label title="Rotate all strings together about their center. The whole S-axis/length frame turns rigidly, so the parallel air-gap relationship is preserved.">Rotate group (°)</label>
+        <input type="number" id="string-rot" step="1" value="15">
+      </div>
+      <div class="seg" style="margin-top:6px">
+        <button id="string-rot-ccw" title="Rotate counter-clockwise by the angle">⟲ CCW</button>
+        <button id="string-rot-cw" title="Rotate clockwise by the angle">CW ⟳</button>
+      </div>
+      <div class="row" style="margin-top:10px">
         <label title="Edge-to-edge air gap between adjacent strings, in SVG units">Air gap</label>
         <input type="number" id="string-gap" step="0.1" value="13">
       </div>
@@ -1196,6 +1207,10 @@ function readGap(){ const v = parseFloat(document.getElementById("distribute-gap
 function readIncludeStroke(){ return document.getElementById("distribute-stroke").checked; }
 document.getElementById("dist-h").onclick = () => distribute("h", readGap(), readIncludeStroke());
 document.getElementById("dist-v").onclick = () => distribute("v", readGap(), readIncludeStroke());
+document.getElementById("string-selectall").onclick = selectAllStrings;
+const readRot = () => { const v = parseFloat(document.getElementById("string-rot").value); return isNaN(v) ? 0 : v; };
+document.getElementById("string-rot-ccw").onclick = () => rotateStrings(-readRot());
+document.getElementById("string-rot-cw").onclick = () => rotateStrings(readRot());
 document.getElementById("string-gap-btn").onclick = () => parallelAirGapStrings(readStringGap());
 document.getElementById("string-table-btn").onclick = openStringsTable;
 document.getElementById("align-top").onclick = () => alignStrings("top");
@@ -1349,6 +1364,46 @@ function parallelAirGapStrings(gap){
   pathModel = null;
   renderOverlay();
   setStatus(`Enforced ${fmt(gap)} parallel air-gap across ${lines.length} strings.`);
+}
+
+// select every string (line) as a group, for moving/styling with normal tools
+function selectAllStrings(){
+  const lines = stringLines();
+  if(!lines.length){ setStatus("No strings to select."); return; }
+  setTool("select");
+  selected = lines;
+  selection = lines[lines.length - 1];
+  pathModel = null; selectedNode = null;
+  readStyleFromSelection(); updateSelCount(); renderOverlay();
+  setStatus(`${lines.length} strings selected.`);
+}
+
+// Rotate all strings together as one rigid body about their common center.
+// A rigid rotation preserves every distance and angle, so the strings stay
+// parallel and their edge-to-edge air gaps are unchanged -- it simply turns the
+// whole S-axis/length frame by `deg` (positive = clockwise on screen, y-down).
+function rotateStrings(deg){
+  const lines = stringLines();
+  if(!lines.length){ setStatus("No strings to rotate."); return; }
+  pushUndo();
+  lines.forEach(bakeLineTransform);
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  const ends = lines.map(el => {
+    const p = ["x1","y1","x2","y2"].map(a => parseFloat(el.getAttribute(a)) || 0);
+    minx = Math.min(minx, p[0], p[2]); maxx = Math.max(maxx, p[0], p[2]);
+    miny = Math.min(miny, p[1], p[3]); maxy = Math.max(maxy, p[1], p[3]);
+    return { el, x1:p[0], y1:p[1], x2:p[2], y2:p[3] };
+  });
+  const cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
+  const a = deg * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
+  const rot = (x, y) => ({ x: cx + (x-cx)*cos - (y-cy)*sin, y: cy + (x-cx)*sin + (y-cy)*cos });
+  ends.forEach(e => {
+    const p1 = rot(e.x1, e.y1), p2 = rot(e.x2, e.y2);
+    e.el.setAttribute("x1", fmt(p1.x)); e.el.setAttribute("y1", fmt(p1.y));
+    e.el.setAttribute("x2", fmt(p2.x)); e.el.setAttribute("y2", fmt(p2.y));
+  });
+  pathModel = null; renderOverlay();
+  setStatus(`Rotated ${lines.length} strings by ${fmt(deg)}° about their center. Parallel air gap preserved.`);
 }
 
 // --- vertical alignment ---------------------------------------------
