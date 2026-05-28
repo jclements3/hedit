@@ -347,6 +347,12 @@
           <button id="zoom-fit" title="Fit &amp; center everything (F)">Fit</button>
         </div>
         <button id="view3d-btn" title="Toggle a 3D orthographic view: left-drag rotate, right-drag pan, wheel zoom, Shift+left roll, double-click recenter">3D view</button>
+        <div class="seg" style="margin-top:4px">
+          <button id="v3d-front" title="Front (X-Z)">Front</button>
+          <button id="v3d-side" title="Side (Y-Z)">Side</button>
+          <button id="v3d-top" title="Top (X-Y)">Top</button>
+          <button id="v3d-iso" title="Isometric">Iso</button>
+        </div>
         <div class="row"><label>Zoom</label><span id="zoom-label">100%</span></div>
         <div class="row">
           <label title="Editor canvas color (not saved in the SVG)">Canvas</label>
@@ -1605,6 +1611,15 @@ function exit3d(){
   setStatus("2D edit.");
 }
 function toggle3d(){ view3d.on ? exit3d() : enter3d(); }
+function set3dPreset(name){
+  if(!view3d.on) enter3d();
+  view3d.roll = 0;
+  if(name === "front"){ view3d.yaw = 0; view3d.pitch = 0; }
+  else if(name === "side"){ view3d.yaw = Math.PI/2; view3d.pitch = 0; }
+  else if(name === "top"){ view3d.yaw = 0; view3d.pitch = -Math.PI/2 + 0.001; }
+  else { view3d.yaw = 0.7; view3d.pitch = -0.6; }   // iso
+  fit3d(); render3d(); setStatus("3D " + name + " view.");
+}
 // --- 3D mouse navigation ---
 let drag3d = null;
 stage3d.addEventListener("contextmenu", e => e.preventDefault());
@@ -1679,6 +1694,10 @@ document.getElementById("zoom-in").onclick = () => zoomBy(0.8);
 document.getElementById("zoom-out").onclick = () => zoomBy(1.25);
 document.getElementById("zoom-fit").onclick = fitView;
 document.getElementById("view3d-btn").onclick = toggle3d;
+document.getElementById("v3d-front").onclick = () => set3dPreset("front");
+document.getElementById("v3d-side").onclick = () => set3dPreset("side");
+document.getElementById("v3d-top").onclick = () => set3dPreset("top");
+document.getElementById("v3d-iso").onclick = () => set3dPreset("iso");
 document.getElementById("node-delete").onclick = deleteSelectedNode;
 document.getElementById("node-corner").onclick = () => setSelectedNodeType("corner");
 document.getElementById("node-smooth").onclick = () => setSelectedNodeType("smooth");
