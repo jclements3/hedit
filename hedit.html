@@ -567,7 +567,32 @@ function segsToSubpaths(segs){
       }
     }
   }
+  subs.forEach(sub => sub.nodes.forEach(detectSmooth));   // flag collinear-handle nodes as smooth
   return subs;
+}
+
+// a node is "smooth" when it has both handles and they are ~collinear (opposite dirs)
+function detectSmooth(nd){
+  if(nd.hasIn && nd.hasOut){
+    const ix=nd.inX-nd.x, iy=nd.inY-nd.y, ox=nd.outX-nd.x, oy=nd.outY-nd.y;
+    const mi=Math.hypot(ix,iy), mo=Math.hypot(ox,oy);
+    const cos = (mi && mo) ? (ix*ox+iy*oy)/(mi*mo) : 0;
+    nd.smooth = cos < -0.999;   // within ~2.5 deg of collinear
+  } else nd.smooth = false;
+  return nd;
+}
+// keep a smooth node's two handles collinear when one is dragged (opposite handle
+// follows the reverse direction, preserving its own length)
+function mirrorHandle(nd, moved){
+  if(moved === "in"){
+    const ix=nd.inX-nd.x, iy=nd.inY-nd.y, d=Math.hypot(ix,iy)||1;
+    const len=Math.hypot(nd.outX-nd.x, nd.outY-nd.y);
+    nd.outX = nd.x - ix/d*len; nd.outY = nd.y - iy/d*len;
+  } else {
+    const ox=nd.outX-nd.x, oy=nd.outY-nd.y, d=Math.hypot(ox,oy)||1;
+    const len=Math.hypot(nd.inX-nd.x, nd.inY-nd.y);
+    nd.inX = nd.x - ox/d*len; nd.inY = nd.y - oy/d*len;
+  }
 }
 
 function subToD(sub){
@@ -811,9 +836,12 @@ function drawNodeEditor(aR, cR){
         c.dataset.kind = "out"; c.dataset.si = si; c.dataset.ni = ni;
         overlayGroup.appendChild(c);
       }
-      // anchor square
+      // anchor: square = corner, circle = smooth node
       const sel = selectedNode && selectedNode.si === si && selectedNode.ni === ni;
-      const r = ovEl("rect", { x:a.x-aR, y:a.y-aR, width:aR*2, height:aR*2 }, "ov-anchor" + (sel?" sel":""));
+      const cls = "ov-anchor" + (sel ? " sel" : "");
+      const r = nd.smooth
+        ? ovEl("circle", { cx:a.x, cy:a.y, r:aR }, cls)
+        : ovEl("rect", { x:a.x-aR, y:a.y-aR, width:aR*2, height:aR*2 }, cls);
       r.dataset.kind = "anchor"; r.dataset.si = si; r.dataset.ni = ni;
       overlayGroup.appendChild(r);
     });
@@ -902,21 +930,21 @@ function setSelectedNodeType(type){
   const nd = pathModel.subs[selectedNode.si].nodes[selectedNode.ni];
   pushUndo();
   if(type === "corner"){
-    // keep handles independent (no change needed beyond marking); nothing to recompute
-    setStatus("Corner node.");
+    nd.smooth = false;   // handles stay independent; dragging one won't move the other
+    setStatus("Corner node — handles independent.");
   } else if(type === "smooth"){
-    // make in/out collinear & equal length (average)
+    // make in/out collinear & equal length (average), and flag smooth (handles stay collinear on drag)
     if(nd.hasIn && nd.hasOut){
       const inV = { x:nd.inX-nd.x, y:nd.inY-nd.y };
       const outV = { x:nd.outX-nd.x, y:nd.outY-nd.y };
       const len = (Math.hypot(inV.x,inV.y) + Math.hypot(outV.x,outV.y)) / 2;
-      // direction: average of (in reversed) and out
       let dx = (-inV.x + outV.x), dy = (-inV.y + outV.y);
       const dl = Math.hypot(dx,dy) || 1; dx/=dl; dy/=dl;
       nd.outX = nd.x + dx*len; nd.outY = nd.y + dy*len;
       nd.inX  = nd.x - dx*len; nd.inY  = nd.y - dy*len;
     }
-    setStatus("Smooth node.");
+    nd.smooth = true;
+    setStatus("Smooth node — handles kept collinear when dragged.");
   }
   commitPathModel(); renderOverlay();
 }
@@ -1024,8 +1052,10 @@ function onMove(e){
       if(nd.hasOut){ nd.outX = drag.o.outX + dx; nd.outY = drag.o.outY + dy; }
     } else if(drag.kind === "in"){
       nd.inX = drag.o.inX + dx; nd.inY = drag.o.inY + dy;
+      if(nd.smooth && nd.hasOut) mirrorHandle(nd, "in");
     } else if(drag.kind === "out"){
       nd.outX = drag.o.outX + dx; nd.outY = drag.o.outY + dy;
+      if(nd.smooth && nd.hasIn) mirrorHandle(nd, "out");
     }
     commitPathModel(); renderOverlay(); return;
   }
