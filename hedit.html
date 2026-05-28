@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hedit — SVG bezier editor</title>
+<style>
+  :root{
+    --bg:#1e1f26; --panel:#262833; --panel2:#2f3240; --line:#3a3d4d;
+    --fg:#e6e7ee; --muted:#9aa0b4; --accent:#6ea8fe; --accent2:#ffb454;
+    --node:#6ea8fe; --node-sel:#ffb454; --handle:#7ee787; --close:#ff7b72;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--fg); font:13px/1.4 system-ui,Segoe UI,Roboto,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden; user-select:none;
+  }
+  header{
+    display:flex; align-items:center; gap:8px; padding:6px 10px;
+    background:var(--panel); border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  header .title{font-weight:700; letter-spacing:.5px; margin-right:8px}
+  header .title span{color:var(--accent)}
+  .spacer{flex:1}
+  button, .btn{
+    background:var(--panel2); color:var(--fg); border:1px solid var(--line);
+    border-radius:6px; padding:5px 10px; cursor:pointer; font-size:12px;
+  }
+  button:hover,.btn:hover{border-color:var(--accent)}
+  button:active{transform:translateY(1px)}
+  .filename{color:var(--muted); font-size:12px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  main{flex:1; display:flex; min-height:0}
+  .tools{
+    flex:0 0 56px; background:var(--panel); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0;
+  }
+  .tool{
+    width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+    border-radius:8px; background:var(--panel2); border:1px solid var(--line); cursor:pointer;
+    font-size:11px; flex-direction:column; gap:2px; color:var(--fg);
+  }
+  .tool small{font-size:9px; color:var(--muted)}
+  .tool.active{background:var(--accent); color:#10131a; border-color:var(--accent)}
+  .tool.active small{color:#10131a}
+  .tool svg{width:18px;height:18px}
+  .canvas-wrap{flex:1; position:relative; min-width:0; background:
+      repeating-conic-gradient(#2a2c36 0% 25%, #23252e 0% 50%) 50% / 22px 22px;}
+  #stage{position:absolute; inset:0; width:100%; height:100%; cursor:default; touch-action:none}
+  #stage.tool-pen{cursor:crosshair}
+  #stage.tool-rect,#stage.tool-ellipse{cursor:crosshair}
+  #stage.panning{cursor:grabbing}
+  .props{
+    flex:0 0 220px; background:var(--panel); border-left:1px solid var(--line);
+    padding:10px; overflow:auto; display:flex; flex-direction:column; gap:12px;
+  }
+  .props h3{margin:0 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted)}
+  .row{display:flex; align-items:center; gap:8px; justify-content:space-between}
+  .row label{color:var(--muted); font-size:12px}
+  input[type=color]{width:38px; height:26px; padding:0; border:1px solid var(--line); border-radius:4px; background:none; cursor:pointer}
+  input[type=number]{width:64px; background:var(--panel2); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:3px 6px}
+  input[type=range]{flex:1}
+  .seg{display:flex; gap:6px}
+  .seg button{flex:1}
+  .hint{color:var(--muted); font-size:11px; line-height:1.6}
+  .hint b{color:var(--fg)}
+  footer{
+    flex:0 0 auto; background:var(--panel); border-top:1px solid var(--line);
+    padding:4px 10px; color:var(--muted); font-size:11px; display:flex; gap:16px;
+  }
+  kbd{background:var(--panel2); border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:11px; color:var(--fg)}
+  .checkrow{display:flex; align-items:center; gap:6px}
+  /* overlay editing visuals */
+  .ov-bbox{fill:none; stroke:var(--accent); stroke-width:1; stroke-dasharray:4 3; vector-effect:non-scaling-stroke}
+  .ov-handle-line{stroke:#5a6b8c; stroke-width:1; vector-effect:non-scaling-stroke}
+  .ov-anchor{fill:var(--node); stroke:#10131a; stroke-width:1; vector-effect:non-scaling-stroke; cursor:grab}
+  .ov-anchor.sel{fill:var(--node-sel)}
+  .ov-ctrl{fill:var(--handle); stroke:#10131a; stroke-width:1; vector-effect:non-scaling-stroke; cursor:grab}
+  .ov-pen-preview{fill:none; stroke:var(--accent2); stroke-width:1.5; vector-effect:non-scaling-stroke}
+  .ov-shape-preview{fill:rgba(110,168,254,.15); stroke:var(--accent); stroke-width:1; vector-effect:non-scaling-stroke}
+  .ov-marquee{fill:rgba(110,168,254,.12); stroke:var(--accent); stroke-width:1; vector-effect:non-scaling-stroke; stroke-dasharray:3 3}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">h<span>edit</span></div>
+  <button id="btn-new" title="New document">New</button>
+  <button id="btn-open" title="Open an SVG file">Open…</button>
+  <button id="btn-save" title="Download SVG (Ctrl+S)">Save</button>
+  <input type="file" id="file-input" accept=".svg,image/svg+xml" hidden>
+  <span class="filename" id="filename">untitled.svg</span>
+  <div class="spacer"></div>
+  <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
+  <button id="btn-redo" title="Redo (Ctrl+Y)">Redo</button>
+  <button id="btn-fit" title="Fit to view (0)">Fit</button>
+  <button id="btn-delete" title="Delete selection (Del)">Delete</button>
+</header>
+
+<main>
+  <div class="tools" id="tools">
+    <div class="tool active" data-tool="select" title="Select / Move (V)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 3l7 17 2-7 7-2z"/></svg>
+      <small>V</small>
+    </div>
+    <div class="tool" data-tool="node" title="Edit nodes (N)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18C8 6 16 6 20 18"/><rect x="2" y="16" width="4" height="4"/><rect x="18" y="16" width="4" height="4"/><circle cx="12" cy="7" r="2"/></svg>
+      <small>N</small>
+    </div>
+    <div class="tool" data-tool="pen" title="Pen / draw bezier (P)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21l4-1L20 7l-3-3L4 17z"/><path d="M14 6l3 3"/></svg>
+      <small>P</small>
+    </div>
+    <div class="tool" data-tool="rect" title="Rectangle (R)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="1"/></svg>
+      <small>R</small>
+    </div>
+    <div class="tool" data-tool="ellipse" title="Ellipse (E)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg>
+      <small>E</small>
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <svg id="stage" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <div class="props">
+    <div>
+      <h3>Style</h3>
+      <div class="row">
+        <label>Fill</label>
+        <div class="checkrow">
+          <input type="checkbox" id="fill-on" checked>
+          <input type="color" id="fill-color" value="#6ea8fe">
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label>Stroke</label>
+        <div class="checkrow">
+          <input type="checkbox" id="stroke-on" checked>
+          <input type="color" id="stroke-color" value="#10131a">
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label>Width</label>
+        <input type="number" id="stroke-width" min="0" step="0.5" value="2">
+      </div>
+    </div>
+
+    <div>
+      <h3>Selected node</h3>
+      <div class="seg">
+        <button id="node-corner" title="Cusp / corner node">Corner</button>
+        <button id="node-smooth" title="Symmetric smooth node">Smooth</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button id="node-delete" style="flex:1" title="Delete node (Del)">Delete node</button>
+      </div>
+    </div>
+
+    <div>
+      <h3>Arrange &amp; distribute</h3>
+      <div class="row">
+        <label>Gap</label>
+        <input type="number" id="distribute-gap" step="1" value="10" title="Air gap between objects, in SVG units">
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label title="Measure edges including stroke width, so the gap is the real visible space between painted edges">Air gap (incl. stroke)</label>
+        <input type="checkbox" id="distribute-stroke" checked>
+      </div>
+      <div class="seg" style="margin-top:6px">
+        <button id="dist-h" title="Distribute left-to-right with the gap above (H)">Distribute →</button>
+        <button id="dist-v" title="Distribute top-to-bottom with the gap above (Shift+H / V)">Distribute ↓</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label id="sel-count">No selection</label>
+      </div>
+    </div>
+
+    <div>
+      <h3>View</h3>
+      <div class="seg">
+        <button id="zoom-out">−</button>
+        <button id="zoom-in">+</button>
+        <button id="zoom-fit">Fit</button>
+      </div>
+      <div class="row" style="margin-top:6px"><label>Zoom</label><span id="zoom-label">100%</span></div>
+    </div>
+
+    <div>
+      <h3>Help</h3>
+      <div class="hint" id="hint"></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span id="status">Ready.</span>
+  <div class="spacer" style="flex:1"></div>
+  <span><kbd>V</kbd> select <kbd>N</kbd> nodes <kbd>P</kbd> pen <kbd>R</kbd>/<kbd>E</kbd> shapes · scroll = zoom · space-drag = pan</span>
+</footer>
+
+<script>
+"use strict";
+const SVGNS = "http://www.w3.org/2000/svg";
+const HANDLE_PX = 5;      // anchor radius in screen px
+const CTRL_PX = 4;        // control handle radius in screen px
+const HIT_PX = 8;         // selection / close tolerance in screen px
+
+// ---- DOM refs ----
+const stage = document.getElementById("stage");
+const fileInput = document.getElementById("file-input");
+const elFilename = document.getElementById("filename");
+const elStatus = document.getElementById("status");
+const elZoomLabel = document.getElementById("zoom-label");
+const elHint = document.getElementById("hint");
+
+// document layers
+let contentGroup, overlayGroup;
+// document metadata for saving
+let doc = { viewBox:"0 0 800 600", width:"800", height:"600" };
+// view
+let view = { x:0, y:0, w:800, h:600 };
+// tool + selection
+let tool = "select";
+let selection = null;          // primary selected element (drives the style panel)
+let selected = [];             // all selected elements (select/move/distribute)
+let pathModel = null;          // {el, subs} when node-editing
+let selectedNode = null;       // {si, ni} index into pathModel.subs
+// undo
+let undoStack = [], redoStack = [];
+
+// ---- init document layers ----
+function buildLayers(){
+  stage.innerHTML = "";
+  contentGroup = document.createElementNS(SVGNS, "g");
+  contentGroup.setAttribute("id", "content");
+  overlayGroup = document.createElementNS(SVGNS, "g");
+  overlayGroup.setAttribute("id", "overlay");
+  stage.appendChild(contentGroup);
+  stage.appendChild(overlayGroup);
+}
+
+// ---- coordinate helpers ----
+function applyView(){
+  stage.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`);
+  const z = stage.clientWidth ? stage.clientWidth / view.w : 1;
+  elZoomLabel.textContent = Math.round(z * 100) + "%";
+}
+function screenScale(){ const m = stage.getScreenCTM(); return m ? m.a : 1; }
+function evtUser(e){
+  const p = stage.createSVGPoint();
+  p.x = e.clientX; p.y = e.clientY;
+  const u = p.matrixTransform(stage.getScreenCTM().inverse());
+  return { x:u.x, y:u.y };
+}
+function toLocal(el, u){
+  const m = el.getCTM(); if(!m) return { x:u.x, y:u.y };
+  const p = stage.createSVGPoint(); p.x = u.x; p.y = u.y;
+  const l = p.matrixTransform(m.inverse()); return { x:l.x, y:l.y };
+}
+function toUserFromLocal(el, l){
+  const m = el.getCTM(); if(!m) return { x:l.x, y:l.y };
+  const p = stage.createSVGPoint(); p.x = l.x; p.y = l.y;
+  const u = p.matrixTransform(m); return { x:u.x, y:u.y };
+}
+function fmt(n){ return (Math.round(n * 1000) / 1000).toString(); }
+
+// ---- status / hints ----
+function setStatus(t){ elStatus.textContent = t; }
+const HINTS = {
+  select: "<b>Select:</b> click an object, drag to move. <b>Shift+click</b> adds to selection; drag an empty area for a <b>box-select</b>; <b>Ctrl+A</b> selects all. With 2+ selected, set a <b>Gap</b> and use <b>Distribute →/↓</b> (<kbd>H</kbd> / <kbd>Shift+H</kbd>) to space them evenly — air gap accounts for stroke width.",
+  node:   "<b>Nodes:</b> click a path, drag <b>squares</b> (anchors) &amp; <b>green dots</b> (handles). <b>Double-click</b> a segment to add a node. Click a node + <b>Del</b> to remove.",
+  pen:    "<b>Pen:</b> click to add corner points; <b>click-drag</b> for smooth curves. Click the first node or press <b>Enter</b> to finish; <b>Esc</b> cancels.",
+  rect:   "<b>Rectangle:</b> drag on the canvas to draw. Hold while dragging to size it.",
+  ellipse:"<b>Ellipse:</b> drag on the canvas to draw."
+};
+function updateHint(){ elHint.innerHTML = HINTS[tool] || ""; }
+
+// =====================================================================
+// PATH PARSING  (d -> absolute segments -> node model)
+// =====================================================================
+function parsePathD(d){
+  const segs = [];
+  const re = /([MmLlHhVvCcSsQqTtAaZz])|(-?\d*\.?\d+(?:[eE][-+]?\d+)?)/g;
+  const toks = []; let m;
+  while((m = re.exec(d))){ toks.push(m[1] !== undefined ? m[1] : parseFloat(m[2])); }
+  let i = 0, cx = 0, cy = 0, sx = 0, sy = 0, cmd = null;
+  let pcx = 0, pcy = 0, ptype = null;
+  const isCmd = t => typeof t === "string";
+  const num = () => toks[i++];
+  while(i < toks.length){
+    if(isCmd(toks[i])) cmd = toks[i++];
+    if(cmd == null) { i++; continue; }
+    const low = cmd.toLowerCase();
+    const rel = cmd === low;
+    if(low === "m"){
+      let x = num(), y = num(); if(rel){ x += cx; y += cy; }
+      cx = sx = x; cy = sy = y;
+      segs.push({ cmd:"M", pts:[{x,y}] }); ptype = "M";
+      cmd = rel ? "l" : "L";
+    } else if(low === "l"){
+      let x = num(), y = num(); if(rel){ x += cx; y += cy; }
+      cx = x; cy = y; segs.push({ cmd:"L", pts:[{x,y}] }); ptype = "L";
+    } else if(low === "h"){
+      let x = num(); if(rel) x += cx; cx = x;
+      segs.push({ cmd:"L", pts:[{x:cx,y:cy}] }); ptype = "L";
+    } else if(low === "v"){
+      let y = num(); if(rel) y += cy; cy = y;
+      segs.push({ cmd:"L", pts:[{x:cx,y:cy}] }); ptype = "L";
+    } else if(low === "c"){
+      let x1=num(),y1=num(),x2=num(),y2=num(),x=num(),y=num();
+      if(rel){ x1+=cx;y1+=cy;x2+=cx;y2+=cy;x+=cx;y+=cy; }
+      segs.push({ cmd:"C", pts:[{x:x1,y:y1},{x:x2,y:y2},{x,y}] });
+      pcx=x2; pcy=y2; cx=x; cy=y; ptype="C";
+    } else if(low === "s"){
+      let x2=num(),y2=num(),x=num(),y=num();
+      if(rel){ x2+=cx;y2+=cy;x+=cx;y+=cy; }
+      let x1,y1;
+      if(ptype==="C"||ptype==="S"){ x1=2*cx-pcx; y1=2*cy-pcy; } else { x1=cx; y1=cy; }
+      segs.push({ cmd:"C", pts:[{x:x1,y:y1},{x:x2,y:y2},{x,y}] });
+      pcx=x2; pcy=y2; cx=x; cy=y; ptype="S";
+    } else if(low === "q"){
+      let x1=num(),y1=num(),x=num(),y=num();
+      if(rel){ x1+=cx;y1+=cy;x+=cx;y+=cy; }
+      const c1x=cx+2/3*(x1-cx), c1y=cy+2/3*(y1-cy);
+      const c2x=x+2/3*(x1-x), c2y=y+2/3*(y1-y);
+      segs.push({ cmd:"C", pts:[{x:c1x,y:c1y},{x:c2x,y:c2y},{x,y}] });
+      pcx=x1; pcy=y1; cx=x; cy=y; ptype="Q";
+    } else if(low === "t"){
+      let x=num(),y=num(); if(rel){ x+=cx; y+=cy; }
+      let qx,qy;
+      if(ptype==="Q"||ptype==="T"){ qx=2*cx-pcx; qy=2*cy-pcy; } else { qx=cx; qy=cy; }
+      const c1x=cx+2/3*(qx-cx), c1y=cy+2/3*(qy-cy);
+      const c2x=x+2/3*(qx-x), c2y=y+2/3*(qy-y);
+      segs.push({ cmd:"C", pts:[{x:c1x,y:c1y},{x:c2x,y:c2y},{x,y}] });
+      pcx=qx; pcy=qy; cx=x; cy=y; ptype="T";
+    } else if(low === "a"){
+      let rx=num(),ry=num(),rot=num(),laf=num(),sf=num(),x=num(),y=num();
+      if(rel){ x+=cx; y+=cy; }
+      segs.push({ cmd:"A", pts:[{x,y}], arc:{rx,ry,rot,laf,sf} });
+      cx=x; cy=y; ptype="A";
+    } else if(low === "z"){
+      segs.push({ cmd:"Z", pts:[] }); cx=sx; cy=sy; ptype="Z";
+    } else { i++; }
+  }
+  return segs;
+}
+
+function segsToSubpaths(segs){
+  const subs = []; let cur = null;
+  const mk = (x,y,seg) => ({ x, y, hasIn:false, inX:0, inY:0, hasOut:false, outX:0, outY:0, seg });
+  for(const s of segs){
+    if(s.cmd === "M"){
+      cur = { closed:false, closeSeg:"L", nodes:[ mk(s.pts[0].x, s.pts[0].y, "M") ] };
+      subs.push(cur);
+    } else if(!cur){
+      continue;
+    } else if(s.cmd === "L"){
+      cur.nodes.push(mk(s.pts[0].x, s.pts[0].y, "L"));
+    } else if(s.cmd === "C"){
+      const prev = cur.nodes[cur.nodes.length-1];
+      prev.hasOut = true; prev.outX = s.pts[0].x; prev.outY = s.pts[0].y;
+      const n = mk(s.pts[2].x, s.pts[2].y, "C");
+      n.hasIn = true; n.inX = s.pts[1].x; n.inY = s.pts[1].y;
+      cur.nodes.push(n);
+    } else if(s.cmd === "A"){
+      const n = mk(s.pts[0].x, s.pts[0].y, "A"); n.arc = s.arc;
+      cur.nodes.push(n);
+    } else if(s.cmd === "Z"){
+      cur.closed = true;
+      const n = cur.nodes;
+      if(n.length > 1){
+        const a = n[n.length-1], b = n[0];
+        if(Math.hypot(a.x-b.x, a.y-b.y) < 1e-6){
+          // collapse duplicated endpoint into the closing segment
+          b.hasIn = a.hasIn; b.inX = a.inX; b.inY = a.inY;
+          cur.closeSeg = a.seg === "C" ? "C" : "L";
+          n.pop();
+        }
+      }
+    }
+  }
+  return subs;
+}
+
+function subToD(sub){
+  const n = sub.nodes; if(!n.length) return "";
+  let d = `M ${fmt(n[0].x)} ${fmt(n[0].y)}`;
+  const curveTo = (a,b) => {
+    const c1x = a.hasOut?a.outX:a.x, c1y = a.hasOut?a.outY:a.y;
+    const c2x = b.hasIn?b.inX:b.x,  c2y = b.hasIn?b.inY:b.y;
+    return ` C ${fmt(c1x)} ${fmt(c1y)} ${fmt(c2x)} ${fmt(c2y)} ${fmt(b.x)} ${fmt(b.y)}`;
+  };
+  for(let k=1;k<n.length;k++){
+    const a = n[k-1], b = n[k];
+    if(b.seg === "C") d += curveTo(a,b);
+    else if(b.seg === "A") d += ` A ${fmt(b.arc.rx)} ${fmt(b.arc.ry)} ${fmt(b.arc.rot)} ${b.arc.laf} ${b.arc.sf} ${fmt(b.x)} ${fmt(b.y)}`;
+    else d += ` L ${fmt(b.x)} ${fmt(b.y)}`;
+  }
+  if(sub.closed){
+    if(sub.closeSeg === "C") d += curveTo(n[n.length-1], n[0]) + " Z";
+    else d += " Z";
+  }
+  return d;
+}
+function subsToD(subs){ return subs.map(subToD).join(" "); }
+
+// effective stroke width in the element's local coords (0 if no stroke painted)
+function effectiveStrokeWidth(el){
+  const stroke = getStyle(el, "stroke");
+  if(stroke == null || stroke === "" || stroke === "none" || stroke === "transparent") return 0;
+  const sw = getStyle(el, "stroke-width");
+  const v = sw == null ? 1 : parseFloat(sw);   // SVG default stroke-width is 1
+  return isNaN(v) ? 1 : v;
+}
+// axis-aligned bounds in content/user coords, optionally inflated by half the stroke
+function visualBounds(el, includeStroke){
+  let bb; try { bb = el.getBBox(); } catch(e){ return null; }
+  const half = includeStroke ? effectiveStrokeWidth(el) / 2 : 0;
+  const x0 = bb.x - half, y0 = bb.y - half, x1 = bb.x + bb.width + half, y1 = bb.y + bb.height + half;
+  const m = el.getCTM();
+  const pts = [[x0,y0],[x1,y0],[x1,y1],[x0,y1]].map(([x,y]) => {
+    const p = stage.createSVGPoint(); p.x = x; p.y = y;
+    return m ? p.matrixTransform(m) : { x, y };
+  });
+  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  return { minX:Math.min(...xs), minY:Math.min(...ys), maxX:Math.max(...xs), maxY:Math.max(...ys) };
+}
+// shift an element by (dx,dy) in content/user coords (content group is identity)
+function translateEl(el, dx, dy){
+  const orig = el.getAttribute("transform") || "";
+  el.setAttribute("transform", `translate(${fmt(dx)} ${fmt(dy)}) ${orig}`.trim());
+}
+// distribute selected objects along an axis with a fixed visible gap
+function distribute(axis, gap, includeStroke){
+  if(selected.length < 2){ setStatus("Select 2 or more objects to distribute."); return; }
+  const items = selected
+    .map(el => ({ el, b: visualBounds(el, includeStroke) }))
+    .filter(it => it.b);
+  if(items.length < 2){ setStatus("Could not measure the selected objects."); return; }
+  const lo = axis === "h" ? (b => b.minX) : (b => b.minY);
+  const hi = axis === "h" ? (b => b.maxX) : (b => b.maxY);
+  items.sort((p, q) => lo(p.b) - lo(q.b));
+  pushUndo();
+  let cursor = hi(items[0].b);            // trailing edge of the anchored (first) object
+  for(let k = 1; k < items.length; k++){
+    const it = items[k];
+    const size = hi(it.b) - lo(it.b);
+    const target = cursor + gap;          // desired leading edge
+    const delta = target - lo(it.b);
+    if(axis === "h") translateEl(it.el, delta, 0); else translateEl(it.el, 0, delta);
+    cursor = target + size;
+  }
+  renderOverlay();
+  setStatus(`Distributed ${items.length} objects ${axis === "h" ? "horizontally" : "vertically"} with a ${fmt(gap)} gap${includeStroke ? " (stroke included)" : ""}.`);
+}
+
+function commitPathModel(){
+  if(pathModel) pathModel.el.setAttribute("d", subsToD(pathModel.subs));
+}
+
+// =====================================================================
+// UNDO
+// =====================================================================
+function pushUndo(){
+  undoStack.push(contentGroup.innerHTML);
+  if(undoStack.length > 100) undoStack.shift();
+  redoStack.length = 0;
+}
+function undo(){
+  if(!undoStack.length) return;
+  redoStack.push(contentGroup.innerHTML);
+  contentGroup.innerHTML = undoStack.pop();
+  clearSelection(); renderOverlay(); setStatus("Undo.");
+}
+function redo(){
+  if(!redoStack.length) return;
+  undoStack.push(contentGroup.innerHTML);
+  contentGroup.innerHTML = redoStack.pop();
+  clearSelection(); renderOverlay(); setStatus("Redo.");
+}
+
+// =====================================================================
+// SELECTION + STYLE
+// =====================================================================
+function clearSelection(){
+  selection = null; selected = []; pathModel = null; selectedNode = null;
+  updateSelCount();
+}
+function selectElement(el){
+  selected = el ? [el] : []; selection = el; pathModel = null; selectedNode = null;
+  readStyleFromSelection(); updateSelCount();
+}
+function toggleSelection(el){
+  const i = selected.indexOf(el);
+  if(i >= 0) selected.splice(i, 1); else selected.push(el);
+  selection = selected.length ? selected[selected.length-1] : null;
+  pathModel = null; selectedNode = null;
+  readStyleFromSelection(); updateSelCount();
+}
+function selectAll(){
+  selected = [...contentGroup.children].filter(n => n.nodeType === 1);
+  selection = selected.length ? selected[selected.length-1] : null;
+  pathModel = null; selectedNode = null;
+  readStyleFromSelection(); updateSelCount();
+}
+function updateSelCount(){
+  const el = document.getElementById("sel-count");
+  if(!el) return;
+  el.textContent = selected.length === 0 ? "No selection"
+    : selected.length === 1 ? "1 object selected"
+    : selected.length + " objects selected";
+}
+function isContentEl(el){
+  return el && el !== stage && contentGroup.contains(el) && el.nodeType === 1;
+}
+
+function readStyleFromSelection(){
+  if(!selection) return;
+  const fill = getStyle(selection, "fill");
+  const stroke = getStyle(selection, "stroke");
+  const sw = getStyle(selection, "stroke-width");
+  const fillOn = !(fill === "none" || fill === "transparent");
+  const strokeOn = !(stroke === "none" || stroke == null || stroke === "");
+  document.getElementById("fill-on").checked = fillOn;
+  document.getElementById("stroke-on").checked = strokeOn;
+  if(fillOn && fill) document.getElementById("fill-color").value = toHex(fill);
+  if(strokeOn && stroke) document.getElementById("stroke-color").value = toHex(stroke);
+  if(sw) document.getElementById("stroke-width").value = parseFloat(sw) || 0;
+}
+function getStyle(el, prop){
+  const inline = el.style.getPropertyValue(prop);
+  if(inline) return inline.trim();
+  if(el.hasAttribute(prop)) return el.getAttribute(prop).trim();
+  return null;
+}
+function toHex(c){
+  if(/^#[0-9a-f]{6}$/i.test(c)) return c;
+  if(/^#[0-9a-f]{3}$/i.test(c)) return "#" + c.slice(1).split("").map(x=>x+x).join("");
+  const probe = document.createElement("div"); probe.style.color = c;
+  document.body.appendChild(probe);
+  const rgb = getComputedStyle(probe).color; probe.remove();
+  const m = rgb.match(/\d+/g);
+  if(!m) return "#000000";
+  return "#" + m.slice(0,3).map(n=>(+n).toString(16).padStart(2,"0")).join("");
+}
+function applyStyleToSelection(){
+  const el = selection || (pathModel && pathModel.el);
+  if(!el) return;
+  pushUndo();
+  const fillOn = document.getElementById("fill-on").checked;
+  const strokeOn = document.getElementById("stroke-on").checked;
+  el.setAttribute("fill", fillOn ? document.getElementById("fill-color").value : "none");
+  if(strokeOn){
+    el.setAttribute("stroke", document.getElementById("stroke-color").value);
+    el.setAttribute("stroke-width", document.getElementById("stroke-width").value);
+  } else {
+    el.setAttribute("stroke", "none");
+  }
+}
+
+function defaultStyleAttrs(elemForFill){
+  const fillOn = document.getElementById("fill-on").checked;
+  const strokeOn = document.getElementById("stroke-on").checked;
+  const attrs = {};
+  attrs.fill = fillOn ? document.getElementById("fill-color").value : "none";
+  attrs.stroke = strokeOn ? document.getElementById("stroke-color").value : "none";
+  if(strokeOn) attrs["stroke-width"] = document.getElementById("stroke-width").value;
+  return attrs;
+}
+
+// =====================================================================
+// OVERLAY RENDERING
+// =====================================================================
+function ovEl(tag, attrs, cls){
+  const e = document.createElementNS(SVGNS, tag);
+  if(cls) e.setAttribute("class", cls);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function clearOverlay(){ while(overlayGroup.firstChild) overlayGroup.removeChild(overlayGroup.firstChild); }
+
+function renderOverlay(){
+  clearOverlay();
+  const scale = screenScale() || 1;
+  const aR = HANDLE_PX / scale, cR = CTRL_PX / scale;
+
+  if(tool === "select"){
+    selected.forEach(drawBBox);
+  }
+  if(tool === "node" && pathModel){
+    drawNodeEditor(aR, cR);
+  }
+}
+
+function drawBBox(el){
+  let bb; try { bb = el.getBBox(); } catch(e){ return; }
+  const m = el.getCTM();
+  const corners = [[bb.x,bb.y],[bb.x+bb.width,bb.y],[bb.x+bb.width,bb.y+bb.height],[bb.x,bb.y+bb.height]]
+    .map(([x,y]) => { const p = stage.createSVGPoint(); p.x=x; p.y=y; const u = m?p.matrixTransform(m):{x,y}; return u; });
+  const xs = corners.map(c=>c.x), ys = corners.map(c=>c.y);
+  const minx=Math.min(...xs), miny=Math.min(...ys), maxx=Math.max(...xs), maxy=Math.max(...ys);
+  overlayGroup.appendChild(ovEl("rect", { x:minx, y:miny, width:maxx-minx, height:maxy-miny }, "ov-bbox"));
+}
+
+function drawNodeEditor(aR, cR){
+  const el = pathModel.el;
+  pathModel.subs.forEach((sub, si) => {
+    sub.nodes.forEach((nd, ni) => {
+      const a = toUserFromLocal(el, { x:nd.x, y:nd.y });
+      // handle lines + control dots
+      if(nd.hasIn){
+        const h = toUserFromLocal(el, { x:nd.inX, y:nd.inY });
+        overlayGroup.appendChild(ovEl("line", { x1:a.x, y1:a.y, x2:h.x, y2:h.y }, "ov-handle-line"));
+        const c = ovEl("circle", { cx:h.x, cy:h.y, r:cR }, "ov-ctrl");
+        c.dataset.kind = "in"; c.dataset.si = si; c.dataset.ni = ni;
+        overlayGroup.appendChild(c);
+      }
+      if(nd.hasOut){
+        const h = toUserFromLocal(el, { x:nd.outX, y:nd.outY });
+        overlayGroup.appendChild(ovEl("line", { x1:a.x, y1:a.y, x2:h.x, y2:h.y }, "ov-handle-line"));
+        const c = ovEl("circle", { cx:h.x, cy:h.y, r:cR }, "ov-ctrl");
+        c.dataset.kind = "out"; c.dataset.si = si; c.dataset.ni = ni;
+        overlayGroup.appendChild(c);
+      }
+      // anchor square
+      const sel = selectedNode && selectedNode.si === si && selectedNode.ni === ni;
+      const r = ovEl("rect", { x:a.x-aR, y:a.y-aR, width:aR*2, height:aR*2 }, "ov-anchor" + (sel?" sel":""));
+      r.dataset.kind = "anchor"; r.dataset.si = si; r.dataset.ni = ni;
+      overlayGroup.appendChild(r);
+    });
+  });
+}
+
+// =====================================================================
+// BEZIER GEOMETRY
+// =====================================================================
+const lerp = (a,b,t) => ({ x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t });
+function cubicAt(p0,p1,p2,p3,t){
+  const u=1-t;
+  const x = u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x;
+  const y = u*u*u*p0.y + 3*u*u*t*p1.y + 3*u*t*t*p2.y + t*t*t*p3.y;
+  return { x, y };
+}
+
+// find nearest segment+t to a local-space point, across all subpaths
+function nearestSegment(localPt){
+  let best = null;
+  pathModel.subs.forEach((sub, si) => {
+    const N = sub.nodes.length;
+    const pairs = [];
+    for(let k=1;k<N;k++) pairs.push([k-1,k,false]);
+    if(sub.closed && N>1) pairs.push([N-1,0,true]);
+    for(const [ai,bi,closing] of pairs){
+      const a = sub.nodes[ai], b = sub.nodes[bi];
+      const isCurve = closing ? sub.closeSeg==="C" : b.seg==="C";
+      const p0 = {x:a.x,y:a.y};
+      const p3 = {x:b.x,y:b.y};
+      const p1 = (isCurve && a.hasOut) ? {x:a.outX,y:a.outY} : p0;
+      const p2 = (isCurve && b.hasIn) ? {x:b.inX,y:b.inY} : p3;
+      const STEPS = 24;
+      for(let s=0;s<=STEPS;s++){
+        const t = s/STEPS;
+        const pt = isCurve ? cubicAt(p0,p1,p2,p3,t) : lerp(p0,p3,t);
+        const d = Math.hypot(pt.x-localPt.x, pt.y-localPt.y);
+        if(!best || d < best.d) best = { d, si, ai, bi, t, isCurve, closing };
+      }
+    }
+  });
+  return best;
+}
+
+function insertNodeAt(hit){
+  const sub = pathModel.subs[hit.si];
+  const a = sub.nodes[hit.ai], b = sub.nodes[hit.bi], t = hit.t;
+  pushUndo();
+  if(hit.isCurve){
+    const p0={x:a.x,y:a.y}, p3={x:b.x,y:b.y};
+    const p1 = a.hasOut?{x:a.outX,y:a.outY}:p0;
+    const p2 = b.hasIn?{x:b.inX,y:b.inY}:p3;
+    const p01=lerp(p0,p1,t), p12=lerp(p1,p2,t), p23=lerp(p2,p3,t);
+    const p012=lerp(p01,p12,t), p123=lerp(p12,p23,t);
+    const mid=lerp(p012,p123,t);
+    a.hasOut=true; a.outX=p01.x; a.outY=p01.y;
+    b.hasIn=true; b.inX=p23.x; b.inY=p23.y;
+    const node={ x:mid.x, y:mid.y, hasIn:true, inX:p012.x, inY:p012.y, hasOut:true, outX:p123.x, outY:p123.y, seg:"C" };
+    if(hit.closing) sub.nodes.push(node);
+    else sub.nodes.splice(hit.bi, 0, node);
+  } else {
+    const mid=lerp({x:a.x,y:a.y},{x:b.x,y:b.y},t);
+    const node={ x:mid.x, y:mid.y, hasIn:false, inX:0, inY:0, hasOut:false, outX:0, outY:0, seg:"L" };
+    if(hit.closing) sub.nodes.push(node);
+    else sub.nodes.splice(hit.bi, 0, node);
+  }
+  commitPathModel(); renderOverlay(); setStatus("Node added.");
+}
+
+function deleteSelectedNode(){
+  if(!pathModel || !selectedNode) return;
+  const sub = pathModel.subs[selectedNode.si];
+  if(sub.nodes.length <= 2){ setStatus("Can't delete — path too small."); return; }
+  pushUndo();
+  const ni = selectedNode.ni;
+  sub.nodes.splice(ni, 1);
+  if(ni === 0){ // promote new first node
+    const f = sub.nodes[0]; f.seg = "M"; f.hasIn = false;
+  }
+  selectedNode = null;
+  commitPathModel(); renderOverlay(); setStatus("Node deleted.");
+}
+
+function setSelectedNodeType(type){
+  if(!pathModel || !selectedNode) return;
+  const nd = pathModel.subs[selectedNode.si].nodes[selectedNode.ni];
+  pushUndo();
+  if(type === "corner"){
+    // keep handles independent (no change needed beyond marking); nothing to recompute
+    setStatus("Corner node.");
+  } else if(type === "smooth"){
+    // make in/out collinear & equal length (average)
+    if(nd.hasIn && nd.hasOut){
+      const inV = { x:nd.inX-nd.x, y:nd.inY-nd.y };
+      const outV = { x:nd.outX-nd.x, y:nd.outY-nd.y };
+      const len = (Math.hypot(inV.x,inV.y) + Math.hypot(outV.x,outV.y)) / 2;
+      // direction: average of (in reversed) and out
+      let dx = (-inV.x + outV.x), dy = (-inV.y + outV.y);
+      const dl = Math.hypot(dx,dy) || 1; dx/=dl; dy/=dl;
+      nd.outX = nd.x + dx*len; nd.outY = nd.y + dy*len;
+      nd.inX  = nd.x - dx*len; nd.inY  = nd.y - dy*len;
+    }
+    setStatus("Smooth node.");
+  }
+  commitPathModel(); renderOverlay();
+}
+
+// =====================================================================
+// POINTER INTERACTION
+// =====================================================================
+let drag = null;       // active drag descriptor
+let spaceDown = false;
+
+stage.addEventListener("mousedown", onDown);
+window.addEventListener("mousemove", onMove);
+window.addEventListener("mouseup", onUp);
+stage.addEventListener("dblclick", onDblClick);
+stage.addEventListener("wheel", onWheel, { passive:false });
+stage.addEventListener("contextmenu", e => { if(tool==="pen" && penState){ e.preventDefault(); finishPen(true); } });
+
+function onDown(e){
+  if(e.button === 1 || (e.button === 0 && spaceDown)){ // pan
+    drag = { type:"pan", sx:e.clientX, sy:e.clientY, ox:view.x, oy:view.y };
+    stage.classList.add("panning");
+    e.preventDefault(); return;
+  }
+  if(e.button !== 0) return;
+  const u = evtUser(e);
+
+  if(tool === "select"){
+    if(isContentEl(e.target)){
+      const tgt = e.target;
+      if(e.shiftKey){ toggleSelection(tgt); renderOverlay(); return; }
+      if(!selected.includes(tgt)) selectElement(tgt);
+      pushUndo();
+      drag = { type:"move", start:u, moved:false,
+               items: selected.map(el => ({ el, orig: el.getAttribute("transform") || "" })) };
+    } else {
+      if(!e.shiftKey) clearSelection();
+      drag = { type:"marquee", start:u, cur:u, additive:e.shiftKey, preview:null };
+    }
+    renderOverlay(); return;
+  }
+
+  if(tool === "node"){
+    const t = e.target;
+    if(t.dataset && t.dataset.kind){
+      const si=+t.dataset.si, ni=+t.dataset.ni, kind=t.dataset.kind;
+      if(kind === "anchor"){ selectedNode = { si, ni }; }
+      pushUndo();
+      drag = { type:"node", kind, si, ni, start:u, node: pathModel.subs[si].nodes[ni] };
+      // snapshot original local positions
+      const nd = drag.node;
+      drag.o = { x:nd.x, y:nd.y, inX:nd.inX, inY:nd.inY, outX:nd.outX, outY:nd.outY };
+      drag.startLocal = toLocal(pathModel.el, u);
+      renderOverlay(); return;
+    }
+    if(isContentEl(t) && t.tagName.toLowerCase() === "path"){
+      enterNodeEdit(t); renderOverlay(); return;
+    }
+    // clicked empty: keep model but deselect node
+    selectedNode = null; renderOverlay(); return;
+  }
+
+  if(tool === "pen"){ penDown(e, u); return; }
+
+  if(tool === "rect" || tool === "ellipse"){
+    drag = { type:"shape", shape:tool, start:u, preview:null };
+    return;
+  }
+}
+
+function onMove(e){
+  if(!drag) return;
+  if(drag.type === "pan"){
+    const k = view.w / stage.clientWidth;
+    view.x = drag.ox - (e.clientX - drag.sx) * k;
+    view.y = drag.oy - (e.clientY - drag.sy) * k;
+    applyView(); renderOverlay(); return;
+  }
+  const u = evtUser(e);
+
+  if(drag.type === "move"){
+    const dx = u.x - drag.start.x, dy = u.y - drag.start.y;
+    for(const it of drag.items){
+      it.el.setAttribute("transform", `translate(${fmt(dx)} ${fmt(dy)}) ${it.orig}`.trim());
+    }
+    drag.moved = true;
+    renderOverlay(); return;
+  }
+
+  if(drag.type === "marquee"){
+    if(!drag.preview){ drag.preview = ovEl("rect", {}, "ov-marquee"); overlayGroup.appendChild(drag.preview); }
+    const x = Math.min(u.x, drag.start.x), y = Math.min(u.y, drag.start.y);
+    const w = Math.abs(u.x - drag.start.x), h = Math.abs(u.y - drag.start.y);
+    drag.preview.setAttribute("x", x); drag.preview.setAttribute("y", y);
+    drag.preview.setAttribute("width", w); drag.preview.setAttribute("height", h);
+    drag.cur = u; return;
+  }
+
+  if(drag.type === "node"){
+    const loc = toLocal(pathModel.el, u);
+    const dx = loc.x - drag.startLocal.x, dy = loc.y - drag.startLocal.y;
+    const nd = drag.node;
+    if(drag.kind === "anchor"){
+      nd.x = drag.o.x + dx; nd.y = drag.o.y + dy;
+      if(nd.hasIn){ nd.inX = drag.o.inX + dx; nd.inY = drag.o.inY + dy; }
+      if(nd.hasOut){ nd.outX = drag.o.outX + dx; nd.outY = drag.o.outY + dy; }
+    } else if(drag.kind === "in"){
+      nd.inX = drag.o.inX + dx; nd.inY = drag.o.inY + dy;
+    } else if(drag.kind === "out"){
+      nd.outX = drag.o.outX + dx; nd.outY = drag.o.outY + dy;
+    }
+    commitPathModel(); renderOverlay(); return;
+  }
+
+  if(drag.type === "shape"){
+    if(!drag.preview){
+      drag.preview = ovEl(drag.shape === "rect" ? "rect" : "ellipse", {}, "ov-shape-preview");
+      overlayGroup.appendChild(drag.preview);
+    }
+    const x = Math.min(u.x, drag.start.x), y = Math.min(u.y, drag.start.y);
+    const w = Math.abs(u.x - drag.start.x), h = Math.abs(u.y - drag.start.y);
+    if(drag.shape === "rect"){
+      drag.preview.setAttribute("x", x); drag.preview.setAttribute("y", y);
+      drag.preview.setAttribute("width", w); drag.preview.setAttribute("height", h);
+    } else {
+      drag.preview.setAttribute("cx", x + w/2); drag.preview.setAttribute("cy", y + h/2);
+      drag.preview.setAttribute("rx", w/2); drag.preview.setAttribute("ry", h/2);
+    }
+    drag.cur = u; return;
+  }
+}
+
+function onUp(e){
+  if(!drag) return;
+  stage.classList.remove("panning");
+  if(drag.type === "move" && !drag.moved){ undoStack.pop(); } // no movement: discard snapshot
+  if(drag.type === "shape"){ finishShape(); }
+  if(drag.type === "marquee"){ finishMarquee(); }
+  drag = null;
+}
+
+function finishMarquee(){
+  if(drag.preview) drag.preview.remove();
+  const a = drag.start, b = drag.cur || drag.start;
+  const rx0 = Math.min(a.x,b.x), ry0 = Math.min(a.y,b.y), rx1 = Math.max(a.x,b.x), ry1 = Math.max(a.y,b.y);
+  if(rx1 - rx0 < 1 && ry1 - ry0 < 1){ updateSelCount(); return; } // a click, not a drag
+  if(!drag.additive) selected = [];
+  for(const el of contentGroup.children){
+    if(el.nodeType !== 1) continue;
+    const bb = visualBounds(el, false);
+    if(!bb) continue;
+    const hit = !(bb.maxX < rx0 || bb.minX > rx1 || bb.maxY < ry0 || bb.minY > ry1);
+    if(hit && !selected.includes(el)) selected.push(el);
+  }
+  selection = selected.length ? selected[selected.length-1] : null;
+  readStyleFromSelection(); updateSelCount(); renderOverlay();
+  setStatus(selected.length ? selected.length + " selected." : "Nothing in selection box.");
+}
+
+function finishShape(){
+  const u = drag.cur || drag.start;
+  const x = Math.min(u.x, drag.start.x), y = Math.min(u.y, drag.start.y);
+  const w = Math.abs(u.x - drag.start.x), h = Math.abs(u.y - drag.start.y);
+  if(drag.preview) drag.preview.remove();
+  if(w < 1 || h < 1) return;
+  pushUndo();
+  const attrs = defaultStyleAttrs();
+  let el;
+  if(drag.shape === "rect"){
+    el = document.createElementNS(SVGNS, "rect");
+    el.setAttribute("x", fmt(x)); el.setAttribute("y", fmt(y));
+    el.setAttribute("width", fmt(w)); el.setAttribute("height", fmt(h));
+  } else {
+    el = document.createElementNS(SVGNS, "ellipse");
+    el.setAttribute("cx", fmt(x+w/2)); el.setAttribute("cy", fmt(y+h/2));
+    el.setAttribute("rx", fmt(w/2)); el.setAttribute("ry", fmt(h/2));
+  }
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  contentGroup.appendChild(el);
+  setTool("select"); selectElement(el); renderOverlay();
+  setStatus(drag.shape + " created.");
+}
+
+function onDblClick(e){
+  if(tool === "node" && pathModel){
+    const loc = toLocal(pathModel.el, evtUser(e));
+    const hit = nearestSegment(loc);
+    if(hit){
+      const scale = screenScale() || 1;
+      if(hit.d * scale < 40) insertNodeAt(hit);
+    }
+  }
+}
+
+function onWheel(e){
+  e.preventDefault();
+  const u = evtUser(e);
+  const factor = e.deltaY < 0 ? 0.85 : 1/0.85;
+  view.w *= factor; view.h *= factor;
+  // keep cursor point stationary
+  view.x = u.x - (u.x - view.x) * factor;
+  view.y = u.y - (u.y - view.y) * factor;
+  applyView(); renderOverlay();
+}
+
+function enterNodeEdit(el){
+  pathModel = { el, subs: segsToSubpaths(parsePathD(el.getAttribute("d") || "")) };
+  selection = el; selected = [el]; selectedNode = null;
+  readStyleFromSelection(); updateSelCount();
+}
+
+// =====================================================================
+// PEN TOOL
+// =====================================================================
+let penState = null;  // { subs:[{closed,nodes}], el, dragging }
+function penDown(e, u){
+  if(!penState){
+    penState = { sub: { closed:false, closeSeg:"L", nodes:[] }, preview:null };
+  }
+  const nodes = penState.sub.nodes;
+  // close if clicking near first node
+  if(nodes.length > 1){
+    const first = nodes[0];
+    const fp = first; const scale = screenScale() || 1;
+    if(Math.hypot(u.x - fp.x, u.y - fp.y) * scale < HIT_PX*1.5){
+      penState.sub.closed = true;
+      finishPen(false);
+      return;
+    }
+  }
+  const node = { x:u.x, y:u.y, hasIn:false, inX:0, inY:0, hasOut:false, outX:0, outY:0, seg: nodes.length===0?"M":"C" };
+  nodes.push(node);
+  penState.dragNode = node;
+  drag = { type:"pen", node, anchor:{x:u.x,y:u.y} };
+  drawPenPreview(u);
+}
+function penMoveDrag(e){
+  if(!drag || drag.type !== "pen") return;
+  const u = evtUser(e);
+  const nd = drag.node;
+  nd.hasOut = true; nd.outX = u.x; nd.outY = u.y;
+  nd.hasIn = true; nd.inX = 2*drag.anchor.x - u.x; nd.inY = 2*drag.anchor.y - u.y;
+  drawPenPreview(u);
+}
+function drawPenPreview(cursor){
+  if(!penState) return;
+  if(penState.preview) penState.preview.remove();
+  let d = subToD(penState.sub);
+  // rubber-band to cursor from last node
+  const nodes = penState.sub.nodes;
+  if(nodes.length && cursor){
+    const last = nodes[nodes.length-1];
+    if(last.hasOut) d += ` C ${fmt(last.outX)} ${fmt(last.outY)} ${fmt(cursor.x)} ${fmt(cursor.y)} ${fmt(cursor.x)} ${fmt(cursor.y)}`;
+    else d += ` L ${fmt(cursor.x)} ${fmt(cursor.y)}`;
+  }
+  penState.preview = ovEl("path", { d }, "ov-pen-preview");
+  overlayGroup.appendChild(penState.preview);
+}
+function finishPen(cancel){
+  if(!penState){ return; }
+  const sub = penState.sub;
+  if(penState.preview) penState.preview.remove();
+  const valid = sub.nodes.length >= 2;
+  penState = null; drag = null;
+  if(cancel || !valid){ setStatus("Pen cancelled."); renderOverlay(); return; }
+  pushUndo();
+  const el = document.createElementNS(SVGNS, "path");
+  el.setAttribute("d", subsToD([sub]));
+  const attrs = defaultStyleAttrs();
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  contentGroup.appendChild(el);
+  setTool("select"); selectElement(el); renderOverlay();
+  setStatus("Path created.");
+}
+// route pen drag through global move
+window.addEventListener("mousemove", e => { if(tool==="pen" && drag && drag.type==="pen") penMoveDrag(e); });
+window.addEventListener("mousemove", e => { if(tool==="pen" && penState && !(drag&&drag.type==="pen")) drawPenPreview(evtUser(e)); });
+window.addEventListener("mouseup", e => { if(tool==="pen" && drag && drag.type==="pen"){ drag=null; } });
+
+// =====================================================================
+// TOOLS
+// =====================================================================
+function setTool(name){
+  if(penState && name !== "pen") finishPen(true);
+  tool = name;
+  document.querySelectorAll(".tool").forEach(t => t.classList.toggle("active", t.dataset.tool === name));
+  stage.className = ""; stage.classList.add("tool-" + name);
+  if(name !== "node") pathModel = null;
+  if(name !== "select") selection = selection; // keep
+  updateHint(); renderOverlay();
+}
+document.getElementById("tools").addEventListener("click", e => {
+  const t = e.target.closest(".tool"); if(t) setTool(t.dataset.tool);
+});
+
+// =====================================================================
+// LOAD / SAVE / NEW
+// =====================================================================
+function sanitizeSVG(root){
+  root.querySelectorAll("script").forEach(n => n.remove());
+  const all = root.querySelectorAll("*");
+  all.forEach(el => {
+    [...el.attributes].forEach(a => {
+      const n = a.name.toLowerCase();
+      if(n.startsWith("on")) el.removeAttribute(a.name);
+      if((n === "href" || n === "xlink:href") && /^\s*javascript:/i.test(a.value)) el.removeAttribute(a.name);
+    });
+  });
+}
+function loadSVGText(text, name){
+  const parsed = new DOMParser().parseFromString(text, "image/svg+xml");
+  const err = parsed.querySelector("parsererror");
+  if(err){ setStatus("Parse error — not a valid SVG."); return; }
+  const root = parsed.querySelector("svg");
+  if(!root){ setStatus("No <svg> root found."); return; }
+  sanitizeSVG(root);
+  buildLayers();
+  // metadata
+  let vb = root.getAttribute("viewBox");
+  const w = root.getAttribute("width"), h = root.getAttribute("height");
+  // import children
+  [...root.childNodes].forEach(n => {
+    if(n.nodeType === 1) contentGroup.appendChild(document.importNode(n, true));
+  });
+  if(!vb){
+    const nw = parseFloat(w) || 0, nh = parseFloat(h) || 0;
+    if(nw && nh) vb = `0 0 ${nw} ${nh}`;
+    else { const bb = contentGroup.getBBox(); vb = `${bb.x} ${bb.y} ${bb.width} ${bb.height}`; }
+  }
+  doc.viewBox = vb;
+  doc.width = w || vb.split(/\s+/)[2];
+  doc.height = h || vb.split(/\s+/)[3];
+  const p = vb.split(/[\s,]+/).map(Number);
+  view = { x:p[0], y:p[1], w:p[2], h:p[3] };
+  applyView();
+  undoStack.length = 0; redoStack.length = 0;
+  clearSelection(); renderOverlay();
+  elFilename.textContent = name || "untitled.svg";
+  setStatus("Loaded " + (name||"") + " — " + contentGroup.children.length + " top-level objects.");
+}
+function saveSVG(){
+  const out = document.createElementNS(SVGNS, "svg");
+  out.setAttribute("xmlns", SVGNS);
+  out.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  if(doc.viewBox) out.setAttribute("viewBox", doc.viewBox);
+  if(doc.width) out.setAttribute("width", doc.width);
+  if(doc.height) out.setAttribute("height", doc.height);
+  [...contentGroup.children].forEach(c => out.appendChild(c.cloneNode(true)));
+  const body = new XMLSerializer().serializeToString(out);
+  const text = '<?xml version="1.0" encoding="UTF-8"?>\n' + body + "\n";
+  const blob = new Blob([text], { type:"image/svg+xml" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = elFilename.textContent || "untitled.svg";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  setStatus("Saved " + a.download + ".");
+}
+function newDoc(){
+  buildLayers();
+  doc = { viewBox:"0 0 800 600", width:"800", height:"600" };
+  view = { x:0, y:0, w:800, h:600 };
+  applyView();
+  undoStack.length = 0; redoStack.length = 0;
+  clearSelection(); renderOverlay();
+  elFilename.textContent = "untitled.svg";
+  setStatus("New document (800×600).");
+}
+
+// =====================================================================
+// FIT / ZOOM
+// =====================================================================
+function fitView(){
+  let bb;
+  try { bb = contentGroup.getBBox(); } catch(e){ bb = null; }
+  if(!bb || bb.width === 0 || bb.height === 0){
+    const p = doc.viewBox.split(/[\s,]+/).map(Number);
+    view = { x:p[0], y:p[1], w:p[2], h:p[3] };
+  } else {
+    const pad = Math.max(bb.width, bb.height) * 0.08 + 4;
+    view = { x:bb.x-pad, y:bb.y-pad, w:bb.width+2*pad, h:bb.height+2*pad };
+  }
+  applyView(); renderOverlay();
+}
+function zoomBy(f){
+  const cx = view.x + view.w/2, cy = view.y + view.h/2;
+  view.w *= f; view.h *= f;
+  view.x = cx - view.w/2; view.y = cy - view.h/2;
+  applyView(); renderOverlay();
+}
+
+// =====================================================================
+// WIRE UP CONTROLS
+// =====================================================================
+document.getElementById("btn-new").onclick = () => { if(confirm("Discard current document?")) newDoc(); };
+document.getElementById("btn-open").onclick = () => fileInput.click();
+document.getElementById("btn-save").onclick = saveSVG;
+document.getElementById("btn-undo").onclick = undo;
+document.getElementById("btn-redo").onclick = redo;
+document.getElementById("btn-fit").onclick = fitView;
+document.getElementById("btn-delete").onclick = deleteSelection;
+document.getElementById("zoom-in").onclick = () => zoomBy(0.8);
+document.getElementById("zoom-out").onclick = () => zoomBy(1.25);
+document.getElementById("zoom-fit").onclick = fitView;
+document.getElementById("node-delete").onclick = deleteSelectedNode;
+document.getElementById("node-corner").onclick = () => setSelectedNodeType("corner");
+document.getElementById("node-smooth").onclick = () => setSelectedNodeType("smooth");
+function readGap(){ const v = parseFloat(document.getElementById("distribute-gap").value); return isNaN(v) ? 0 : v; }
+function readIncludeStroke(){ return document.getElementById("distribute-stroke").checked; }
+document.getElementById("dist-h").onclick = () => distribute("h", readGap(), readIncludeStroke());
+document.getElementById("dist-v").onclick = () => distribute("v", readGap(), readIncludeStroke());
+
+["fill-on","stroke-on","fill-color","stroke-color","stroke-width"].forEach(id => {
+  document.getElementById(id).addEventListener("change", applyStyleToSelection);
+});
+
+fileInput.addEventListener("change", e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => loadSVGText(r.result, f.name);
+  r.readAsText(f);
+  fileInput.value = "";
+});
+
+function deleteSelection(){
+  if(tool === "node" && selectedNode){ deleteSelectedNode(); return; }
+  if(selected.length){
+    const n = selected.length;
+    pushUndo(); selected.forEach(el => el.remove()); clearSelection(); renderOverlay();
+    setStatus("Deleted " + n + (n === 1 ? " object." : " objects."));
+  }
+}
+
+// keyboard
+window.addEventListener("keydown", e => {
+  if(e.target.tagName === "INPUT") return;
+  if(e.code === "Space"){ spaceDown = true; if(!drag) stage.style.cursor = "grab"; }
+  const ctrl = e.ctrlKey || e.metaKey;
+  if(ctrl && e.key.toLowerCase() === "z"){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if(ctrl && e.key.toLowerCase() === "y"){ e.preventDefault(); redo(); return; }
+  if(ctrl && e.key.toLowerCase() === "s"){ e.preventDefault(); saveSVG(); return; }
+  if(ctrl && e.key.toLowerCase() === "a"){ e.preventDefault(); setTool("select"); selectAll(); renderOverlay(); return; }
+  if(ctrl) return;
+  switch(e.key){
+    case "h": distribute("h", readGap(), readIncludeStroke()); break;
+    case "H": distribute("v", readGap(), readIncludeStroke()); break;
+    case "v": case "V": setTool("select"); break;
+    case "n": case "N": setTool("node"); break;
+    case "p": case "P": setTool("pen"); break;
+    case "r": case "R": setTool("rect"); break;
+    case "e": case "E": setTool("ellipse"); break;
+    case "Delete": case "Backspace": e.preventDefault(); deleteSelection(); break;
+    case "Enter": if(penState) finishPen(false); break;
+    case "Escape": if(penState) finishPen(true); else { clearSelection(); renderOverlay(); } break;
+    case "0": fitView(); break;
+    case "+": case "=": zoomBy(0.8); break;
+    case "-": case "_": zoomBy(1.25); break;
+  }
+});
+window.addEventListener("keyup", e => {
+  if(e.code === "Space"){ spaceDown = false; stage.style.cursor = ""; }
+});
+window.addEventListener("resize", () => { applyView(); renderOverlay(); });
+
+// =====================================================================
+// SAMPLE CONTENT (so the editor is immediately usable / testable)
+// =====================================================================
+function loadSample(){
+  buildLayers();
+  doc = { viewBox:"0 0 800 600", width:"800", height:"600" };
+  view = { x:0, y:0, w:800, h:600 };
+  applyView();
+  const p = document.createElementNS(SVGNS, "path");
+  p.setAttribute("d", "M 150 400 C 150 200 350 200 400 350 C 450 500 650 480 650 300");
+  p.setAttribute("fill", "none"); p.setAttribute("stroke", "#6ea8fe"); p.setAttribute("stroke-width", "6");
+  contentGroup.appendChild(p);
+  const blob = document.createElementNS(SVGNS, "path");
+  blob.setAttribute("d", "M 250 150 C 320 100 420 120 430 200 C 440 280 360 320 290 290 C 220 260 180 200 250 150 Z");
+  blob.setAttribute("fill", "#ffb454"); blob.setAttribute("stroke", "#10131a"); blob.setAttribute("stroke-width", "2");
+  contentGroup.appendChild(blob);
+  const r = document.createElementNS(SVGNS, "rect");
+  r.setAttribute("x","520"); r.setAttribute("y","120"); r.setAttribute("width","160"); r.setAttribute("height","110");
+  r.setAttribute("rx","12"); r.setAttribute("fill","#7ee787"); r.setAttribute("stroke","#10131a"); r.setAttribute("stroke-width","2");
+  contentGroup.appendChild(r);
+  clearSelection(); renderOverlay();
+  setStatus("Sample document — switch to the Node tool (N) and drag a path's handles. Open… to load your own SVG.");
+}
+
+// boot
+loadSample();
+setTool("select");
+updateHint();
+</script>
+</body>
+</html>
