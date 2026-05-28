@@ -1532,8 +1532,8 @@ function setSAxis(){
   ax.setAttribute("x2", fmt(p2.x)); ax.setAttribute("y2", fmt(p2.y));
   ax.setAttribute("fill", "none");
   ax.setAttribute("stroke", "#6ea8fe"); ax.setAttribute("stroke-width", "1");
-  ax.setAttribute("stroke-opacity", "0.4"); ax.setAttribute("stroke-dasharray", "6 4");
-  contentGroup.insertBefore(ax, contentGroup.firstChild);   // behind the strings
+  ax.setAttribute("stroke-opacity", "0.55"); ax.setAttribute("stroke-dasharray", "6 4");
+  contentGroup.appendChild(ax);   // on top, so it's visible over the background and strings
   renderOverlay();
   setStatus("S axis set — faint dashed line through the string centers along the spacing axis. It rotates with the strings.");
 }
