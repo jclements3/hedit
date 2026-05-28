@@ -134,6 +134,17 @@ document is `strings.svg`. The **Strings (harp)** panel section drives this:
 Headless verification of all of the above is in `test-hedit.sh` (and the ad-hoc
 harnesses it inspired); run it after any change to the strings logic.
 
+## Save / Open
+
+`serializeDoc()` builds the SVG text (embedded harp metadata, S axis, +X/+Z frame, all
+included). **Open…** (`openFile`) uses `showOpenFilePicker` and keeps the returned
+`fileHandle`. **Save** (`saveSVG`, Ctrl+S) writes back *in place* to that handle
+(`ensureWritable` requests `readwrite` permission, needs a user gesture); with no handle
+it falls back to **Save As** (`saveAs`, Ctrl+Shift+S → `showSaveFilePicker`), and on
+browsers without the API (or `file://`) to a plain download (`downloadSVG`, lands in the
+browser's download folder). `<input>`/drag-drop opens give no writable handle, so they
+reset `fileHandle = null` (Save then behaves as Save As). `newDoc` clears it too.
+
 ## Persistence
 
 The working document is auto-saved to `localStorage` (`hedit:autosave:svg`/`:name`) so a
