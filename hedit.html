@@ -106,7 +106,8 @@
   <div class="title">h<span>edit</span></div>
   <button id="btn-new" title="New document">New</button>
   <button id="btn-open" title="Open an SVG file">Open…</button>
-  <button id="btn-save" title="Download SVG (Ctrl+S)">Save</button>
+  <button id="btn-save" title="Save in place to the opened file, else prompt (Ctrl+S)">Save</button>
+  <button id="btn-save-as" title="Save to a new file / location (Ctrl+Shift+S)">Save As…</button>
   <input type="file" id="file-input" accept=".svg,image/svg+xml" hidden>
   <span class="filename" id="filename">untitled.svg</span>
   <div class="spacer"></div>
@@ -1211,15 +1212,68 @@ function serializeDoc(){
   const body = new XMLSerializer().serializeToString(out);
   return '<?xml version="1.0" encoding="UTF-8"?>\n' + body + "\n";
 }
-function saveSVG(){
-  const text = serializeDoc();
+// the file we opened/saved via the File System Access API; null = no in-place target
+let fileHandle = null;
+const FILE_TYPES = [{ description:"SVG image", accept:{ "image/svg+xml":[".svg"] } }];
+
+async function ensureWritable(handle){
+  const opts = { mode:"readwrite" };
+  try {
+    if((await handle.queryPermission(opts)) === "granted") return true;
+    if((await handle.requestPermission(opts)) === "granted") return true;   // prompts (needs a user gesture)
+  } catch(e){}
+  return false;
+}
+async function writeHandle(handle, text){
+  const w = await handle.createWritable();
+  await w.write(new Blob([text], { type:"image/svg+xml" }));
+  await w.close();
+}
+function downloadSVG(text, name){
   const blob = new Blob([text], { type:"image/svg+xml" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = elFilename.textContent || "untitled.svg";
+  a.download = name || "untitled.svg";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  setStatus("Saved " + a.download + ".");
+}
+
+// Save: write back in place to the opened file if we have a handle; otherwise
+// prompt for a location (Save As) where supported, else fall back to download.
+async function saveSVG(){
+  const text = serializeDoc();
+  if(fileHandle){
+    try {
+      if(!(await ensureWritable(fileHandle))){ setStatus("Write permission denied — try Save As (Ctrl+Shift+S)."); return; }
+      await writeHandle(fileHandle, text);
+      setStatus("Saved in place to " + (fileHandle.name || elFilename.textContent) + ".");
+      return;
+    } catch(e){ setStatus("In-place save failed (" + e.message + ") — opening Save As."); }
+  }
+  if(window.showSaveFilePicker){ return saveAs(); }
+  downloadSVG(text, elFilename.textContent);
+  setStatus("Downloaded " + (elFilename.textContent || "untitled.svg") + " to your browser's download folder.");
+}
+
+// Save As: always prompt for a new location/name (and remember it for future Saves).
+async function saveAs(){
+  const text = serializeDoc();
+  if(window.showSaveFilePicker){
+    try {
+      const handle = await window.showSaveFilePicker({
+        id: "hedit-svg",   // shares the last-used folder with Open
+        suggestedName: elFilename.textContent || "untitled.svg",
+        types: FILE_TYPES,
+      });
+      await writeHandle(handle, text);
+      fileHandle = handle;
+      elFilename.textContent = handle.name;
+      setStatus("Saved as " + handle.name + " (future Saves write here).");
+      return;
+    } catch(e){ if(e && e.name === "AbortError") return; setStatus("Save As failed — downloading instead."); }
+  }
+  downloadSVG(text, elFilename.textContent);
+  setStatus("Downloaded " + (elFilename.textContent || "untitled.svg") + ".");
 }
 
 // =====================================================================
@@ -1259,6 +1313,7 @@ function newDoc(){
   harpAlignment = null;
   frameXZ = false; contentGroup.removeAttribute("transform"); syncFrameButton();
   clearAutosave();
+  fileHandle = null;
   elFilename.textContent = "untitled.svg";
   setStatus("New document (800×600).");
 }
@@ -1300,6 +1355,7 @@ function zoomBy(f){
 document.getElementById("btn-new").onclick = () => { if(confirm("Discard current document?")) newDoc(); };
 document.getElementById("btn-open").onclick = openFile;
 document.getElementById("btn-save").onclick = saveSVG;
+document.getElementById("btn-save-as").onclick = saveAs;
 document.getElementById("btn-undo").onclick = undo;
 document.getElementById("btn-redo").onclick = redo;
 document.getElementById("btn-fit").onclick = fitView;
@@ -1355,8 +1411,9 @@ async function openFile(){
         id: "hedit-svg",              // browser remembers a separate last folder for this id
         startIn: "documents",         // first-time default before any folder is remembered
         multiple: false,
-        types: [{ description:"SVG image", accept:{ "image/svg+xml":[".svg"] } }],
+        types: FILE_TYPES,
       });
+      fileHandle = handle;                 // remember it so Save writes back in place
       loadFile(await handle.getFile());
     }catch(e){
       if(e && e.name === "AbortError") return;   // user cancelled the dialog
@@ -1368,6 +1425,7 @@ async function openFile(){
 }
 
 fileInput.addEventListener("change", e => {
+  fileHandle = null;                       // <input>/drop give no writable handle -> Save = Save As
   loadFile(e.target.files[0]);
   fileInput.value = "";
 });
@@ -1391,6 +1449,7 @@ window.addEventListener("drop", e => e.preventDefault());
     const f = e.dataTransfer.files && e.dataTransfer.files[0];
     if(!f) return;
     if(!/\.svg$/i.test(f.name) && f.type !== "image/svg+xml"){ setStatus("Drop an .svg file to open it."); return; }
+    fileHandle = null;                     // dropped file has no writable handle -> Save = Save As
     loadFile(f);
   });
 })();
@@ -1411,7 +1470,7 @@ window.addEventListener("keydown", e => {
   const ctrl = e.ctrlKey || e.metaKey;
   if(ctrl && e.key.toLowerCase() === "z"){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if(ctrl && e.key.toLowerCase() === "y"){ e.preventDefault(); redo(); return; }
-  if(ctrl && e.key.toLowerCase() === "s"){ e.preventDefault(); saveSVG(); return; }
+  if(ctrl && e.key.toLowerCase() === "s"){ e.preventDefault(); e.shiftKey ? saveAs() : saveSVG(); return; }
   if(ctrl && e.key.toLowerCase() === "a"){ e.preventDefault(); setTool("select"); selectAll(); renderOverlay(); return; }
   if(ctrl) return;
   switch(e.key){
