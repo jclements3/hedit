@@ -42,9 +42,30 @@ function railModel(ch){
 
 // ---- strings from the SVG <line> elements ----
 function attr(tag, n){ const m = tag.match(new RegExp('\\b' + n + '="([^"]+)"')); return m ? m[1] : null; }
-function loadStrings(svgText){
+
+// ---- a hedit cubic-bezier path "d" ("M x y C x1 y1 x2 y2 x3 y3 C ...") -> Maker.js BezierCurve models (Y-up) ----
+function cubicPathToBeziers(d, H){
+  // grab the leading moveto, then each subsequent C (6 numbers) builds one cubic seg
+  const mm = d.match(/M\s*(-?[\d.eE+]+)[\s,]+(-?[\d.eE+]+)/);
+  if(!mm) return [];
+  let cx = +mm[1], cy = +mm[2];               // current point (svg y-down)
+  const segs = [];
+  const re = /C\s*(-?[\d.eE+]+)[\s,]+(-?[\d.eE+]+)[\s,]+(-?[\d.eE+]+)[\s,]+(-?[\d.eE+]+)[\s,]+(-?[\d.eE+]+)[\s,]+(-?[\d.eE+]+)/g;
+  let c;
+  while((c = re.exec(d)) !== null){
+    const x1=+c[1], y1=+c[2], x2=+c[3], y2=+c[4], x3=+c[5], y3=+c[6];
+    // flip every y to H - y so curves share the rails' Y-up frame
+    segs.push(new makerjs.models.BezierCurve([cx, H-cy], [x1, H-y1], [x2, H-y2], [x3, H-y3]));
+    cx = x3; cy = y3;
+  }
+  return segs;
+}
+function svgHeight(svgText){
   const vb = (attr(svgText, "viewBox") || "0 0 800 600").split(/[\s,]+/).map(Number);
-  const H = vb[3];
+  return vb[3];
+}
+function loadStrings(svgText){
+  const H = svgHeight(svgText);
   const lines = [];
   for(const m of svgText.matchAll(/<line\b[^>]*?\/?>/g)){
     const t = m[0];
@@ -55,6 +76,33 @@ function loadStrings(svgText){
     lines.push([[x1, H - y1], [x2, H - y2]]);
   }
   return lines;
+}
+
+// ---- hedit fitted curves: <path data-role="bottom-curve"|"top-curve" d="..."> ----
+function loadCurves(svgText, role){
+  const H = svgHeight(svgText);
+  for(const m of svgText.matchAll(/<path\b[^>]*?\/?>/g)){
+    const t = m[0];
+    if(!new RegExp('data-role="' + role + '"').test(t)) continue;
+    const d = attr(t, "d");
+    if(d) return cubicPathToBeziers(d, H);
+  }
+  return [];
+}
+
+// ---- hedit circles by data-role (pins / natural / sharp / midi) -> Maker.js Circles (Y-up) ----
+function loadCircles(svgText, role){
+  const H = svgHeight(svgText);
+  const circles = [];
+  for(const m of svgText.matchAll(/<circle\b[^>]*?\/?>/g)){
+    const t = m[0];
+    if(!new RegExp('data-role="' + role + '"').test(t)) continue;
+    const cx=+attr(t,"cx"), cy=+attr(t,"cy"), r=+attr(t,"r");
+    if([cx,cy,r].some(isNaN)) continue;
+    // SVG is y-down; flip cy to Y-up
+    circles.push(new makerjs.paths.Circle([cx, H - cy], r));
+  }
+  return circles;
 }
 
 function main(){
@@ -77,21 +125,60 @@ function main(){
     report.push("(no harp.json found at " + JSON_PATH + ")");
   }
 
-  // 2) strings from the SVG
+  // 2) strings + hedit-authored elements from the SVG
   if(fs.existsSync(SVG_PATH)){
-    const strs = loadStrings(fs.readFileSync(SVG_PATH, "utf8"));
+    const svgText = fs.readFileSync(SVG_PATH, "utf8");
+
+    // 2a) strings
+    const strs = loadStrings(svgText);
     if(strs.length){
       const m = { paths: {}, layer: "strings" };
       strs.forEach((s, i) => { m.paths["s" + i] = new makerjs.paths.Line(s[0], s[1]); });
       harp.models.strings = m;
       report.push(`strings: ${strs.length} lines`);
     }
+
+    // 2b) fitted curves: bottom-curve -> soundboard, top-curve -> neck
+    const curveDefs = [
+      { role: "bottom-curve", key: "bottomCurve", layer: "soundboard", label: "bottom curve" },
+      { role: "top-curve",    key: "topCurve",    layer: "neck",       label: "top curve" },
+    ];
+    curveDefs.forEach(cd => {
+      const segs = loadCurves(svgText, cd.role);
+      const m = { models: {}, layer: cd.layer };
+      segs.forEach((bz, i) => { m.models["c" + i] = bz; });
+      harp.models[cd.key] = m;
+      report.push(`${cd.label}: ${segs.length} segs`);
+    });
+
+    // 2c) pins
+    const pins = loadCircles(svgText, "pin");
+    const pm = { paths: {}, layer: "pins" };
+    pins.forEach((c, i) => { pm.paths["p" + i] = c; });
+    harp.models.pins = pm;
+    report.push(`pins: ${pins.length}`);
+
+    // 2d) sensor dots: natural / sharp / midi
+    const dotRoles = ["natural", "sharp", "midi"];
+    const dotCounts = {};
+    dotRoles.forEach(role => {
+      const dots = loadCircles(svgText, role);
+      const m = { paths: {}, layer: role };
+      dots.forEach((c, i) => { m.paths["d" + i] = c; });
+      harp.models[role] = m;
+      dotCounts[role] = dots.length;
+    });
+    report.push(`sensor dots: natural=${dotCounts.natural} sharp=${dotCounts.sharp} midi=${dotCounts.midi}`);
   }
 
   // 3) export
   const svgOpts = {
     units: makerjs.unitType.Millimeter,
-    layerOptions: { DP:{stroke:RAIL_COLOR.DP}, BP:{stroke:RAIL_COLOR.BP}, SP:{stroke:RAIL_COLOR.SP}, strings:{stroke:"#888"} },
+    layerOptions: {
+      DP:{stroke:RAIL_COLOR.DP}, BP:{stroke:RAIL_COLOR.BP}, SP:{stroke:RAIL_COLOR.SP}, strings:{stroke:"#888"},
+      soundboard:{stroke:"red"}, neck:{stroke:"blue"}, pins:{stroke:"#ffb454"},
+      natural:{stroke:"#e6261f"}, sharp:{stroke:"#3ad13a"}, midi:{stroke:"#2d7ff9"},
+    },
   };
   fs.writeFileSync(path.join(__dirname, "harp.svg"), makerjs.exporter.toSVG(harp, svgOpts));
   fs.writeFileSync(path.join(__dirname, "harp.dxf"), makerjs.exporter.toDXF(harp, { units: makerjs.unitType.Millimeter }));
