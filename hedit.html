@@ -269,6 +269,15 @@
         <button id="zoom-fit">Fit</button>
       </div>
       <div class="row" style="margin-top:6px"><label>Zoom</label><span id="zoom-label">100%</span></div>
+      <div class="row" style="margin-top:8px">
+        <label title="Editor canvas color (not saved in the SVG)">Canvas</label>
+        <input type="color" id="canvas-bg" value="#3a3d4d">
+      </div>
+      <div class="seg" style="margin-top:6px">
+        <button id="bg-checker" title="Transparency checkerboard">Checker</button>
+        <button id="bg-dark" title="Dark slate">Dark</button>
+        <button id="bg-paper" title="Soft paper">Paper</button>
+      </div>
     </div>
 
     <div>
@@ -1410,6 +1419,20 @@ document.getElementById("fit-bottoms-btn").onclick = () => {
   fitBottomsCurve(isNaN(v) ? 8 : Math.max(2, v));
 };
 document.getElementById("clear-curve-btn").onclick = clearBottomCurve;
+// ---- editor canvas background (view-only; persisted, not saved in the SVG) ----
+const CANVAS_BG_KEY = "hedit:canvasbg";
+const canvasWrap = document.querySelector(".canvas-wrap");
+function setCanvasBg(value){            // value = a CSS color, or "" to restore the checker
+  if(value){ canvasWrap.style.background = value; }
+  else { canvasWrap.style.background = ""; }   // fall back to the CSS checker
+  try { value ? localStorage.setItem(CANVAS_BG_KEY, value) : localStorage.removeItem(CANVAS_BG_KEY); } catch(e){}
+}
+document.getElementById("canvas-bg").addEventListener("input", e => setCanvasBg(e.target.value));
+document.getElementById("bg-checker").onclick = () => setCanvasBg("");
+document.getElementById("bg-dark").onclick = () => { const c="#1e1f26"; document.getElementById("canvas-bg").value=c; setCanvasBg(c); };
+document.getElementById("bg-paper").onclick = () => { const c="#f4f2ec"; document.getElementById("canvas-bg").value=c; setCanvasBg(c); };
+try { const saved = localStorage.getItem(CANVAS_BG_KEY); if(saved){ document.getElementById("canvas-bg").value = saved; setCanvasBg(saved); } } catch(e){}
+
 const jsonInput = document.getElementById("json-input");
 document.getElementById("harp-import-btn").onclick = () => jsonInput.click();
 document.getElementById("harp-export-btn").onclick = () => downloadText(exportHarpJSON(), "harp.json", "application/json");
