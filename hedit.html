@@ -1794,17 +1794,17 @@ function alignStringsToCurve(end){
 // --- spec table -----------------------------------------------------
 // each column maps a table cell to an attribute (or a derived value) on the line
 const STRING_COLS = [
-  { key:"num",  label:"#",     attr:"data-num",  type:"text",   w:"w-sm" },
-  { key:"note", label:"Note",  attr:"data-note", type:"text",   w:"w-sm" },
-  { key:"color",label:"Color", type:"color" },
-  { key:"dia",  label:"Dia",   type:"number" },   // -> data-dia + stroke-width
-  { key:"len",  label:"Len",   type:"number" },   // -> data-len + y2 (= y1 + len)
-  { key:"ten",  label:"Ten",   attr:"data-ten",  type:"number" },
-  { key:"core", label:"Core",  attr:"data-core", type:"text" },
-  { key:"wrap", label:"Wrap",  attr:"data-wrap", type:"text" },
-  { key:"cdia", label:"cdia",  attr:"data-cdia", type:"number", w:"w-sm" },
-  { key:"wdia", label:"wdia",  attr:"data-wdia", type:"number", w:"w-sm" },
-  { key:"x",    label:"X",     type:"number" },   // -> x1 + x2 (position)
+  { key:"num",  label:"#",     attr:"data-num",  type:"text",   w:"w-sm", tip:"String number" },
+  { key:"note", label:"Note",  attr:"data-note", type:"text",   w:"w-sm", tip:"Note name (e.g. c1)" },
+  { key:"color",label:"Color", type:"color", tip:"Stroke color" },
+  { key:"dia",  label:"Dia",   type:"number", tip:"Overall diameter (mm) - also sets the stroke width" },
+  { key:"len",  label:"Len",   type:"number", tip:"Speaking length (mm) - sets y2 = y1 + len" },
+  { key:"ten",  label:"Ten",   attr:"data-ten",  type:"number", tip:"Tension" },
+  { key:"core", label:"Core",  attr:"data-core", type:"text", tip:"Core material" },
+  { key:"wrap", label:"Wrap",  attr:"data-wrap", type:"text", tip:"Wrap material" },
+  { key:"cdia", label:"cdia",  attr:"data-cdia", type:"number", w:"w-sm", tip:"Core diameter (mm)" },
+  { key:"wdia", label:"wdia",  attr:"data-wdia", type:"number", w:"w-sm", tip:"Wrap diameter (mm)" },
+  { key:"x",    label:"X",     type:"number", tip:"Horizontal position (x1 = x2)" },   // -> x1 + x2 (position)
 ];
 let stringsEditDirty = false;   // one undo entry per table-editing session
 function markStringsDirty(){ if(!stringsEditDirty){ pushUndo(); stringsEditDirty = true; } }
@@ -1841,7 +1841,7 @@ function buildStringsTable(){
   const table = document.getElementById("strings-table");
   table.innerHTML = "";
   const head = document.createElement("tr");
-  head.innerHTML = "<th></th>" + STRING_COLS.map(c => `<th>${c.label}</th>`).join("");
+  head.innerHTML = "<th></th>" + STRING_COLS.map(c => `<th title="${c.tip || ""}">${c.label}</th>`).join("");
   table.appendChild(head);
   stringLines().forEach(el => {
     const tr = document.createElement("tr");
