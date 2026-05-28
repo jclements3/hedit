@@ -180,6 +180,13 @@
         <button id="align-curve-top" title="Align string TOP ends to a selected path/curve">Tops on curve</button>
         <button id="align-curve-bottom" title="Align string BOTTOM ends to a selected path/curve">Bottoms on curve</button>
       </div>
+      <div class="row" style="margin-top:8px">
+        <label title="Maximum number of on-curve nodes in the fitted curve (endpoints are pinned to the first/last string bottoms)">Fit max nodes</label>
+        <input type="number" id="fit-nodes" min="2" step="1" value="8">
+      </div>
+      <div class="seg" style="margin-top:6px">
+        <button id="fit-bottoms-btn" title="Fit a cubic-Bezier curve (Schneider) through the string bottom ends, capped at Max nodes with fixed endpoints. Draws it as a red reference path and selects it, ready for 'Bottoms on curve'.">Fit bottoms → curve</button>
+      </div>
       <div class="row" style="margin-top:8px"><label>Coordinate frame</label></div>
       <div class="seg">
         <button id="xz-btn" title="Put the whole harp in a right-handed +X/+Z frame: +X right, +Z up, Y into the page; origin at the bounding-box bottom-left, all coordinates positive. Renders upright (flip for display).">Orient +X/+Z (RH)</button>
@@ -1387,6 +1394,10 @@ document.getElementById("align-bottom").onclick = () => alignStrings("bottom");
 document.getElementById("align-curve-top").onclick = () => alignStringsToCurve("top");
 document.getElementById("align-curve-bottom").onclick = () => alignStringsToCurve("bottom");
 document.getElementById("xz-btn").onclick = orientXZ;
+document.getElementById("fit-bottoms-btn").onclick = () => {
+  const v = parseInt(document.getElementById("fit-nodes").value, 10);
+  fitBottomsCurve(isNaN(v) ? 8 : Math.max(2, v));
+};
 document.getElementById("strings-close").onclick = closeStringsTable;
 document.getElementById("strings-apply-gap").onclick = () => { parallelAirGapStrings(readStringGap()); buildStringsTable(); };
 // close the spec modal on backdrop click or Escape
@@ -1935,6 +1946,152 @@ function orientXZ(){
   }
   syncFrameButton();
   clearSelection(); pathModel = null; renderOverlay();
+}
+
+// =====================================================================
+// BEZIER CURVE FITTING  (Schneider 1990, ported from bezierfit.py)
+// Fits cubic Bezier segments through a polyline; fitCurveMaxNodes caps the
+// node count and pins the first/last anchors to the endpoints exactly.
+// Points are [x, y] arrays.
+// =====================================================================
+const Vec = {
+  sub:(a,b)=>[a[0]-b[0], a[1]-b[1]],
+  add:(a,b)=>[a[0]+b[0], a[1]+b[1]],
+  mul:(a,s)=>[a[0]*s, a[1]*s],
+  dot:(a,b)=>a[0]*b[0] + a[1]*b[1],
+  len:a=>Math.hypot(a[0], a[1]),
+  unit:a=>{ const n = Math.hypot(a[0],a[1]); return n === 0 ? a : [a[0]/n, a[1]/n]; },
+};
+const _b0 = u => (1-u)*(1-u)*(1-u);
+const _b1 = u => 3*u*(1-u)*(1-u);
+const _b2 = u => 3*u*u*(1-u);
+const _b3 = u => u*u*u;
+function _bq(c,u){ return Vec.add(Vec.add(Vec.mul(c[0],_b0(u)),Vec.mul(c[1],_b1(u))), Vec.add(Vec.mul(c[2],_b2(u)),Vec.mul(c[3],_b3(u)))); }
+function _bq1(c,u){ const t=1-u; return Vec.add(Vec.add(Vec.mul(Vec.sub(c[1],c[0]),3*t*t),Vec.mul(Vec.sub(c[2],c[1]),6*t*u)),Vec.mul(Vec.sub(c[3],c[2]),3*u*u)); }
+function _bq2(c,u){ return Vec.add(Vec.mul(Vec.add(Vec.sub(c[2],Vec.mul(c[1],2)),c[0]),6*(1-u)),Vec.mul(Vec.add(Vec.sub(c[3],Vec.mul(c[2],2)),c[1]),6*u)); }
+
+function fitCurve(points, error){
+  if(points.length < 2) return [];
+  const lt = Vec.unit(Vec.sub(points[1], points[0]));
+  const rt = Vec.unit(Vec.sub(points[points.length-2], points[points.length-1]));
+  return _fitCubic(points, lt, rt, error);
+}
+function _fitCubic(points, lt, rt, error){
+  if(points.length === 2){
+    const d = Vec.len(Vec.sub(points[0], points[1])) / 3;
+    return [[points[0], Vec.add(points[0],Vec.mul(lt,d)), Vec.add(points[1],Vec.mul(rt,d)), points[1]]];
+  }
+  let u = _chordParam(points);
+  let bez = _genBezier(points, u, lt, rt);
+  let [err, split] = _maxError(points, bez, u);
+  if(err < error) return [bez];
+  if(err < error*error){
+    for(let i=0;i<20;i++){
+      const up = u.map((uu,k)=>_newton(bez, points[k], uu));
+      bez = _genBezier(points, up, lt, rt);
+      [err, split] = _maxError(points, bez, up);
+      if(err < error) return [bez];
+      u = up;
+    }
+  }
+  const ct = _centerTangent(points, split);
+  return _fitCubic(points.slice(0,split+1), lt, ct, error)
+    .concat(_fitCubic(points.slice(split), Vec.mul(ct,-1), rt, error));
+}
+function _genBezier(points, params, lt, rt){
+  const n = points.length, first = points[0], last = points[n-1];
+  const A = params.map(u => [Vec.mul(lt,_b1(u)), Vec.mul(rt,_b2(u))]);
+  let C = [[0,0],[0,0]], X = [0,0];
+  for(let i=0;i<n;i++){
+    C[0][0]+=Vec.dot(A[i][0],A[i][0]); C[0][1]+=Vec.dot(A[i][0],A[i][1]);
+    C[1][0]=C[0][1];                   C[1][1]+=Vec.dot(A[i][1],A[i][1]);
+    const u = params[i];
+    const tmp = Vec.sub(points[i], Vec.add(Vec.add(Vec.mul(first,_b0(u)),Vec.mul(first,_b1(u))), Vec.add(Vec.mul(last,_b2(u)),Vec.mul(last,_b3(u)))));
+    X[0]+=Vec.dot(A[i][0],tmp); X[1]+=Vec.dot(A[i][1],tmp);
+  }
+  const detCC = C[0][0]*C[1][1]-C[1][0]*C[0][1];
+  const detCX = C[0][0]*X[1]-C[1][0]*X[0];
+  const detXC = X[0]*C[1][1]-X[1]*C[0][1];
+  const aL = detCC===0?0:detXC/detCC, aR = detCC===0?0:detCX/detCC;
+  const segLen = Vec.len(Vec.sub(first,last)), eps = 1e-6*segLen;
+  if(aL < eps || aR < eps)
+    return [first, Vec.add(first,Vec.mul(lt,segLen/3)), Vec.add(last,Vec.mul(rt,segLen/3)), last];
+  return [first, Vec.add(first,Vec.mul(lt,aL)), Vec.add(last,Vec.mul(rt,aR)), last];
+}
+function _newton(bez, point, u){
+  const d = Vec.sub(_bq(bez,u), point), qp = _bq1(bez,u), qpp = _bq2(bez,u);
+  const num = Vec.dot(d,qp), den = Vec.dot(qp,qp)+Vec.dot(d,qpp);
+  return Math.abs(den) < 1e-10 ? u : u - num/den;
+}
+function _chordParam(points){
+  const u = [0];
+  for(let i=1;i<points.length;i++) u.push(u[i-1] + Vec.len(Vec.sub(points[i],points[i-1])));
+  const total = u[u.length-1];
+  return total === 0 ? points.map(()=>0) : u.map(v=>v/total);
+}
+function _maxError(points, bez, params){
+  let max = 0, split = Math.floor(points.length/2);
+  for(let i=0;i<points.length;i++){
+    const dist = Vec.len(Vec.sub(_bq(bez,params[i]), points[i])) ** 2;
+    if(dist >= max){ max = dist; split = i; }
+  }
+  return [max, split];
+}
+function _centerTangent(points, c){
+  return Vec.unit(Vec.mul(Vec.add(Vec.sub(points[c-1],points[c]), Vec.sub(points[c],points[c+1])), 0.5));
+}
+// fit with at most `maxNodes` on-curve anchors; first/last anchors pinned exactly
+function fitCurveMaxNodes(points, maxNodes){
+  if(points.length < 2) return [];
+  const maxSegs = Math.max(1, (maxNodes|0) - 1);
+  let best = fitCurve(points, 1e-9);
+  if(best.length <= maxSegs) return _pinEnds(best, points);
+  let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  for(const p of points){ minx=Math.min(minx,p[0]);maxx=Math.max(maxx,p[0]);miny=Math.min(miny,p[1]);maxy=Math.max(maxy,p[1]); }
+  let hi = Math.max(Math.hypot(maxx-minx, maxy-miny), 1);
+  while(fitCurve(points, hi).length > maxSegs) hi *= 2;
+  best = fitCurve(points, hi);
+  let lo = 0;
+  for(let i=0;i<48;i++){
+    const mid = (lo+hi)/2, c = fitCurve(points, mid);
+    if(c.length <= maxSegs){ best = c; hi = mid; } else lo = mid;
+    if(hi - lo < 1e-3) break;
+  }
+  return _pinEnds(best, points);
+}
+function _pinEnds(curves, points){
+  if(curves.length){ curves[0][0] = points[0]; curves[curves.length-1][3] = points[points.length-1]; }
+  return curves;
+}
+
+// Fit a cubic-Bezier curve through the string BOTTOM ends and draw it as a
+// red reference <path data-role="bottom-curve"> (regenerated each call).
+// Select it + "Bottoms on curve" to align the strings to it.
+function fitBottomsCurve(maxNodes){
+  const strings = stringLines();
+  if(strings.length < 2){ setStatus("Need 2+ strings to fit a curve."); return; }
+  const flip = yIsFlipped();   // visual bottom = larger screen-y (= smaller stored y when flipped)
+  const pts = strings.map(el => {
+    const x1=+el.getAttribute("x1"), y1=+el.getAttribute("y1"), x2=+el.getAttribute("x2"), y2=+el.getAttribute("y2");
+    const lowerIsLargerY = !flip;
+    return lowerIsLargerY ? (y1 >= y2 ? [x1,y1] : [x2,y2]) : (y1 <= y2 ? [x1,y1] : [x2,y2]);
+  }).sort((a,b) => a[0]-b[0]);
+  pushUndo();
+  [...contentGroup.querySelectorAll('path[data-role="bottom-curve"]')].forEach(p => p.remove());
+  const curves = fitCurveMaxNodes(pts, maxNodes);
+  if(!curves.length){ setStatus("Could not fit a curve."); return; }
+  let d = "M " + fmt(curves[0][0][0]) + " " + fmt(curves[0][0][1]);
+  for(const c of curves)
+    d += " C " + fmt(c[1][0]) + " " + fmt(c[1][1]) + " " + fmt(c[2][0]) + " " + fmt(c[2][1]) + " " + fmt(c[3][0]) + " " + fmt(c[3][1]);
+  const path = document.createElementNS(SVGNS, "path");
+  path.setAttribute("data-role", "bottom-curve");
+  path.setAttribute("d", d);
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "#cc2222"); path.setAttribute("stroke-width", "1.5");
+  contentGroup.appendChild(path);
+  selectElement(path);   // selected so "Bottoms on curve" can align to it immediately
+  renderOverlay();
+  setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} string bottoms. Now click "Bottoms on curve" to align.`);
 }
 
 // =====================================================================

@@ -116,6 +116,12 @@ document is `strings.svg`. The **Strings (harp)** panel section drives this:
   swap via `yIsFlipped`, and move/draw/pen/fit go through these. Read flip params back
   from the transform *attribute* (`frameParams`), not `getCTM` (which can fold in the
   viewport scale).
+- **Fit bottoms → curve** (`fitBottomsCurve` / `fitCurveMaxNodes`) — Schneider's cubic
+  Bézier fitter (ported from `bezierfit.py`) run over the string bottom ends. Capped at a
+  "Fit max nodes" budget with the first/last anchors pinned to the first/last bottoms,
+  drawn as a red `<path data-role="bottom-curve">` and auto-selected so **Bottoms on
+  curve** can align to it immediately. The standalone `bezierfit.py` + `fit_bottoms.py`
+  remain for offline/CLI use; the JS port mirrors them.
 - **Select all strings** (`selectAllStrings`) — selects every `<line>` as a group.
 - **S axis** (`setSAxis` / `sAxisLines`) — a faint dashed `<line data-role="s-axis">`
   drawn through the string centers along the spacing direction (perpendicular to the
