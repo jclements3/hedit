@@ -57,10 +57,12 @@
   #stage.tool-rect,#stage.tool-ellipse{cursor:crosshair}
   #stage.panning{cursor:grabbing}
   .props{
-    flex:0 0 220px; background:var(--panel); border-left:1px solid var(--line);
+    flex:0 0 226px; background:var(--panel); border-left:1px solid var(--line);
     padding:10px; overflow:auto; display:flex; flex-direction:column; gap:12px;
   }
+  .props-left{ border-left:none; border-right:1px solid var(--line); }
   .props h3{margin:0 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted)}
+  .props h3.harp{color:var(--accent2)}
   .row{display:flex; align-items:center; gap:8px; justify-content:space-between}
   .row label{color:var(--muted); font-size:12px}
   input[type=color]{width:38px; height:26px; padding:0; border:1px solid var(--line); border-radius:4px; background:none; cursor:pointer}
@@ -141,65 +143,9 @@
     </div>
   </div>
 
-  <div class="canvas-wrap">
-    <svg id="stage" xmlns="http://www.w3.org/2000/svg"></svg>
-  </div>
-
-  <div class="props">
+  <div class="props props-left">
     <div>
-      <h3>Style</h3>
-      <div class="row">
-        <label>Fill</label>
-        <div class="checkrow">
-          <input type="checkbox" id="fill-on" checked>
-          <input type="color" id="fill-color" value="#6ea8fe">
-        </div>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <label>Stroke</label>
-        <div class="checkrow">
-          <input type="checkbox" id="stroke-on" checked>
-          <input type="color" id="stroke-color" value="#10131a">
-        </div>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <label>Width</label>
-        <input type="number" id="stroke-width" min="0" step="0.5" value="2">
-      </div>
-    </div>
-
-    <div>
-      <h3>Selected node</h3>
-      <div class="seg">
-        <button id="node-corner" title="Cusp / corner node">Corner</button>
-        <button id="node-smooth" title="Symmetric smooth node">Smooth</button>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <button id="node-delete" style="flex:1" title="Delete node (Del)">Delete node</button>
-      </div>
-    </div>
-
-    <div>
-      <h3>Arrange &amp; distribute</h3>
-      <div class="row">
-        <label>Gap</label>
-        <input type="number" id="distribute-gap" step="1" value="10" title="Air gap between objects, in SVG units">
-      </div>
-      <div class="row" style="margin-top:6px">
-        <label title="Measure edges including stroke width, so the gap is the real visible space between painted edges">Air gap (incl. stroke)</label>
-        <input type="checkbox" id="distribute-stroke" checked>
-      </div>
-      <div class="seg" style="margin-top:6px">
-        <button id="dist-h" title="Distribute left-to-right with the gap above (H)">Distribute →</button>
-        <button id="dist-v" title="Distribute top-to-bottom with the gap above (Shift+H / V)">Distribute ↓</button>
-      </div>
-      <div class="row" style="margin-top:6px">
-        <label id="sel-count">No selection</label>
-      </div>
-    </div>
-
-    <div>
-      <h3>Strings (harp)</h3>
+      <h3 class="harp">Strings (harp)</h3>
       <div class="row">
         <button id="string-selectall" style="flex:1" title="Select every string (line) as a group">Select all strings</button>
       </div>
@@ -237,6 +183,64 @@
       <div class="row" style="margin-top:8px"><label>Coordinate frame</label></div>
       <div class="seg">
         <button id="xz-btn" title="Put the whole harp in a right-handed +X/+Z frame: +X right, +Z up, Y into the page; origin at the bounding-box bottom-left, all coordinates positive. Renders upright (flip for display).">Orient +X/+Z (RH)</button>
+      </div>
+    </div>
+
+    <div>
+      <h3>Arrange &amp; distribute</h3>
+      <div class="row">
+        <label>Gap</label>
+        <input type="number" id="distribute-gap" step="1" value="10" title="Air gap between objects, in SVG units">
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label title="Measure edges including stroke width, so the gap is the real visible space between painted edges">Air gap (incl. stroke)</label>
+        <input type="checkbox" id="distribute-stroke" checked>
+      </div>
+      <div class="seg" style="margin-top:6px">
+        <button id="dist-h" title="Distribute left-to-right with the gap above (H)">Distribute →</button>
+        <button id="dist-v" title="Distribute top-to-bottom with the gap above (Shift+H / V)">Distribute ↓</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label id="sel-count">No selection</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <svg id="stage" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <div class="props">
+    <div>
+      <h3>Style</h3>
+      <div class="row">
+        <label>Fill</label>
+        <div class="checkrow">
+          <input type="checkbox" id="fill-on" checked>
+          <input type="color" id="fill-color" value="#6ea8fe">
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label>Stroke</label>
+        <div class="checkrow">
+          <input type="checkbox" id="stroke-on" checked>
+          <input type="color" id="stroke-color" value="#10131a">
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label>Width</label>
+        <input type="number" id="stroke-width" min="0" step="0.5" value="2">
+      </div>
+    </div>
+
+    <div>
+      <h3>Selected node</h3>
+      <div class="seg">
+        <button id="node-corner" title="Cusp / corner node">Corner</button>
+        <button id="node-smooth" title="Symmetric smooth node">Smooth</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button id="node-delete" style="flex:1" title="Delete node (Del)">Delete node</button>
       </div>
     </div>
 
