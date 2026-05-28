@@ -151,6 +151,26 @@ browsers without the API (or `file://`) to a plain download (`downloadSVG`, land
 browser's download folder). `<input>`/drag-drop opens give no writable handle, so they
 reset `fileHandle = null` (Save then behaves as Save As). `newDoc` clears it too.
 
+## Paraguayan harp curves (DP/BP/SP/WP)
+
+hedit's real purpose: author the four curves that drive the Paraguayan harp body —
+**DP** (dimple) and **BP** (bulge) closed Bézier rails, **SP** (spine, derived), and
+**WP** (waterfall profile, a 1-D `{f→r}`). It imports/exports the **exact
+`paraguayan_overrides.json` schema** (`{closed, nodes:[{x,y,hin:{dx,dy},hout:{dx,dy}}]}`
+per rail; `WP={nodes:[{f,r}]}`; plus `column_width`, `_comment`), so it's a drop-in
+front-end for the existing Python `paraguayan_core` (spine/WP/limaçon-sweep/winding/3-D).
+
+- `chainToPathD` / `pathToChain` convert between the rail's relative `hin/hout` handle
+  deltas and hedit's absolute `pathModel` handles. DP/BP/SP become `<path data-role>`
+  chains (colors: DP `#0a4fc4`, BP `#e60000`, SP `#7a1fa2`). WP + extras pass through
+  unchanged (`harpWP`, `harpExtra`) so round-trip is value-exact (verified maxNodeDiff 0).
+- Import/Export JSON buttons are in the left **Harp curves** panel.
+- Note: Paraguayan coords are **Y-up mm**; hedit renders y-down, so an imported body looks
+  vertically mirrored (editing + round-trip are unaffected). A non-destructive display
+  flip is a TODO. The "lemicon" cross-section is a convex **limaçon** `r=b(2+cosθ), b=a/4`.
+- Output goal: SVG (drawing) + DXF (2-D fab) + JSON (parametric truth driving the 3-D body
+  and CF-strand braiding). DXF export and a WP editor are still to come.
+
 ## Persistence
 
 The working document is auto-saved to `localStorage` (`hedit:autosave:svg`/`:name`) so a

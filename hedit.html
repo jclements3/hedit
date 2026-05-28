@@ -111,6 +111,7 @@
   <button id="btn-save" title="Save in place to the opened file, else prompt (Ctrl+S)">Save</button>
   <button id="btn-save-as" title="Save to a new file / location (Ctrl+Shift+S)">Save As…</button>
   <input type="file" id="file-input" accept=".svg,image/svg+xml" hidden>
+  <input type="file" id="json-input" accept=".json,application/json" hidden>
   <span class="filename" id="filename">untitled.svg</span>
   <div class="spacer"></div>
   <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
@@ -144,6 +145,14 @@
   </div>
 
   <div class="props props-left">
+    <div>
+      <h3 class="harp">Harp curves (DP/BP/SP/WP)</h3>
+      <div class="seg">
+        <button id="harp-import-btn" title="Import a Paraguayan-format harp JSON (DP/BP/SP rails + WP)">Import JSON</button>
+        <button id="harp-export-btn" title="Export DP/BP/SP/WP as paraguayan_overrides.json (drop-in)">Export JSON</button>
+      </div>
+    </div>
+
     <div>
       <h3 class="harp">Strings (harp)</h3>
       <div class="row">
@@ -1241,14 +1250,15 @@ async function writeHandle(handle, text){
   await w.write(new Blob([text], { type:"image/svg+xml" }));
   await w.close();
 }
-function downloadSVG(text, name){
-  const blob = new Blob([text], { type:"image/svg+xml" });
+function downloadText(text, name, type){
+  const blob = new Blob([text], { type: type || "text/plain" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = name || "untitled.svg";
+  a.download = name || "download.txt";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+function downloadSVG(text, name){ downloadText(text, name || "untitled.svg", "image/svg+xml"); }
 
 // Save: write back in place to the opened file if we have a handle; otherwise
 // prompt for a location (Save As) where supported, else fall back to download.
@@ -1400,6 +1410,16 @@ document.getElementById("fit-bottoms-btn").onclick = () => {
   fitBottomsCurve(isNaN(v) ? 8 : Math.max(2, v));
 };
 document.getElementById("clear-curve-btn").onclick = clearBottomCurve;
+const jsonInput = document.getElementById("json-input");
+document.getElementById("harp-import-btn").onclick = () => jsonInput.click();
+document.getElementById("harp-export-btn").onclick = () => downloadText(exportHarpJSON(), "harp.json", "application/json");
+jsonInput.addEventListener("change", e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => importHarpJSON(r.result);
+  r.readAsText(f);
+  jsonInput.value = "";
+});
 document.getElementById("strings-close").onclick = closeStringsTable;
 document.getElementById("strings-apply-gap").onclick = () => { parallelAirGapStrings(readStringGap()); buildStringsTable(); };
 // close the spec modal on backdrop click or Escape
@@ -2105,6 +2125,74 @@ function fitBottomsCurve(maxNodes){
   // right away (enterNodeEdit also sets `selection`, so "Bottoms on curve" still works)
   setTool("node"); enterNodeEdit(path); renderOverlay();
   setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} string bottoms. Drag the green handles to tweak, or click "Bottoms on curve" to align.`);
+}
+
+// =====================================================================
+// PARAGUAYAN HARP JSON  (drop-in for paraguayan_overrides.json)
+// Curves stored as { closed, nodes:[{x,y,hin:{dx,dy},hout:{dx,dy}}] }.
+// hin/hout are handle deltas relative to the node (hedit stores absolute).
+// DP/BP/SP become editable <path data-role> chains; WP + extras pass through.
+// =====================================================================
+const HARP_ROLE_STROKE = { DP:"#0a4fc4", BP:"#e60000", SP:"#7a1fa2" };  // dimple / bulge / spine
+let harpWP = null;     // pass-through WP {nodes:[{f,r}]}
+let harpExtra = {};    // pass-through extras: column_width, _comment, ...
+
+function chainToPathD(chain){
+  const n = chain.nodes; if(!n || !n.length) return "";
+  let d = "M " + fmt(n[0].x) + " " + fmt(n[0].y);
+  const seg = (a, b) => {
+    const aox = a.hout ? a.hout.dx : 0, aoy = a.hout ? a.hout.dy : 0;
+    const bix = b.hin ? b.hin.dx : 0,  biy = b.hin ? b.hin.dy : 0;
+    return " C " + fmt(a.x+aox) + " " + fmt(a.y+aoy) + " " + fmt(b.x+bix) + " " + fmt(b.y+biy) + " " + fmt(b.x) + " " + fmt(b.y);
+  };
+  for(let k=1;k<n.length;k++) d += seg(n[k-1], n[k]);
+  if(chain.closed) d += seg(n[n.length-1], n[0]) + " Z";
+  return d;
+}
+function pathToChain(el){
+  const subs = segsToSubpaths(parsePathD(el.getAttribute("d") || ""));
+  const sub = subs[0]; if(!sub) return null;
+  const nodes = sub.nodes.map(nd => ({
+    x: round3(nd.x), y: round3(nd.y),
+    hin:  { dx: round3((nd.hasIn  ? nd.inX  : nd.x) - nd.x), dy: round3((nd.hasIn  ? nd.inY  : nd.y) - nd.y) },
+    hout: { dx: round3((nd.hasOut ? nd.outX : nd.x) - nd.x), dy: round3((nd.hasOut ? nd.outY : nd.y) - nd.y) },
+  }));
+  return { closed: !!sub.closed, nodes };
+}
+function importHarpJSON(text){
+  let j; try { j = JSON.parse(text); } catch(e){ setStatus("Bad harp JSON: " + e.message); return; }
+  newDoc();
+  ["DP","BP","SP"].forEach(role => {
+    const ch = j[role]; if(!ch || !ch.nodes) return;
+    const p = document.createElementNS(SVGNS, "path");
+    p.setAttribute("data-role", role);
+    p.setAttribute("d", chainToPathD(ch));
+    p.setAttribute("fill", "none");
+    p.setAttribute("stroke", HARP_ROLE_STROKE[role] || "#000");
+    p.setAttribute("stroke-width", "2");
+    contentGroup.appendChild(p);
+  });
+  harpWP = j.WP || null;
+  harpExtra = {}; Object.keys(j).forEach(k => { if(!["DP","BP","SP","WP"].includes(k)) harpExtra[k] = j[k]; });
+  // frame the imported curves (Paraguayan coords are Y-up mm; set the document box to fit)
+  let bb; try { bb = contentGroup.getBBox(); } catch(e){ bb = null; }
+  if(bb && bb.width && bb.height){
+    doc = { viewBox: `${fmt(bb.x)} ${fmt(bb.y)} ${fmt(bb.width)} ${fmt(bb.height)}`, width: fmt(bb.width)+"mm", height: fmt(bb.height)+"mm" };
+  }
+  fitView();
+  const got = ["DP","BP","SP"].filter(r => j[r]);
+  setStatus(`Imported harp JSON: ${got.join("/")}${j.WP ? " + WP("+j.WP.nodes.length+")" : ""}. (Paraguayan Y-up mm.)`);
+}
+function exportHarpJSON(){
+  const out = {};
+  if(harpExtra._comment !== undefined) out._comment = harpExtra._comment;
+  ["SP","DP","BP"].forEach(role => {                       // SP/DP/BP order matches the source file
+    const el = contentGroup.querySelector('path[data-role="' + role + '"]');
+    if(el){ const ch = pathToChain(el); if(ch) out[role] = ch; }
+  });
+  if(harpWP) out.WP = harpWP;
+  Object.keys(harpExtra).forEach(k => { if(k !== "_comment" && !(k in out)) out[k] = harpExtra[k]; });
+  return JSON.stringify(out, null, 2);
 }
 
 // =====================================================================
