@@ -210,6 +210,9 @@
         <button id="string-rot-ccw" title="Rotate counter-clockwise by the angle">⟲ CCW</button>
         <button id="string-rot-cw" title="Rotate clockwise by the angle">CW ⟳</button>
       </div>
+      <div class="row" style="margin-top:6px">
+        <button id="s-axis-btn" style="flex:1" title="Draw a faint reference line (the S axis) through the string centers along the spacing direction. It is not a string and rotates with the strings.">Set S axis</button>
+      </div>
       <div class="row" style="margin-top:10px">
         <label title="Edge-to-edge air gap between adjacent strings, in SVG units">Air gap</label>
         <input type="number" id="string-gap" step="0.1" value="13">
@@ -1275,6 +1278,7 @@ document.getElementById("string-selectall").onclick = selectAllStrings;
 const readRot = () => { const v = parseFloat(document.getElementById("string-rot").value); return isNaN(v) ? 0 : v; };
 document.getElementById("string-rot-ccw").onclick = () => rotateStrings(-readRot());
 document.getElementById("string-rot-cw").onclick = () => rotateStrings(readRot());
+document.getElementById("s-axis-btn").onclick = setSAxis;
 document.getElementById("string-gap-btn").onclick = () => parallelAirGapStrings(readStringGap());
 document.getElementById("string-table-btn").onclick = openStringsTable;
 document.getElementById("align-top").onclick = () => alignStrings("top");
@@ -1395,7 +1399,45 @@ window.addEventListener("resize", () => { applyView(); renderOverlay(); });
 // STRINGS (harp): parallel air-gap arrangement + spec table
 // A "string" is a <line> in the content layer. stroke-width == diameter.
 // =====================================================================
-function stringLines(){ return [...contentGroup.querySelectorAll("line")]; }
+// the strings themselves (excludes reference lines like the S axis)
+function stringLines(){ return [...contentGroup.querySelectorAll("line")].filter(l => l.getAttribute("data-role") !== "s-axis"); }
+// the S-axis reference line(s), if any
+function sAxisLines(){ return [...contentGroup.querySelectorAll('line[data-role="s-axis"]')]; }
+
+// Draw the S axis: a faint reference line through the string centers along the
+// spacing direction. It is NOT a string (excluded from string ops) but rotates
+// with them, so it stays visible (and correctly oriented) after a rotation.
+function setSAxis(){
+  const strings = stringLines();
+  if(strings.length < 2){ setStatus("Need 2+ strings to set the S axis."); return; }
+  pushUndo();
+  sAxisLines().forEach(l => l.remove());
+  const e0 = strings[0];
+  let dx = (parseFloat(e0.getAttribute("x2"))||0) - (parseFloat(e0.getAttribute("x1"))||0);
+  let dy = (parseFloat(e0.getAttribute("y2"))||0) - (parseFloat(e0.getAttribute("y1"))||0);
+  const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+  const s = { x:-dy, y:dx };   // spacing direction = perpendicular to the strings
+  const centers = strings.map(el => ({
+    x: ((parseFloat(el.getAttribute("x1"))||0) + (parseFloat(el.getAttribute("x2"))||0)) / 2,
+    y: ((parseFloat(el.getAttribute("y1"))||0) + (parseFloat(el.getAttribute("y2"))||0)) / 2,
+  }));
+  const C = { x: centers.reduce((a,c)=>a+c.x,0)/centers.length, y: centers.reduce((a,c)=>a+c.y,0)/centers.length };
+  let tmin = Infinity, tmax = -Infinity;
+  centers.forEach(c => { const t = (c.x-C.x)*s.x + (c.y-C.y)*s.y; tmin = Math.min(tmin,t); tmax = Math.max(tmax,t); });
+  const m = (tmax - tmin) * 0.03 + 2;
+  const p1 = { x: C.x + s.x*(tmin-m), y: C.y + s.y*(tmin-m) };
+  const p2 = { x: C.x + s.x*(tmax+m), y: C.y + s.y*(tmax+m) };
+  const ax = document.createElementNS(SVGNS, "line");
+  ax.setAttribute("data-role", "s-axis");
+  ax.setAttribute("x1", fmt(p1.x)); ax.setAttribute("y1", fmt(p1.y));
+  ax.setAttribute("x2", fmt(p2.x)); ax.setAttribute("y2", fmt(p2.y));
+  ax.setAttribute("fill", "none");
+  ax.setAttribute("stroke", "#6ea8fe"); ax.setAttribute("stroke-width", "1");
+  ax.setAttribute("stroke-opacity", "0.4"); ax.setAttribute("stroke-dasharray", "6 4");
+  contentGroup.insertBefore(ax, contentGroup.firstChild);   // behind the strings
+  renderOverlay();
+  setStatus("S axis set — faint dashed line through the string centers along the spacing axis. It rotates with the strings.");
+}
 
 // fold any transform into the x1/y1/x2/y2 attributes so coords are clean
 function bakeLineTransform(el){
@@ -1451,24 +1493,28 @@ function rotateStrings(deg){
   const lines = stringLines();
   if(!lines.length){ setStatus("No strings to rotate."); return; }
   pushUndo();
-  lines.forEach(bakeLineTransform);
+  const axis = sAxisLines();
+  const all = lines.concat(axis);            // rotate strings + S axis together (rigidly)
+  all.forEach(bakeLineTransform);
+  // pivot = center of the strings' bbox (S axis follows, but does not move the pivot)
   let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-  const ends = lines.map(el => {
+  lines.forEach(el => {
     const p = ["x1","y1","x2","y2"].map(a => parseFloat(el.getAttribute(a)) || 0);
     minx = Math.min(minx, p[0], p[2]); maxx = Math.max(maxx, p[0], p[2]);
     miny = Math.min(miny, p[1], p[3]); maxy = Math.max(maxy, p[1], p[3]);
-    return { el, x1:p[0], y1:p[1], x2:p[2], y2:p[3] };
   });
   const cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
   const a = deg * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
   const rot = (x, y) => ({ x: cx + (x-cx)*cos - (y-cy)*sin, y: cy + (x-cx)*sin + (y-cy)*cos });
-  ends.forEach(e => {
-    const p1 = rot(e.x1, e.y1), p2 = rot(e.x2, e.y2);
-    e.el.setAttribute("x1", fmt(p1.x)); e.el.setAttribute("y1", fmt(p1.y));
-    e.el.setAttribute("x2", fmt(p2.x)); e.el.setAttribute("y2", fmt(p2.y));
+  all.forEach(el => {
+    const x1 = parseFloat(el.getAttribute("x1")) || 0, y1 = parseFloat(el.getAttribute("y1")) || 0;
+    const x2 = parseFloat(el.getAttribute("x2")) || 0, y2 = parseFloat(el.getAttribute("y2")) || 0;
+    const p1 = rot(x1, y1), p2 = rot(x2, y2);
+    el.setAttribute("x1", fmt(p1.x)); el.setAttribute("y1", fmt(p1.y));
+    el.setAttribute("x2", fmt(p2.x)); el.setAttribute("y2", fmt(p2.y));
   });
   pathModel = null; renderOverlay();
-  setStatus(`Rotated ${lines.length} strings by ${fmt(deg)}° about their center. Parallel air gap preserved.`);
+  setStatus(`Rotated ${lines.length} strings${axis.length ? " + S axis" : ""} by ${fmt(deg)}° about their center. Parallel air gap preserved.`);
 }
 
 // --- vertical alignment ---------------------------------------------
