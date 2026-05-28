@@ -185,7 +185,8 @@
         <input type="number" id="fit-nodes" min="2" step="1" value="8">
       </div>
       <div class="seg" style="margin-top:6px">
-        <button id="fit-bottoms-btn" title="Fit a cubic-Bezier curve (Schneider) through the string bottom ends, capped at Max nodes with fixed endpoints. Draws it as a red reference path and selects it, ready for 'Bottoms on curve'.">Fit bottoms → curve</button>
+        <button id="fit-bottoms-btn" title="Fit a cubic-Bezier curve (Schneider) through the string bottom ends, capped at Max nodes with fixed endpoints. Draws it as a red reference path and node-edits it, ready for 'Bottoms on curve'.">Fit bottoms → curve</button>
+        <button id="clear-curve-btn" title="Delete the fitted bottom curve(s)">Clear curve</button>
       </div>
       <div class="row" style="margin-top:8px"><label>Coordinate frame</label></div>
       <div class="seg">
@@ -1398,6 +1399,7 @@ document.getElementById("fit-bottoms-btn").onclick = () => {
   const v = parseInt(document.getElementById("fit-nodes").value, 10);
   fitBottomsCurve(isNaN(v) ? 8 : Math.max(2, v));
 };
+document.getElementById("clear-curve-btn").onclick = clearBottomCurve;
 document.getElementById("strings-close").onclick = closeStringsTable;
 document.getElementById("strings-apply-gap").onclick = () => { parallelAirGapStrings(readStringGap()); buildStringsTable(); };
 // close the spec modal on backdrop click or Escape
@@ -2067,6 +2069,16 @@ function _pinEnds(curves, points){
 // Fit a cubic-Bezier curve through the string BOTTOM ends and draw it as a
 // red reference <path data-role="bottom-curve"> (regenerated each call).
 // Select it + "Bottoms on curve" to align the strings to it.
+// remove the fitted bottom curve(s) so you can re-fit from a clean slate
+function clearBottomCurve(){
+  const paths = [...contentGroup.querySelectorAll('path[data-role="bottom-curve"]')];
+  if(!paths.length){ setStatus("No fitted curve to clear."); return; }
+  pushUndo();
+  paths.forEach(p => p.remove());
+  if(pathModel && pathModel.el && !pathModel.el.isConnected) pathModel = null;
+  clearSelection(); renderOverlay();
+  setStatus(`Cleared ${paths.length} fitted curve${paths.length > 1 ? "s" : ""}.`);
+}
 function fitBottomsCurve(maxNodes){
   const strings = stringLines();
   if(strings.length < 2){ setStatus("Need 2+ strings to fit a curve."); return; }
