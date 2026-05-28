@@ -117,7 +117,14 @@ document is `strings.svg`. The **Strings (harp)** panel section drives this:
   from the transform *attribute* (`frameParams`), not `getCTM` (which can fold in the
   viewport scale).
 - **Select all strings** (`selectAllStrings`) — selects every `<line>` as a group.
-- **Rotate group** (`rotateStrings`) — rigid rotation of all string endpoints about
+- **S axis** (`setSAxis` / `sAxisLines`) — a faint dashed `<line data-role="s-axis">`
+  drawn through the string centers along the spacing direction (perpendicular to the
+  strings). It is a reference, not a string: `stringLines()` filters it out (so air-gap,
+  alignment, the spec table, and the harp model all ignore it), but `rotateStrings`
+  rotates it together with the strings, so it stays visible and correctly oriented after
+  a rotation. It round-trips as an ordinary tagged content line.
+- **Rotate group** (`rotateStrings`) — rigid rotation of all string endpoints (and the
+  S axis, if present) about
   the group's bounding-box center. Because a rigid rotation preserves all distances
   and angles, the strings stay parallel and the *perpendicular* edge-to-edge air gap
   is unchanged — it turns the whole S-axis (spacing) / length-axis frame as one body.
