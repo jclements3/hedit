@@ -95,6 +95,13 @@ document is `strings.svg`. The **Strings (harp)** panel section drives this:
   taken from `data-len` (fallback: `|y2-y1|`). Curve alignment samples a selected
   `<path>` and maps each string's chosen end to the path's y at that string's x
   (nearest-x sampling; assumes the curve is roughly monotonic in x).
+- **Select all strings** (`selectAllStrings`) — selects every `<line>` as a group.
+- **Rotate group** (`rotateStrings`) — rigid rotation of all string endpoints about
+  the group's bounding-box center. Because a rigid rotation preserves all distances
+  and angles, the strings stay parallel and the *perpendicular* edge-to-edge air gap
+  is unchanged — it turns the whole S-axis (spacing) / length-axis frame as one body.
+  This is the one string op that produces non-vertical strings, so run it *after*
+  air-gap/alignment (those assume upright strings).
 
 Headless verification of all of the above is in `test-hedit.sh` (and the ad-hoc
 harnesses it inspired); run it after any change to the strings logic.
