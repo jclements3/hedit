@@ -2174,7 +2174,8 @@ function docUnits(){
 // build the full harp model from the current strings + measured layout
 function buildHarpModel(){
   const lines = stringLines();
-  if(!lines.length) return null;
+  // emit metadata for any harp doc: strings, OR harp-role curves, OR an edited WP
+  if(!lines.length && !harpWP && !contentGroup.querySelector("path[data-role]")) return null;
   const strings = lines.map(el => ({
     num:  el.getAttribute("data-num")  || "",
     note: el.getAttribute("data-note") || "",
