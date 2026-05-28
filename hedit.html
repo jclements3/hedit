@@ -228,7 +228,7 @@
           <label title="Maximum on-curve nodes in the fit (endpoints pinned to the first/last bottom)">Max nodes</label>
           <input type="number" id="fit-nodes" min="2" step="1" value="8">
         </div>
-        <button id="fit-bottoms-btn" class="btn-primary" title="Fit a cubic-Bezier curve (Schneider) through the string bottoms, capped at Max nodes with fixed endpoints; draws it and opens it for node editing">Fit bottoms → curve</button>
+        <button id="fit-bottoms-btn" class="btn-primary" title="Fit a cubic-Bezier curve (Schneider) through the bottom ends of the selected lines (or all strings if none selected), capped at Max nodes with fixed endpoints; draws it and opens it for node editing">Fit curve to ends</button>
         <button id="clear-curve-btn" class="danger" title="Delete the fitted bottom curve(s)">Clear fitted curve</button>
       </div>
     </details>
@@ -2194,10 +2194,14 @@ function clearBottomCurve(){
   setStatus(`Cleared ${paths.length} fitted curve${paths.length > 1 ? "s" : ""}.`);
 }
 function fitBottomsCurve(maxNodes){
-  const strings = stringLines();
-  if(strings.length < 2){ setStatus("Need 2+ strings to fit a curve."); return; }
+  // fit through the bottom ends of the SELECTED lines (2+), else all strings
+  const isLine = el => el && el.tagName && el.tagName.toLowerCase() === "line" && el.getAttribute("data-role") !== "s-axis";
+  const selLines = selected.filter(isLine);
+  const usingSel = selLines.length >= 2;
+  const src = usingSel ? selLines : stringLines();
+  if(src.length < 2){ setStatus("Select 2+ lines (or load strings) to fit a curve to their ends."); return; }
   const flip = yIsFlipped();   // visual bottom = larger screen-y (= smaller stored y when flipped)
-  const pts = strings.map(el => {
+  const pts = src.map(el => {
     const x1=+el.getAttribute("x1"), y1=+el.getAttribute("y1"), x2=+el.getAttribute("x2"), y2=+el.getAttribute("y2");
     const lowerIsLargerY = !flip;
     return lowerIsLargerY ? (y1 >= y2 ? [x1,y1] : [x2,y2]) : (y1 <= y2 ? [x1,y1] : [x2,y2]);
@@ -2218,7 +2222,7 @@ function fitBottomsCurve(maxNodes){
   // drop into node-editing the new curve so its anchors + handles are visible
   // right away (enterNodeEdit also sets `selection`, so "Bottoms on curve" still works)
   setTool("node"); enterNodeEdit(path); renderOverlay();
-  setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} string bottoms. Drag the green handles to tweak, or click "Bottoms on curve" to align.`);
+  setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} ${usingSel ? "selected line" : "string"} ends. Drag the green handles to tweak, or click "Bottoms on curve" to align.`);
 }
 
 // =====================================================================
