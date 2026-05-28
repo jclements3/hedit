@@ -302,7 +302,7 @@
 <footer>
   <span id="status">Ready.</span>
   <div class="spacer" style="flex:1"></div>
-  <span><kbd>V</kbd> select <kbd>N</kbd> nodes <kbd>P</kbd> pen <kbd>R</kbd>/<kbd>E</kbd> shapes · scroll = zoom · space-drag = pan</span>
+  <span><kbd>V</kbd> select <kbd>N</kbd> nodes <kbd>P</kbd> pen <kbd>R</kbd>/<kbd>E</kbd> shapes · <kbd>F</kbd> fit all · scroll = zoom · space-drag = pan</span>
 </footer>
 
 <script>
@@ -1355,12 +1355,14 @@ function newDoc(){
 function fitView(){
   let bb;
   try { bb = contentGroup.getBBox(); } catch(e){ bb = null; }
-  if(bb){   // bbox is in content-local coords; map to stage coords if content is transformed
-    const m = contentGroup.getCTM();
-    if(m && (m.a !== 1 || m.b || m.c || m.d !== 1 || m.e || m.f)){
-      const pts = [[bb.x,bb.y],[bb.x+bb.width,bb.y],[bb.x+bb.width,bb.y+bb.height],[bb.x,bb.y+bb.height]]
-        .map(([x,y]) => { const p = stage.createSVGPoint(); p.x = x; p.y = y; return p.matrixTransform(m); });
-      const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  if(bb){   // bbox is content-local; map to user coords via contentGroup's OWN transform
+    const t = contentGroup.getAttribute("transform");   // not getCTM (folds in viewport scale)
+    const mm = t && t.match(/matrix\(\s*([-\d.eE+]+)[ ,]+([-\d.eE+]+)[ ,]+([-\d.eE+]+)[ ,]+([-\d.eE+]+)[ ,]+([-\d.eE+]+)[ ,]+([-\d.eE+]+)\s*\)/);
+    if(mm){
+      const a=+mm[1],b=+mm[2],c=+mm[3],d=+mm[4],e=+mm[5],f=+mm[6];
+      const xf=(x,y)=>[a*x+c*y+e, b*x+d*y+f];
+      const pts=[[bb.x,bb.y],[bb.x+bb.width,bb.y],[bb.x+bb.width,bb.y+bb.height],[bb.x,bb.y+bb.height]].map(([x,y])=>xf(x,y));
+      const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
       bb = { x:Math.min(...xs), y:Math.min(...ys), width:Math.max(...xs)-Math.min(...xs), height:Math.max(...ys)-Math.min(...ys) };
     }
   }
@@ -1544,7 +1546,7 @@ window.addEventListener("keydown", e => {
     case "Delete": case "Backspace": e.preventDefault(); deleteSelection(); break;
     case "Enter": if(penState) finishPen(false); break;
     case "Escape": if(penState) finishPen(true); else { clearSelection(); renderOverlay(); } break;
-    case "0": fitView(); break;
+    case "0": case "f": case "F": fitView(); break;   // fit & center everything
     case "+": case "=": zoomBy(0.8); break;
     case "-": case "_": zoomBy(1.25); break;
   }
