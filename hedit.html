@@ -1015,7 +1015,7 @@ function setTool(name){
   if(penState && name !== "pen") finishPen(true);
   tool = name;
   document.querySelectorAll(".tool").forEach(t => t.classList.toggle("active", t.dataset.tool === name));
-  stage.className = ""; stage.classList.add("tool-" + name);
+  stage.setAttribute("class", ""); stage.classList.add("tool-" + name);
   if(name !== "node") pathModel = null;
   if(name !== "select") selection = selection; // keep
   updateHint(); renderOverlay();
