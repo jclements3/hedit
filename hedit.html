@@ -230,6 +230,10 @@
         <button id="align-curve-top" title="Align string TOP ends to a selected path/curve">Tops on curve</button>
         <button id="align-curve-bottom" title="Align string BOTTOM ends to a selected path/curve">Bottoms on curve</button>
       </div>
+      <div class="row" style="margin-top:8px"><label>Coordinate frame</label></div>
+      <div class="seg">
+        <button id="xz-btn" title="Put the whole harp in a right-handed +X/+Z frame: +X right, +Z up, Y into the page; origin at the bounding-box bottom-left, all coordinates positive. Renders upright (flip for display).">Orient +X/+Z (RH)</button>
+      </div>
     </div>
 
     <div>
@@ -332,6 +336,16 @@ function toUserFromLocal(el, l){
   const u = p.matrixTransform(m); return { x:u.x, y:u.y };
 }
 function fmt(n){ return (Math.round(n * 1000) / 1000).toString(); }
+// map a screen/stage point into contentGroup-local coords (handles a content transform, e.g. the +X/+Z flip)
+function toContent(u){ return toLocal(contentGroup, u); }
+// map a screen/stage delta vector into contentGroup-local coords (linear part of the inverse CTM)
+function screenVecToContent(dx, dy){
+  const m = contentGroup.getCTM(); if(!m) return { dx, dy };
+  const inv = m.inverse();
+  return { dx: inv.a*dx + inv.c*dy, dy: inv.b*dx + inv.d*dy };
+}
+// true when content is displayed vertically flipped (the +X/+Z frame)
+function yIsFlipped(){ const m = contentGroup.getCTM(); return !!(m && m.d < 0); }
 
 // ---- status / hints ----
 function setStatus(t){ elStatus.textContent = t; }
@@ -494,10 +508,11 @@ function visualBounds(el, includeStroke){
   const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
   return { minX:Math.min(...xs), minY:Math.min(...ys), maxX:Math.max(...xs), maxY:Math.max(...ys) };
 }
-// shift an element by (dx,dy) in content/user coords (content group is identity)
+// shift an element by (dx,dy) given in stage/user coords (converted to content-local)
 function translateEl(el, dx, dy){
+  const v = screenVecToContent(dx, dy);
   const orig = el.getAttribute("transform") || "";
-  el.setAttribute("transform", `translate(${fmt(dx)} ${fmt(dy)}) ${orig}`.trim());
+  el.setAttribute("transform", `translate(${fmt(v.dx)} ${fmt(v.dy)}) ${orig}`.trim());
 }
 // distribute selected objects along an axis with a fixed visible gap
 function distribute(axis, gap, includeStroke){
@@ -877,9 +892,9 @@ function onMove(e){
   const u = evtUser(e);
 
   if(drag.type === "move"){
-    const dx = u.x - drag.start.x, dy = u.y - drag.start.y;
+    const v = screenVecToContent(u.x - drag.start.x, u.y - drag.start.y);
     for(const it of drag.items){
-      it.el.setAttribute("transform", `translate(${fmt(dx)} ${fmt(dy)}) ${it.orig}`.trim());
+      it.el.setAttribute("transform", `translate(${fmt(v.dx)} ${fmt(v.dy)}) ${it.orig}`.trim());
     }
     drag.moved = true;
     renderOverlay(); return;
@@ -957,8 +972,9 @@ function finishMarquee(){
 
 function finishShape(){
   const u = drag.cur || drag.start;
-  const x = Math.min(u.x, drag.start.x), y = Math.min(u.y, drag.start.y);
-  const w = Math.abs(u.x - drag.start.x), h = Math.abs(u.y - drag.start.y);
+  const a = toContent(drag.start), b = toContent(u);   // content-local (handles +X/+Z flip)
+  const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+  const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
   if(drag.preview) drag.preview.remove();
   if(w < 1 || h < 1) return;
   pushUndo();
@@ -1062,6 +1078,12 @@ function finishPen(cancel){
   penState = null; drag = null;
   if(cancel || !valid){ setStatus("Pen cancelled."); renderOverlay(); return; }
   pushUndo();
+  // pen nodes were captured in stage coords; map them into content-local (handles +X/+Z flip)
+  sub.nodes.forEach(nd => {
+    const a = toContent({ x:nd.x, y:nd.y }); nd.x = a.x; nd.y = a.y;
+    if(nd.hasIn){ const i = toContent({ x:nd.inX, y:nd.inY }); nd.inX = i.x; nd.inY = i.y; }
+    if(nd.hasOut){ const o = toContent({ x:nd.outX, y:nd.outY }); nd.outX = o.x; nd.outY = o.y; }
+  });
   const el = document.createElementNS(SVGNS, "path");
   el.setAttribute("d", subsToD([sub]));
   const attrs = defaultStyleAttrs();
@@ -1118,10 +1140,17 @@ function loadSVGText(text, name){
   const w = root.getAttribute("width"), h = root.getAttribute("height");
   const harpMeta = root.querySelector('metadata[id="hedit-harp"]');
   // import children (metadata is kept out of the content layer; it's re-emitted on save)
+  let frameOnLoad = false, frameTransform = null;
   [...root.childNodes].forEach(n => {
     if(n.nodeType !== 1) return;
-    if(n.nodeName.toLowerCase() === "metadata") return;
-    contentGroup.appendChild(document.importNode(n, true));
+    const nm = n.nodeName.toLowerCase();
+    if(nm === "metadata") return;
+    if(nm === "g" && n.getAttribute && n.getAttribute("id") === "hedit-frame"){
+      frameOnLoad = true; frameTransform = n.getAttribute("transform");   // unwrap: children are X-Z coords
+      [...n.childNodes].forEach(c => { if(c.nodeType === 1) contentGroup.appendChild(document.importNode(c, true)); });
+    } else {
+      contentGroup.appendChild(document.importNode(n, true));
+    }
   });
   if(!vb){
     const nw = parseFloat(w) || 0, nh = parseFloat(h) || 0;
@@ -1139,6 +1168,10 @@ function loadSVGText(text, name){
   elFilename.textContent = name || "untitled.svg";
   setStatus("Loaded " + (name||"") + " — " + contentGroup.children.length + " top-level objects.");
   harpAlignment = null;
+  frameXZ = frameOnLoad;
+  if(frameXZ && frameTransform) contentGroup.setAttribute("transform", frameTransform);
+  else contentGroup.removeAttribute("transform");
+  syncFrameButton();
   if(harpMeta){
     try { applyHarpModel(JSON.parse(harpMeta.textContent || "{}")); }
     catch(e){ setStatus("Loaded, but the embedded harp spec was unreadable."); }
@@ -1151,11 +1184,19 @@ function saveSVG(){
   if(doc.viewBox) out.setAttribute("viewBox", doc.viewBox);
   if(doc.width) out.setAttribute("width", doc.width);
   if(doc.height) out.setAttribute("height", doc.height);
+  let host = out;
+  if(frameXZ){   // wrap content in the +X/+Z display-flip group so the file renders upright
+    const g = document.createElementNS(SVGNS, "g");
+    g.setAttribute("id", "hedit-frame");
+    g.setAttribute("data-frame", "RH-XZ");
+    const t = contentGroup.getAttribute("transform"); if(t) g.setAttribute("transform", t);
+    out.appendChild(g); host = g;
+  }
   [...contentGroup.children].forEach(c => {
     if(c.nodeName.toLowerCase() === "metadata") return;   // rebuilt fresh below
-    out.appendChild(c.cloneNode(true));
+    host.appendChild(c.cloneNode(true));
   });
-  writeHarpMetadata(out);   // embed the complete harp definition (no-op if no strings)
+  writeHarpMetadata(out);   // embed the complete harp definition (no-op if no strings); stays at <svg> root
   const body = new XMLSerializer().serializeToString(out);
   const text = '<?xml version="1.0" encoding="UTF-8"?>\n' + body + "\n";
   const blob = new Blob([text], { type:"image/svg+xml" });
@@ -1174,6 +1215,7 @@ function newDoc(){
   undoStack.length = 0; redoStack.length = 0;
   clearSelection(); renderOverlay();
   harpAlignment = null;
+  frameXZ = false; contentGroup.removeAttribute("transform"); syncFrameButton();
   elFilename.textContent = "untitled.svg";
   setStatus("New document (800×600).");
 }
@@ -1184,6 +1226,15 @@ function newDoc(){
 function fitView(){
   let bb;
   try { bb = contentGroup.getBBox(); } catch(e){ bb = null; }
+  if(bb){   // bbox is in content-local coords; map to stage coords if content is transformed
+    const m = contentGroup.getCTM();
+    if(m && (m.a !== 1 || m.b || m.c || m.d !== 1 || m.e || m.f)){
+      const pts = [[bb.x,bb.y],[bb.x+bb.width,bb.y],[bb.x+bb.width,bb.y+bb.height],[bb.x,bb.y+bb.height]]
+        .map(([x,y]) => { const p = stage.createSVGPoint(); p.x = x; p.y = y; return p.matrixTransform(m); });
+      const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+      bb = { x:Math.min(...xs), y:Math.min(...ys), width:Math.max(...xs)-Math.min(...xs), height:Math.max(...ys)-Math.min(...ys) };
+    }
+  }
   if(!bb || bb.width === 0 || bb.height === 0){
     const p = doc.viewBox.split(/[\s,]+/).map(Number);
     view = { x:p[0], y:p[1], w:p[2], h:p[3] };
@@ -1231,6 +1282,7 @@ document.getElementById("align-middle").onclick = () => alignStrings("middle");
 document.getElementById("align-bottom").onclick = () => alignStrings("bottom");
 document.getElementById("align-curve-top").onclick = () => alignStringsToCurve("top");
 document.getElementById("align-curve-bottom").onclick = () => alignStringsToCurve("bottom");
+document.getElementById("xz-btn").onclick = orientXZ;
 document.getElementById("strings-close").onclick = closeStringsTable;
 document.getElementById("strings-apply-gap").onclick = () => { parallelAirGapStrings(readStringGap()); buildStringsTable(); };
 // close the spec modal on backdrop click or Escape
@@ -1438,14 +1490,17 @@ function alignStrings(mode){
   if(!lines.length){ setStatus("No strings to align."); return; }
   pushUndo();
   const g = lines.map(stringGeom);
+  // when content is displayed flipped (+X/+Z frame), visual top/bottom swap relative to stored y
+  let m = mode;
+  if(yIsFlipped() && (mode === "top" || mode === "bottom")) m = mode === "top" ? "bottom" : "top";
   let target;
-  if(mode === "top")    target = Math.min(...g.map(i => i.top));
-  else if(mode === "bottom") target = Math.max(...g.map(i => i.bot));
-  else /* middle */     target = g.reduce((s,i) => s + (i.top + i.bot)/2, 0) / g.length;
+  if(m === "top")    target = Math.min(...g.map(i => i.top));
+  else if(m === "bottom") target = Math.max(...g.map(i => i.bot));
+  else /* middle */  target = g.reduce((s,i) => s + (i.top + i.bot)/2, 0) / g.length;
   g.forEach(i => {
-    if(mode === "top")         placeString(i.el, target, i.len);
-    else if(mode === "bottom") placeString(i.el, target - i.len, i.len);
-    else                       placeString(i.el, target - i.len/2, i.len);
+    if(m === "top")         placeString(i.el, target, i.len);
+    else if(m === "bottom") placeString(i.el, target - i.len, i.len);
+    else                    placeString(i.el, target - i.len/2, i.len);
   });
   harpAlignment = mode;
   pathModel = null; renderOverlay();
@@ -1631,7 +1686,7 @@ function buildHarpModel(){
   return {
     hedit: "harp", version: 1,
     units: docUnits(),
-    layout: { airGap: measuredAirGap(), rotationDeg: measuredRotationDeg(), alignment: harpAlignment },
+    layout: { airGap: measuredAirGap(), rotationDeg: measuredRotationDeg(), alignment: harpAlignment, frame: frameXZ ? "RH-XZ" : "SVG" },
     strings,
   };
 }
@@ -1654,6 +1709,83 @@ function applyHarpModel(model){
   const n = model.strings ? model.strings.length : 0;
   setStatus(`Loaded harp spec: ${n} strings, air gap ${model.layout ? model.layout.airGap : "?"} ${model.units||""}.`);
   return true;
+}
+
+// =====================================================================
+// +X/+Z FRAME  (right-handed: +X right, +Z up, Y into the page)
+// Stored content coords become X-Z (origin at bbox bottom-left, all >= 0);
+// contentGroup carries a display flip so it still renders upright.
+// =====================================================================
+let frameXZ = false;
+
+// apply coordinate maps to every geometry element under contentGroup
+// (flat document assumed: line/rect/ellipse/circle/poly/path; nested groups not recursed)
+function transformContentCoords(mapX, mapY){
+  const flip = (mapY(0) - mapY(1)) > 0;   // mapY decreasing => vertical reflection (flips arc sweep)
+  contentGroup.querySelectorAll("*").forEach(el => {
+    const tag = el.tagName.toLowerCase();
+    const set = (a, v) => el.setAttribute(a, fmt(v));
+    const g = a => numAttr(el.getAttribute(a)) || 0;
+    if(tag === "line"){
+      set("x1", mapX(g("x1"))); set("y1", mapY(g("y1")));
+      set("x2", mapX(g("x2"))); set("y2", mapY(g("y2")));
+    } else if(tag === "rect"){
+      set("x", mapX(g("x")));
+      set("y", Math.min(mapY(g("y")), mapY(g("y") + g("height"))));   // size preserved
+    } else if(tag === "ellipse" || tag === "circle"){
+      if(el.hasAttribute("cx")) set("cx", mapX(g("cx")));
+      if(el.hasAttribute("cy")) set("cy", mapY(g("cy")));
+    } else if(tag === "polyline" || tag === "polygon"){
+      const pts = (el.getAttribute("points") || "").trim().split(/\s+/).filter(Boolean).map(pair => {
+        const c = pair.split(/[, ]+/).map(Number); return fmt(mapX(c[0])) + "," + fmt(mapY(c[1]));
+      });
+      el.setAttribute("points", pts.join(" "));
+    } else if(tag === "path"){
+      const subs = segsToSubpaths(parsePathD(el.getAttribute("d") || ""));
+      subs.forEach(sub => sub.nodes.forEach(nd => {
+        nd.x = mapX(nd.x); nd.y = mapY(nd.y);
+        if(nd.hasIn){ nd.inX = mapX(nd.inX); nd.inY = mapY(nd.inY); }
+        if(nd.hasOut){ nd.outX = mapX(nd.outX); nd.outY = mapY(nd.outY); }
+        if(nd.arc && flip) nd.arc.sf = nd.arc.sf ? 0 : 1;
+      }));
+      el.setAttribute("d", subsToD(subs));
+    } else if(tag === "text" || tag === "image" || tag === "use"){
+      if(el.hasAttribute("x")) set("x", mapX(g("x")));
+      if(el.hasAttribute("y")) set("y", mapY(g("y")));
+    }
+  });
+}
+
+function syncFrameButton(){
+  const b = document.getElementById("xz-btn");
+  if(b) b.textContent = frameXZ ? "Revert to y-down" : "Orient +X/+Z (RH)";
+}
+// read minX/maxY back from the flip transform attribute (robust; getCTM may fold in viewport scale)
+function frameParams(){
+  const t = contentGroup.getAttribute("transform") || "";
+  const m = t.match(/matrix\(\s*1\s+0\s+0\s+-1\s+(-?[\d.eE+]+)\s+(-?[\d.eE+]+)\s*\)/);
+  return m ? { minX: parseFloat(m[1]), maxY: parseFloat(m[2]) } : { minX: 0, maxY: 0 };
+}
+// toggle the harp into / out of the +X/+Z right-handed frame
+function orientXZ(){
+  let bb; try { bb = contentGroup.getBBox(); } catch(e){ bb = null; }
+  if(!bb || (!bb.width && !bb.height)){ setStatus("Nothing to orient."); return; }
+  pushUndo();
+  if(!frameXZ){
+    const minX = bb.x, maxY = bb.y + bb.height;
+    transformContentCoords(x => x - minX, y => maxY - y);   // X = x-minX (>=0), Z = maxY-y (>=0, up)
+    contentGroup.setAttribute("transform", `matrix(1 0 0 -1 ${fmt(minX)} ${fmt(maxY)})`);
+    frameXZ = true;
+    setStatus("Oriented to +X/+Z (right-handed: +X right, +Z up, Y into page). Origin at bbox bottom-left; all X,Z >= 0.");
+  } else {
+    const { minX, maxY } = frameParams();
+    transformContentCoords(x => x + minX, y => maxY - y);   // inverse: x = X+minX, y = maxY-Z
+    contentGroup.removeAttribute("transform");
+    frameXZ = false;
+    setStatus("Reverted to standard SVG (y-down) coordinates.");
+  }
+  syncFrameButton();
+  clearSelection(); pathModel = null; renderOverlay();
 }
 
 // =====================================================================
