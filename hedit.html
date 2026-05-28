@@ -181,6 +181,7 @@
           <button id="harp-export-btn" title="Export DP/BP/SP/WP as paraguayan_overrides.json (drop-in)">Export</button>
         </div>
         <button id="vim-source-btn" title="Edit the harp JSON directly in an embedded vim editor; Apply parses it back into the curves">Edit JSON (vim)</button>
+        <button id="js-source-btn" title="Open a vim JavaScript console that runs in hedit's scope: call stringLines(), addPins(), fitEndsCurve(), contentGroup, exportHarpJSON()... Run to eval, Undo (Ctrl+Z) to revert">JS console (vim)</button>
       </div>
     </details>
 
@@ -383,6 +384,21 @@
     </div>
     <div class="modal-body" style="padding:0">
       <iframe id="vim-frame" title="vim" style="width:100%; height:100%; border:0; display:block; background:#1e1f26"></iframe>
+    </div>
+  </div>
+</div>
+
+<div id="js-modal" class="modal" hidden>
+  <div class="modal-box" style="width:min(960px,95vw); height:82vh">
+    <div class="modal-head">
+      <h3>JS console — vim</h3>
+      <span class="hint" style="margin-left:8px">runs in hedit's scope · i insert · Esc command · Run to eval · Ctrl+Z undoes</span>
+      <div class="spacer"></div>
+      <button id="js-run" class="btn-primary" title="Evaluate the code in hedit's scope">Run ▶</button>
+      <button id="js-close">Close</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <iframe id="js-frame" title="js" style="width:100%; height:100%; border:0; display:block; background:#1e1f26"></iframe>
     </div>
   </div>
 </div>
@@ -1569,6 +1585,10 @@ document.getElementById("harp-export-btn").onclick = () => downloadText(exportHa
 document.getElementById("vim-source-btn").onclick = openVimSource;
 document.getElementById("vim-apply").onclick = applyVimSource;
 document.getElementById("vim-close").onclick = closeVimSource;
+document.getElementById("js-source-btn").onclick = openJsEditor;
+document.getElementById("js-run").onclick = runJsConsole;
+document.getElementById("js-close").onclick = closeJsEditor;
+document.getElementById("js-modal").addEventListener("mousedown", e => { if(e.target.id === "js-modal") closeJsEditor(); });
 document.getElementById("vim-modal").addEventListener("mousedown", e => { if(e.target.id === "vim-modal") closeVimSource(); });
 jsonInput.addEventListener("change", e => {
   const f = e.target.files[0]; if(!f) return;
@@ -2588,6 +2608,50 @@ function applyVimSource(){
 function closeVimSource(){
   document.getElementById("vim-modal").hidden = true;
   document.getElementById("vim-frame").srcdoc = "";   // unload the iframe -> drops its key listeners
+}
+
+// --- vim JS console: runs in hedit's scope (direct eval) to prototype features ---
+const JS_CONSOLE_KEY = "hedit:jsconsole";
+const JS_STARTER = `// hedit JS console -- code runs in hedit's scope. Run (eval) it, Ctrl+Z to undo.
+// Available: stringLines(), addPins(), addSensorDots(), fitEndsCurve("tops"|"bottoms", n),
+//   parallelAirGapStrings(g), alignStrings("top"|"middle"|"bottom"), rotateStrings(deg),
+//   orientXZ(), contentGroup, exportHarpJSON(), setStatus(), renderOverlay() ...
+// The last expression's value is shown in the status bar + console.
+
+stringLines().length`;
+function openJsEditor(){
+  const m = document.getElementById("js-modal"), f = document.getElementById("js-frame");
+  m.hidden = false;
+  f.srcdoc = VIM_SRCDOC;
+  let saved = JS_STARTER; try { saved = localStorage.getItem(JS_CONSOLE_KEY) || JS_STARTER; } catch(e){}
+  const t0 = Date.now();
+  (function wait(){
+    const w = f.contentWindow;
+    if(w && w.__ready && w.loadText){ w.loadText(saved); try { w.focus(); } catch(e){} }
+    else if(Date.now() - t0 < 5000) setTimeout(wait, 60);
+    else setStatus("vim editor failed to load.");
+  })();
+  setStatus("JS console — write code that runs in hedit's scope, then Run.");
+}
+function runJsConsole(){
+  const w = document.getElementById("js-frame").contentWindow;
+  let code = ""; try { code = w.getText(); } catch(e){}
+  if(!code.trim()){ setStatus("Nothing to run."); return; }
+  try { localStorage.setItem(JS_CONSOLE_KEY, code); } catch(e){}
+  pushUndo();
+  try {
+    const result = eval(code);   // direct eval -> sees hedit's top-level scope
+    renderOverlay();
+    if(result !== undefined){ try { console.log("[hedit JS]", result); } catch(e){} }
+    setStatus("Ran JS." + (result !== undefined ? " => " + String(result).slice(0, 120) : ""));
+  } catch(e){
+    if(undoStack.length) undoStack.pop();   // nothing changed
+    setStatus("JS error: " + e.message);
+  }
+}
+function closeJsEditor(){
+  document.getElementById("js-modal").hidden = true;
+  document.getElementById("js-frame").srcdoc = "";
 }
 
 // =====================================================================
