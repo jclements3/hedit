@@ -171,6 +171,17 @@ front-end for the existing Python `paraguayan_core` (spine/WP/limaçon-sweep/win
 - Output goal: SVG (drawing) + DXF (2-D fab) + JSON (parametric truth driving the 3-D body
   and CF-strand braiding). DXF export and a WP editor are still to come.
 
+## Export & embedded editor
+
+- **DXF export** (`buildDXF`/`exportDXF`, header "DXF" button): samples content
+  (paths via `cubicAt`, lines/rect/ellipse/circle) into DXF LINE+CIRCLE entities,
+  `$INSUNITS=4` (mm), Y-up for CAD (stored coords when in the +X/+Z frame, else flip
+  y-down→y-up). Skips the s-axis guide. Verified with `ezdxf`.
+- **Vim JSON editor** (`VIM_SRCDOC`/`openVimSource`, "Edit JSON (vim)" button): the
+  vendored `vendor/js-vim.min.js` (MIT, itsjoesullivan/js-vim) hosted in an **iframe**
+  so its document-wide key capture stays isolated from hedit's shortcuts. Loads the harp
+  JSON via `vim.curDoc.text(...)`, **Apply** reads it back and `importHarpJSON`s it.
+
 ## Persistence
 
 The working document is auto-saved to `localStorage` (`hedit:autosave:svg`/`:name`) so a
