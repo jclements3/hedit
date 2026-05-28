@@ -73,6 +73,32 @@ and note the `onUp` pattern that pops an unused snapshot when a move drag didn't
   derives `viewBox`/size.
 - `saveSVG` builds a fresh `<svg>` from `contentGroup` children only and downloads it as a Blob.
 
+## Domain feature: harp strings
+
+hedit doubles as a harp string-layout tool. A "string" is a `<line>` in
+`contentGroup` whose `stroke-width` equals its diameter; spec metadata lives in
+`data-*` attributes (`data-num`, `data-note`, `data-len`, `data-ten`,
+`data-core`, `data-wrap`, `data-cdia`, `data-wdia`, `data-dia`). The reference
+document is `strings.svg`. The **Strings (harp)** panel section drives this:
+
+- **Parallel air-gap** (`parallelAirGapStrings`) — makes every string vertical and
+  re-spaces them so the *edge-to-edge* gap between adjacent strings is constant,
+  accounting for each string's diameter (`effectiveStrokeWidth/2`). Writes clean
+  `x1`/`x2`, baking any transform first (`bakeLineTransform`).
+- **Edit specs…** (`openStringsTable` / `STRING_COLS`) — a modal table mapping each
+  cell to a line attribute or derived value. Notable mappings: `dia` → `data-dia` +
+  `stroke-width`; `len` → `data-len` + `y2` (`= y1 + len`); `x` → `x1` + `x2`.
+  One undo entry per editing session (`markStringsDirty`).
+- **Align** (`alignStrings` top/middle/bottom, `alignStringsToCurve` top/bottom) —
+  **Invariant: alignment is vertical-only.** It never touches `x1`/`x2` and never
+  changes a string's length, so the parallel air-gap is always preserved. Length is
+  taken from `data-len` (fallback: `|y2-y1|`). Curve alignment samples a selected
+  `<path>` and maps each string's chosen end to the path's y at that string's x
+  (nearest-x sampling; assumes the curve is roughly monotonic in x).
+
+Headless verification of all of the above is in `test-hedit.sh` (and the ad-hoc
+harnesses it inspired); run it after any change to the strings logic.
+
 ## Conventions
 
 - Vanilla JS, `"use strict"`, no frameworks or external libs — keep it that way; the single-file,

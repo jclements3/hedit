@@ -85,6 +85,20 @@
   .ov-pen-preview{fill:none; stroke:var(--accent2); stroke-width:1.5; vector-effect:non-scaling-stroke}
   .ov-shape-preview{fill:rgba(110,168,254,.15); stroke:var(--accent); stroke-width:1; vector-effect:non-scaling-stroke}
   .ov-marquee{fill:rgba(110,168,254,.12); stroke:var(--accent); stroke-width:1; vector-effect:non-scaling-stroke; stroke-dasharray:3 3}
+  /* strings spec-table modal */
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:50}
+  .modal[hidden]{display:none}
+  .modal-box{background:var(--panel); border:1px solid var(--line); border-radius:10px; width:min(1000px,95vw); max-height:88vh; display:flex; flex-direction:column; overflow:hidden}
+  .modal-head{display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line)}
+  .modal-head h3{margin:0; font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--muted)}
+  .modal-body{overflow:auto; padding:8px 12px}
+  #strings-table{border-collapse:collapse; width:100%; font-size:12px}
+  #strings-table th,#strings-table td{border:1px solid var(--line); padding:2px 4px; text-align:center; white-space:nowrap}
+  #strings-table th{position:sticky; top:0; background:var(--panel2); color:var(--muted); font-weight:600; z-index:1}
+  #strings-table input[type=text],#strings-table input[type=number]{width:64px; background:var(--panel2); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:2px 4px; font-size:12px}
+  #strings-table input.w-sm{width:44px}
+  #strings-table input[type=color]{width:30px; height:22px; padding:0; border:1px solid var(--line); border-radius:4px; background:none; cursor:pointer}
+  #strings-table .row-del{cursor:pointer; color:var(--close); background:none; border:none; font-size:15px; line-height:1}
 </style>
 </head>
 <body>
@@ -184,6 +198,30 @@
     </div>
 
     <div>
+      <h3>Strings (harp)</h3>
+      <div class="row">
+        <label title="Edge-to-edge air gap between adjacent strings, in SVG units">Air gap</label>
+        <input type="number" id="string-gap" step="0.1" value="13">
+      </div>
+      <div class="seg" style="margin-top:6px">
+        <button id="string-gap-btn" title="Make every string line vertical and space them with a constant edge-to-edge air gap (accounts for each string's diameter)">Parallel air-gap</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button id="string-table-btn" style="flex:1" title="Edit the string specification table">Edit specs…</button>
+      </div>
+      <div class="row" style="margin-top:8px"><label>Align (vertical only)</label></div>
+      <div class="seg">
+        <button id="align-top" title="Align all string tops; lengths & air gap preserved">Top</button>
+        <button id="align-middle" title="Center strings vertically; lengths & air gap preserved">Middle</button>
+        <button id="align-bottom" title="Align all string bottoms; lengths & air gap preserved">Bottom</button>
+      </div>
+      <div class="seg" style="margin-top:6px">
+        <button id="align-curve-top" title="Align string TOP ends to a selected path/curve">Tops on curve</button>
+        <button id="align-curve-bottom" title="Align string BOTTOM ends to a selected path/curve">Bottoms on curve</button>
+      </div>
+    </div>
+
+    <div>
       <h3>View</h3>
       <div class="seg">
         <button id="zoom-out">−</button>
@@ -199,6 +237,18 @@
     </div>
   </div>
 </main>
+
+<div id="strings-modal" class="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>String specifications</h3>
+      <div class="spacer"></div>
+      <button id="strings-apply-gap" title="Re-apply the parallel air-gap with current diameters">Apply air-gap</button>
+      <button id="strings-close">Close</button>
+    </div>
+    <div class="modal-body"><table id="strings-table"></table></div>
+  </div>
+</div>
 
 <footer>
   <span id="status">Ready.</span>
@@ -1146,6 +1196,18 @@ function readGap(){ const v = parseFloat(document.getElementById("distribute-gap
 function readIncludeStroke(){ return document.getElementById("distribute-stroke").checked; }
 document.getElementById("dist-h").onclick = () => distribute("h", readGap(), readIncludeStroke());
 document.getElementById("dist-v").onclick = () => distribute("v", readGap(), readIncludeStroke());
+document.getElementById("string-gap-btn").onclick = () => parallelAirGapStrings(readStringGap());
+document.getElementById("string-table-btn").onclick = openStringsTable;
+document.getElementById("align-top").onclick = () => alignStrings("top");
+document.getElementById("align-middle").onclick = () => alignStrings("middle");
+document.getElementById("align-bottom").onclick = () => alignStrings("bottom");
+document.getElementById("align-curve-top").onclick = () => alignStringsToCurve("top");
+document.getElementById("align-curve-bottom").onclick = () => alignStringsToCurve("bottom");
+document.getElementById("strings-close").onclick = closeStringsTable;
+document.getElementById("strings-apply-gap").onclick = () => { parallelAirGapStrings(readStringGap()); buildStringsTable(); };
+// close the spec modal on backdrop click or Escape
+document.getElementById("strings-modal").addEventListener("mousedown", e => { if(e.target.id === "strings-modal") closeStringsTable(); });
+document.getElementById("strings-modal").addEventListener("keydown", e => { if(e.key === "Escape"){ e.stopPropagation(); closeStringsTable(); } });
 
 ["fill-on","stroke-on","fill-color","stroke-color","stroke-width"].forEach(id => {
   document.getElementById(id).addEventListener("change", applyStyleToSelection);
@@ -1248,6 +1310,190 @@ window.addEventListener("keyup", e => {
   if(e.code === "Space"){ spaceDown = false; stage.style.cursor = ""; }
 });
 window.addEventListener("resize", () => { applyView(); renderOverlay(); });
+
+// =====================================================================
+// STRINGS (harp): parallel air-gap arrangement + spec table
+// A "string" is a <line> in the content layer. stroke-width == diameter.
+// =====================================================================
+function stringLines(){ return [...contentGroup.querySelectorAll("line")]; }
+
+// fold any transform into the x1/y1/x2/y2 attributes so coords are clean
+function bakeLineTransform(el){
+  if(!el.getAttribute("transform")) return;
+  const p1 = toUserFromLocal(el, { x:parseFloat(el.getAttribute("x1"))||0, y:parseFloat(el.getAttribute("y1"))||0 });
+  const p2 = toUserFromLocal(el, { x:parseFloat(el.getAttribute("x2"))||0, y:parseFloat(el.getAttribute("y2"))||0 });
+  el.setAttribute("x1", fmt(p1.x)); el.setAttribute("y1", fmt(p1.y));
+  el.setAttribute("x2", fmt(p2.x)); el.setAttribute("y2", fmt(p2.y));
+  el.removeAttribute("transform");
+}
+function readStringGap(){ const v = parseFloat(document.getElementById("string-gap").value); return isNaN(v)?0:v; }
+
+// make every string vertical and space them so the visible edge-to-edge gap
+// between adjacent strings is constant (each string's diameter is accounted for)
+function parallelAirGapStrings(gap){
+  const lines = stringLines();
+  if(lines.length < 2){ setStatus("Need at least 2 string lines."); return; }
+  pushUndo();
+  lines.forEach(bakeLineTransform);
+  lines.sort((a,b) => (parseFloat(a.getAttribute("x1"))||0) - (parseFloat(b.getAttribute("x1"))||0));
+  const rad = el => effectiveStrokeWidth(el) / 2;     // half the diameter
+  let prevX = parseFloat(lines[0].getAttribute("x1")) || 0;   // anchor the leftmost string
+  lines[0].setAttribute("x1", fmt(prevX));            // force the anchor perfectly vertical too
+  lines[0].setAttribute("x2", fmt(prevX));
+  for(let k = 1; k < lines.length; k++){
+    const cur = lines[k];
+    const x = prevX + rad(lines[k-1]) + gap + rad(cur);
+    cur.setAttribute("x1", fmt(x)); cur.setAttribute("x2", fmt(x));
+    prevX = x;
+  }
+  pathModel = null;
+  renderOverlay();
+  setStatus(`Enforced ${fmt(gap)} parallel air-gap across ${lines.length} strings.`);
+}
+
+// --- vertical alignment ---------------------------------------------
+// Alignment moves each string only vertically: x1/x2 are never touched (so the
+// parallel separation / air gap is preserved) and each string keeps its length.
+function stringGeom(el){
+  bakeLineTransform(el);
+  const y1 = parseFloat(el.getAttribute("y1")) || 0, y2 = parseFloat(el.getAttribute("y2")) || 0;
+  const top = Math.min(y1, y2), bot = Math.max(y1, y2);
+  const len = parseFloat(el.getAttribute("data-len")) || (bot - top);
+  return { el, top, bot, len, x: parseFloat(el.getAttribute("x1")) || 0 };
+}
+function placeString(el, top, len){
+  el.setAttribute("y1", fmt(top));
+  el.setAttribute("y2", fmt(top + len));
+}
+function alignStrings(mode){
+  const lines = stringLines();
+  if(!lines.length){ setStatus("No strings to align."); return; }
+  pushUndo();
+  const g = lines.map(stringGeom);
+  let target;
+  if(mode === "top")    target = Math.min(...g.map(i => i.top));
+  else if(mode === "bottom") target = Math.max(...g.map(i => i.bot));
+  else /* middle */     target = g.reduce((s,i) => s + (i.top + i.bot)/2, 0) / g.length;
+  g.forEach(i => {
+    if(mode === "top")         placeString(i.el, target, i.len);
+    else if(mode === "bottom") placeString(i.el, target - i.len, i.len);
+    else                       placeString(i.el, target - i.len/2, i.len);
+  });
+  pathModel = null; renderOverlay();
+  setStatus(`Aligned ${lines.length} strings (${mode}). Air gap & lengths preserved.`);
+}
+
+// Align one end of every string onto a selected <path> curve (the other end
+// follows so each string keeps its length). `end` is "top" or "bottom".
+function alignStringsToCurve(end){
+  const lines = stringLines();
+  if(!lines.length){ setStatus("No strings to align."); return; }
+  const curve = selection && selection.tagName.toLowerCase() === "path" ? selection : null;
+  if(!curve){ setStatus("Select a path to use as the curve (Select tool), then click On curve."); return; }
+  const total = curve.getTotalLength();
+  if(!total){ setStatus("Selected path has no length."); return; }
+  const N = Math.max(300, Math.ceil(total));
+  const samples = [];
+  for(let i = 0; i <= N; i++) samples.push(curve.getPointAtLength(total * i / N));
+  const yAtX = x => {                       // nearest sampled point by x
+    let best = null;
+    for(const s of samples){ const d = Math.abs(s.x - x); if(!best || d < best.d) best = { d, y:s.y }; }
+    return best ? best.y : null;
+  };
+  pushUndo();
+  lines.forEach(el => {
+    const i = stringGeom(el);
+    const cy = yAtX(i.x);
+    if(cy == null) return;
+    if(end === "bottom") placeString(el, cy - i.len, i.len);
+    else                 placeString(el, cy, i.len);
+  });
+  pathModel = null; renderOverlay();
+  setStatus(`Aligned ${lines.length} string ${end} ends to the curve. Air gap & lengths preserved.`);
+}
+
+// --- spec table -----------------------------------------------------
+// each column maps a table cell to an attribute (or a derived value) on the line
+const STRING_COLS = [
+  { key:"num",  label:"#",     attr:"data-num",  type:"text",   w:"w-sm" },
+  { key:"note", label:"Note",  attr:"data-note", type:"text",   w:"w-sm" },
+  { key:"color",label:"Color", type:"color" },
+  { key:"dia",  label:"Dia",   type:"number" },   // -> data-dia + stroke-width
+  { key:"len",  label:"Len",   type:"number" },   // -> data-len + y2 (= y1 + len)
+  { key:"ten",  label:"Ten",   attr:"data-ten",  type:"number" },
+  { key:"core", label:"Core",  attr:"data-core", type:"text" },
+  { key:"wrap", label:"Wrap",  attr:"data-wrap", type:"text" },
+  { key:"cdia", label:"cdia",  attr:"data-cdia", type:"number", w:"w-sm" },
+  { key:"wdia", label:"wdia",  attr:"data-wdia", type:"number", w:"w-sm" },
+  { key:"x",    label:"X",     type:"number" },   // -> x1 + x2 (position)
+];
+let stringsEditDirty = false;   // one undo entry per table-editing session
+function markStringsDirty(){ if(!stringsEditDirty){ pushUndo(); stringsEditDirty = true; } }
+
+function readCell(el, key){
+  switch(key){
+    case "color": return toHex(getStyle(el, "stroke") || "#000000");
+    case "dia":   return el.getAttribute("data-dia") || getStyle(el, "stroke-width") || "";
+    case "len":   return el.getAttribute("data-len")
+                    || fmt(Math.abs((parseFloat(el.getAttribute("y2"))||0) - (parseFloat(el.getAttribute("y1"))||0)));
+    case "x":     return el.getAttribute("x1") || "";
+    default:      return el.getAttribute(STRING_COLS.find(c => c.key === key).attr) || "";
+  }
+}
+function writeCell(el, key, val){
+  markStringsDirty();
+  switch(key){
+    case "color": el.setAttribute("stroke", val); break;
+    case "dia":   el.setAttribute("data-dia", val); el.setAttribute("stroke-width", val); break;
+    case "len": {
+      el.setAttribute("data-len", val);
+      const y1 = parseFloat(el.getAttribute("y1")) || 0;
+      el.setAttribute("y2", fmt(y1 + (parseFloat(val) || 0)));
+      break;
+    }
+    case "x":     el.setAttribute("x1", val); el.setAttribute("x2", val); break;
+    default:      el.setAttribute(STRING_COLS.find(c => c.key === key).attr, val);
+  }
+  if(selection === el) readStyleFromSelection();
+  renderOverlay();
+}
+
+function buildStringsTable(){
+  const table = document.getElementById("strings-table");
+  table.innerHTML = "";
+  const head = document.createElement("tr");
+  head.innerHTML = "<th></th>" + STRING_COLS.map(c => `<th>${c.label}</th>`).join("");
+  table.appendChild(head);
+  stringLines().forEach(el => {
+    const tr = document.createElement("tr");
+    const delTd = document.createElement("td");
+    const del = document.createElement("button");
+    del.className = "row-del"; del.textContent = "×"; del.title = "Delete this string";
+    del.onclick = () => { markStringsDirty(); el.remove(); buildStringsTable(); renderOverlay(); };
+    delTd.appendChild(del); tr.appendChild(delTd);
+    STRING_COLS.forEach(c => {
+      const td = document.createElement("td");
+      const inp = document.createElement("input");
+      inp.type = c.type;
+      if(c.type === "number") inp.step = "0.001";
+      if(c.w) inp.className = c.w;
+      inp.value = readCell(el, c.key);
+      inp.addEventListener("change", () => writeCell(el, c.key, inp.value));
+      td.appendChild(inp); tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+}
+function openStringsTable(){
+  if(!stringLines().length){ setStatus("No string (line) elements to edit."); return; }
+  stringsEditDirty = false;
+  buildStringsTable();
+  document.getElementById("strings-modal").hidden = false;
+}
+function closeStringsTable(){
+  document.getElementById("strings-modal").hidden = true;
+  renderOverlay();
+}
 
 // =====================================================================
 // SAMPLE CONTENT (so the editor is immediately usable / testable)
