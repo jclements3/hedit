@@ -104,6 +104,18 @@ document is `strings.svg`. The **Strings (harp)** panel section drives this:
   the content layer stays purely graphical). Layout values are *measured from geometry*
   at save time, so they survive undo/manual edits. Don't use `<script>` for this —
   `sanitizeSVG` strips it.
+- **+X/+Z frame** (`orientXZ` / `transformContentCoords`) — toggles the harp into a
+  right-handed CAD frame: **+X right, +Z up, Y into the page**, origin at the content
+  bounding-box bottom-left, all coordinates ≥ 0. It rewrites content coordinates into
+  X-Z (`X = x − minX`, `Z = maxY − y`) and puts a `matrix(1 0 0 -1 minX maxY)` flip on
+  `contentGroup` so it still renders upright (appearance is preserved — verified to
+  ~0.001). Persisted on save by wrapping content in `<g id="hedit-frame" data-frame=
+  "RH-XZ" transform=…>` (+ `layout.frame` in the metadata) and detected/unwrapped on
+  load. Because a content transform now exists, the editor's coordinate conversions are
+  flip-aware: stage↔content via `toContent`/`screenVecToContent`, alignment top/bottom
+  swap via `yIsFlipped`, and move/draw/pen/fit go through these. Read flip params back
+  from the transform *attribute* (`frameParams`), not `getCTM` (which can fold in the
+  viewport scale).
 - **Select all strings** (`selectAllStrings`) — selects every `<line>` as a group.
 - **Rotate group** (`rotateStrings`) — rigid rotation of all string endpoints about
   the group's bounding-box center. Because a rigid rotation preserves all distances
