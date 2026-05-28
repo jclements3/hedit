@@ -225,11 +225,35 @@
       <summary><span class="step">4</span> Fit curve to ends</summary>
       <div class="sec-body">
         <div class="row">
-          <label title="Maximum on-curve nodes in the fit (endpoints pinned to the first/last bottom)">Max nodes</label>
+          <label title="Max on-curve nodes (smooth C2 spline; endpoints pinned)">Max nodes</label>
           <input type="number" id="fit-nodes" min="2" step="1" value="8">
         </div>
-        <button id="fit-bottoms-btn" class="btn-primary" title="Fit a cubic-Bezier curve (Schneider) through the bottom ends of the selected lines (or all strings if none selected), capped at Max nodes with fixed endpoints; draws it and opens it for node editing">Fit curve to ends</button>
-        <button id="clear-curve-btn" class="danger" title="Delete the fitted bottom curve(s)">Clear fitted curve</button>
+        <div class="seg">
+          <button id="fit-bottoms-btn" class="btn-primary" title="Fit a smooth C2 curve through the BOTTOM ends of the selected lines (or all strings)">Fit bottoms</button>
+          <button id="fit-tops-btn" class="btn-primary" title="Fit a smooth C2 curve through the TOP ends of the selected lines (or all strings)">Fit tops</button>
+        </div>
+        <button id="clear-curve-btn" class="danger" title="Delete the fitted curve(s) (bottom and top)">Clear fitted curves</button>
+        <div class="row" style="margin-top:8px">
+          <label title="Shift the selected path/curve (or the fitted curves) vertically">Shift</label>
+          <input type="number" id="shift-amt" step="1" value="13">
+        </div>
+        <div class="row">
+          <label title="Use the string air gap as the shift step instead of the amount">× air gap</label>
+          <input type="checkbox" id="shift-gap">
+        </div>
+        <div class="seg">
+          <button id="shift-up-btn" title="Shift up">Shift ↑</button>
+          <button id="shift-down-btn" title="Shift down">Shift ↓</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="sec harp">
+      <summary><span class="step">6</span> Pins &amp; sensors</summary>
+      <div class="sec-body">
+        <button id="add-pins-btn" title="Add a pin dot per string: from the top end, ~30° up-and-left, 3 air-gaps away">Add pins</button>
+        <button id="add-sensors-btn" title="Add natural/sharp/midi RGB dots along each string at the Paraguayan fractions (0.0561L / 0.1091L / 0.125L below the tip)">Add sensor dots (RGB)</button>
+        <button id="clear-annot-btn" class="danger" title="Remove all pins and sensor dots">Clear pins &amp; dots</button>
       </div>
     </details>
 
@@ -1516,11 +1540,15 @@ document.getElementById("align-bottom").onclick = () => alignStrings("bottom");
 document.getElementById("align-curve-top").onclick = () => alignStringsToCurve("top");
 document.getElementById("align-curve-bottom").onclick = () => alignStringsToCurve("bottom");
 document.getElementById("xz-btn").onclick = orientXZ;
-document.getElementById("fit-bottoms-btn").onclick = () => {
-  const v = parseInt(document.getElementById("fit-nodes").value, 10);
-  fitBottomsCurve(isNaN(v) ? 8 : Math.max(2, v));
-};
-document.getElementById("clear-curve-btn").onclick = clearBottomCurve;
+const readFitNodes = () => { const v = parseInt(document.getElementById("fit-nodes").value, 10); return isNaN(v) ? 8 : Math.max(2, v); };
+document.getElementById("fit-bottoms-btn").onclick = () => fitEndsCurve("bottoms", readFitNodes());
+document.getElementById("fit-tops-btn").onclick = () => fitEndsCurve("tops", readFitNodes());
+document.getElementById("clear-curve-btn").onclick = clearFitCurves;
+document.getElementById("shift-up-btn").onclick = () => shiftCurves(true);
+document.getElementById("shift-down-btn").onclick = () => shiftCurves(false);
+document.getElementById("add-pins-btn").onclick = addPins;
+document.getElementById("add-sensors-btn").onclick = addSensorDots;
+document.getElementById("clear-annot-btn").onclick = clearAnnotations;
 // ---- editor canvas background (view-only; persisted, not saved in the SVG) ----
 const CANVAS_BG_KEY = "hedit:canvasbg";
 const canvasWrap = document.querySelector(".canvas-wrap");
@@ -2271,9 +2299,12 @@ function fitSmoothSpline(points, maxNodes){
 // Fit a cubic-Bezier curve through the string BOTTOM ends and draw it as a
 // red reference <path data-role="bottom-curve"> (regenerated each call).
 // Select it + "Bottoms on curve" to align the strings to it.
-// remove the fitted bottom curve(s) so you can re-fit from a clean slate
-function clearBottomCurve(){
-  const paths = [...contentGroup.querySelectorAll('path[data-role="bottom-curve"]')];
+const FIT_ROLE  = { bottoms:"bottom-curve", tops:"top-curve" };
+const FIT_COLOR = { bottoms:"#cc2222",      tops:"#2255cc"   };   // red bottoms / blue tops
+
+// remove the fitted curve(s) (both bottom and top) so you can re-fit cleanly
+function clearFitCurves(){
+  const paths = [...contentGroup.querySelectorAll('path[data-role="bottom-curve"],path[data-role="top-curve"]')];
   if(!paths.length){ setStatus("No fitted curve to clear."); return; }
   pushUndo();
   paths.forEach(p => p.remove());
@@ -2281,36 +2312,114 @@ function clearBottomCurve(){
   clearSelection(); renderOverlay();
   setStatus(`Cleared ${paths.length} fitted curve${paths.length > 1 ? "s" : ""}.`);
 }
-function fitBottomsCurve(maxNodes){
-  // fit through the bottom ends of the SELECTED lines (2+), else all strings
+const clearBottomCurve = clearFitCurves;   // back-compat alias
+
+// Fit a smooth (C2) curve through the BOTTOM or TOP ends of the selected lines
+// (2+), else all strings. which = "bottoms" | "tops".
+function fitEndsCurve(which, maxNodes){
   const isLine = el => el && el.tagName && el.tagName.toLowerCase() === "line" && el.getAttribute("data-role") !== "s-axis";
   const selLines = selected.filter(isLine);
   const usingSel = selLines.length >= 2;
   const src = usingSel ? selLines : stringLines();
   if(src.length < 2){ setStatus("Select 2+ lines (or load strings) to fit a curve to their ends."); return; }
-  const flip = yIsFlipped();   // visual bottom = larger screen-y (= smaller stored y when flipped)
+  const flip = yIsFlipped();
+  const wantLower = (which === "bottoms");
   const pts = src.map(el => {
-    const x1=+el.getAttribute("x1"), y1=+el.getAttribute("y1"), x2=+el.getAttribute("x2"), y2=+el.getAttribute("y2");
-    const lowerIsLargerY = !flip;
-    return lowerIsLargerY ? (y1 >= y2 ? [x1,y1] : [x2,y2]) : (y1 <= y2 ? [x1,y1] : [x2,y2]);
-  }).sort((a,b) => a[0]-b[0]);
+    const a = [+el.getAttribute("x1"), +el.getAttribute("y1")], b = [+el.getAttribute("x2"), +el.getAttribute("y2")];
+    // visually-lower endpoint = larger screen-y (larger stored y unless flipped)
+    const lower = (!flip ? (a[1] >= b[1]) : (a[1] <= b[1])) ? a : b;
+    const upper = (lower === a) ? b : a;
+    return wantLower ? lower : upper;
+  }).sort((p,q) => p[0]-q[0]);
   pushUndo();
-  [...contentGroup.querySelectorAll('path[data-role="bottom-curve"]')].forEach(p => p.remove());
+  const role = FIT_ROLE[which];
+  [...contentGroup.querySelectorAll('path[data-role="' + role + '"]')].forEach(p => p.remove());
   const curves = fitSmoothSpline(pts, maxNodes);   // C2 natural-spline: smooth, no kink/overshoot
   if(!curves.length){ setStatus("Could not fit a curve."); return; }
   let d = "M " + fmt(curves[0][0][0]) + " " + fmt(curves[0][0][1]);
   for(const c of curves)
     d += " C " + fmt(c[1][0]) + " " + fmt(c[1][1]) + " " + fmt(c[2][0]) + " " + fmt(c[2][1]) + " " + fmt(c[3][0]) + " " + fmt(c[3][1]);
   const path = document.createElementNS(SVGNS, "path");
-  path.setAttribute("data-role", "bottom-curve");
+  path.setAttribute("data-role", role);
   path.setAttribute("d", d);
   path.setAttribute("fill", "none");
-  path.setAttribute("stroke", "#cc2222"); path.setAttribute("stroke-width", "1.5");
+  path.setAttribute("stroke", FIT_COLOR[which]); path.setAttribute("stroke-width", "1.5");
   contentGroup.appendChild(path);
-  // drop into node-editing the new curve so its anchors + handles are visible
-  // right away (enterNodeEdit also sets `selection`, so "Bottoms on curve" still works)
   setTool("node"); enterNodeEdit(path); renderOverlay();
-  setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} ${usingSel ? "selected line" : "string"} ends. Drag the green handles to tweak, or click "Bottoms on curve" to align.`);
+  setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} ${which === "bottoms" ? "bottom" : "top"} ends${usingSel ? " (selected)" : ""}. Drag handles, or click "${which === "bottoms" ? "Bottoms" : "Tops"} on curve" to align.`);
+}
+function fitBottomsCurve(maxNodes){ return fitEndsCurve("bottoms", maxNodes); }   // back-compat
+
+// ---- per-string annotations: tuning pins + RGB sensor dots ----
+// Paraguayan fractions: dot sits k*L below the tip (L = string length).
+const SENSORS = [
+  { role:"natural", k: 1 - 0.9439, color:"#e6261f" },   // R
+  { role:"sharp",   k: 1 - 0.8909, color:"#3ad13a" },   // G
+  { role:"midi",    k: 0.125,      color:"#2d7ff9" },   // B
+];
+function stringEnds(el){   // visual top/bottom endpoints in stored coords
+  const a = [+el.getAttribute("x1"), +el.getAttribute("y1")], b = [+el.getAttribute("x2"), +el.getAttribute("y2")];
+  const flip = yIsFlipped();
+  const lower = ((!flip ? (a[1] >= b[1]) : (a[1] <= b[1])) ? a : b);   // visually-lower end
+  return { top: (lower === a ? b : a), bot: lower };
+}
+function mkDot(cx, cy, r, role, fill, num){
+  const c = document.createElementNS(SVGNS, "circle");
+  c.setAttribute("data-role", role); if(num != null) c.setAttribute("data-num", num);
+  c.setAttribute("cx", fmt(cx)); c.setAttribute("cy", fmt(cy)); c.setAttribute("r", fmt(r));
+  c.setAttribute("fill", fill); c.setAttribute("stroke", "none");
+  contentGroup.appendChild(c);
+}
+function clearByRole(roles){ roles.forEach(r => [...contentGroup.querySelectorAll('[data-role="' + r + '"]')].forEach(e => e.remove())); }
+
+// a pin dot per string: from the top end, ~30 deg up-and-to-the-left, 3 air-gaps away
+function addPins(){
+  const strings = stringLines(); if(!strings.length){ setStatus("No strings to pin."); return; }
+  pushUndo(); clearByRole(["pin"]);
+  const flip = yIsFlipped(), dist = 3 * readStringGap();
+  const ang = (flip ? 30 : -30) * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);
+  strings.forEach(el => {
+    const { top, bot } = stringEnds(el);
+    let ux = top[0]-bot[0], uy = top[1]-bot[1]; const L = Math.hypot(ux,uy) || 1; ux/=L; uy/=L;   // up dir
+    const dx = ux*ca - uy*sa, dy = ux*sa + uy*ca;                                                  // rotate up by ang
+    mkDot(top[0] + dx*dist, top[1] + dy*dist, 2.5, "pin", "#ffb454", el.getAttribute("data-num"));
+  });
+  renderOverlay(); setStatus(`Added ${strings.length} pin dots (30° up-left, ${fmt(dist)} away).`);
+}
+// natural / sharp / midi RGB dots along each string at the Paraguayan fractions
+function addSensorDots(){
+  const strings = stringLines(); if(!strings.length){ setStatus("No strings for sensor dots."); return; }
+  pushUndo(); clearByRole(SENSORS.map(s => s.role));
+  strings.forEach(el => {
+    const { top, bot } = stringEnds(el);
+    let dx = bot[0]-top[0], dy = bot[1]-top[1]; const L = Math.hypot(dx,dy) || 1; const ux = dx/L, uy = dy/L;  // down dir
+    SENSORS.forEach(s => mkDot(top[0] + ux*(s.k*L), top[1] + uy*(s.k*L), 1.4, s.role, s.color, el.getAttribute("data-num")));
+  });
+  renderOverlay(); setStatus(`Added natural/sharp/midi dots on ${strings.length} strings.`);
+}
+function clearAnnotations(){
+  pushUndo(); clearByRole(["pin","natural","sharp","midi"]); renderOverlay(); setStatus("Cleared pins & sensor dots.");
+}
+
+// shift the selected path(s), else the fitted curves, vertically (visual up/down)
+// by a specific amount or by the air gap
+function shiftCurves(visualUp){
+  const amtIn = parseFloat(document.getElementById("shift-amt").value) || 0;
+  const useGap = document.getElementById("shift-gap").checked;
+  const amt = (useGap ? readStringGap() : amtIn);
+  if(!amt){ setStatus("Set a shift amount (or check air gap)."); return; }
+  const dyStored = (yIsFlipped() ? 1 : -1) * amt * (visualUp ? 1 : -1);   // visual up/down -> stored y
+  let targets = selected.filter(el => el && el.tagName && el.tagName.toLowerCase() === "path");
+  if(!targets.length) targets = [...contentGroup.querySelectorAll('path[data-role="bottom-curve"],path[data-role="top-curve"]')];
+  if(!targets.length){ setStatus("Select a path/curve to shift (or fit one first)."); return; }
+  pushUndo();
+  targets.forEach(el => {
+    const subs = segsToSubpaths(parsePathD(el.getAttribute("d") || ""));
+    subs.forEach(sub => sub.nodes.forEach(nd => { nd.y += dyStored; if(nd.hasIn) nd.inY += dyStored; if(nd.hasOut) nd.outY += dyStored; }));
+    el.setAttribute("d", subsToD(subs));
+  });
+  pathModel = null; clearSelection(); renderOverlay();
+  setStatus(`Shifted ${targets.length} path(s) ${visualUp ? "up" : "down"} by ${fmt(amt)}${useGap ? " (air gap)" : ""}.`);
 }
 
 // =====================================================================
