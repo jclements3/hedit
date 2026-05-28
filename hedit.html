@@ -46,6 +46,12 @@
   .tool svg{width:18px;height:18px}
   .canvas-wrap{flex:1; position:relative; min-width:0; background:
       repeating-conic-gradient(#2a2c36 0% 25%, #23252e 0% 50%) 50% / 22px 22px;}
+  .canvas-wrap.dragover::after{
+    content:"Drop SVG to open"; position:absolute; inset:0; display:flex;
+    align-items:center; justify-content:center; font-size:15px; color:var(--accent);
+    background:rgba(110,168,254,.12); outline:2px dashed var(--accent); outline-offset:-6px;
+    pointer-events:none; z-index:10;
+  }
   #stage{position:absolute; inset:0; width:100%; height:100%; cursor:default; touch-action:none}
   #stage.tool-pen{cursor:crosshair}
   #stage.tool-rect,#stage.tool-ellipse{cursor:crosshair}
@@ -1124,7 +1130,7 @@ function zoomBy(f){
 // WIRE UP CONTROLS
 // =====================================================================
 document.getElementById("btn-new").onclick = () => { if(confirm("Discard current document?")) newDoc(); };
-document.getElementById("btn-open").onclick = () => fileInput.click();
+document.getElementById("btn-open").onclick = openFile;
 document.getElementById("btn-save").onclick = saveSVG;
 document.getElementById("btn-undo").onclick = undo;
 document.getElementById("btn-redo").onclick = redo;
@@ -1145,13 +1151,63 @@ document.getElementById("dist-v").onclick = () => distribute("v", readGap(), rea
   document.getElementById(id).addEventListener("change", applyStyleToSelection);
 });
 
-fileInput.addEventListener("change", e => {
-  const f = e.target.files[0]; if(!f) return;
+// read a File (or Blob with a name) as text and load it
+function loadFile(file){
+  if(!file) return;
   const r = new FileReader();
-  r.onload = () => loadSVGText(r.result, f.name);
-  r.readAsText(f);
+  r.onload = () => loadSVGText(r.result, file.name || "untitled.svg");
+  r.onerror = () => setStatus("Could not read the file.");
+  r.readAsText(file);
+}
+
+// Open: prefer the File System Access API (remembers the last-used folder per
+// `id`, persisted across sessions by the browser); fall back to <input type=file>.
+async function openFile(){
+  if(window.showOpenFilePicker){
+    try{
+      const [handle] = await window.showOpenFilePicker({
+        id: "hedit-svg",              // browser remembers a separate last folder for this id
+        startIn: "documents",         // first-time default before any folder is remembered
+        multiple: false,
+        types: [{ description:"SVG image", accept:{ "image/svg+xml":[".svg"] } }],
+      });
+      loadFile(await handle.getFile());
+    }catch(e){
+      if(e && e.name === "AbortError") return;   // user cancelled the dialog
+      fileInput.click();                          // anything else: fall back
+    }
+    return;
+  }
+  fileInput.click();   // browser without File System Access (e.g. Firefox, or file://)
+}
+
+fileInput.addEventListener("change", e => {
+  loadFile(e.target.files[0]);
   fileInput.value = "";
 });
+
+// Drag-and-drop an SVG anywhere on the canvas. Window-level handlers stop the
+// browser from navigating away when a file is dropped outside the drop zone.
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => e.preventDefault());
+(function wireDrop(){
+  const wrap = document.querySelector(".canvas-wrap");
+  const hasFile = e => e.dataTransfer && [...e.dataTransfer.items || []].some(i => i.kind === "file");
+  wrap.addEventListener("dragover", e => {
+    if(!hasFile(e)) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "copy"; wrap.classList.add("dragover");
+  });
+  wrap.addEventListener("dragleave", e => {
+    if(e.target === wrap) wrap.classList.remove("dragover");
+  });
+  wrap.addEventListener("drop", e => {
+    e.preventDefault(); wrap.classList.remove("dragover");
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(!f) return;
+    if(!/\.svg$/i.test(f.name) && f.type !== "image/svg+xml"){ setStatus("Drop an .svg file to open it."); return; }
+    loadFile(f);
+  });
+})();
 
 function deleteSelection(){
   if(tool === "node" && selectedNode){ deleteSelectedNode(); return; }
