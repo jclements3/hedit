@@ -313,7 +313,14 @@ function buildLayers(){
   overlayGroup.setAttribute("id", "overlay");
   stage.appendChild(contentGroup);
   stage.appendChild(overlayGroup);
+  // (re)attach the autosave observer to the fresh content layer
+  if(window.MutationObserver){
+    if(contentObserver) contentObserver.disconnect();
+    contentObserver = new MutationObserver(() => { if(typeof schedulePersist === "function") schedulePersist(); });
+    contentObserver.observe(contentGroup, { childList:true, subtree:true, attributes:true });
+  }
 }
+let contentObserver = null;
 
 // ---- coordinate helpers ----
 function applyView(){
@@ -1180,7 +1187,8 @@ function loadSVGText(text, name){
     catch(e){ setStatus("Loaded, but the embedded harp spec was unreadable."); }
   }
 }
-function saveSVG(){
+// serialize the current document to SVG text (shared by Save and autosave)
+function serializeDoc(){
   const out = document.createElementNS(SVGNS, "svg");
   out.setAttribute("xmlns", SVGNS);
   out.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
@@ -1201,7 +1209,10 @@ function saveSVG(){
   });
   writeHarpMetadata(out);   // embed the complete harp definition (no-op if no strings); stays at <svg> root
   const body = new XMLSerializer().serializeToString(out);
-  const text = '<?xml version="1.0" encoding="UTF-8"?>\n' + body + "\n";
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + body + "\n";
+}
+function saveSVG(){
+  const text = serializeDoc();
   const blob = new Blob([text], { type:"image/svg+xml" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -1209,6 +1220,34 @@ function saveSVG(){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   setStatus("Saved " + a.download + ".");
+}
+
+// =====================================================================
+// AUTOSAVE  (persist the working document to localStorage so a reload
+// restores it instead of dropping back to the sample)
+// =====================================================================
+const AUTOSAVE_KEY = "hedit:autosave:svg";
+const AUTOSAVE_NAME = "hedit:autosave:name";
+let persistTimer = null, restoring = false;
+function persist(){
+  if(restoring) return;   // don't re-save while restoring
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, serializeDoc());
+    localStorage.setItem(AUTOSAVE_NAME, elFilename.textContent || "untitled.svg");
+  } catch(e){ /* storage disabled or over quota: ignore */ }
+}
+function schedulePersist(){ clearTimeout(persistTimer); persistTimer = setTimeout(persist, 400); }
+function clearAutosave(){ try { localStorage.removeItem(AUTOSAVE_KEY); localStorage.removeItem(AUTOSAVE_NAME); } catch(e){} }
+function restoreAutosave(){
+  let svg; try { svg = localStorage.getItem(AUTOSAVE_KEY); } catch(e){ return false; }
+  if(!svg) return false;
+  restoring = true;
+  try {
+    loadSVGText(svg, (function(){ try { return localStorage.getItem(AUTOSAVE_NAME); } catch(e){ return null; } })() || "untitled.svg");
+    setStatus("Restored your last session from this browser. Use New to start fresh.");
+    return true;
+  } catch(e){ return false; }
+  finally { restoring = false; }
 }
 function newDoc(){
   buildLayers();
@@ -1219,6 +1258,7 @@ function newDoc(){
   clearSelection(); renderOverlay();
   harpAlignment = null;
   frameXZ = false; contentGroup.removeAttribute("transform"); syncFrameButton();
+  clearAutosave();
   elFilename.textContent = "untitled.svg";
   setStatus("New document (800×600).");
 }
@@ -1858,8 +1898,8 @@ function loadSample(){
   setStatus("Sample document — switch to the Node tool (N) and drag a path's handles. Open… to load your own SVG.");
 }
 
-// boot
-loadSample();
+// boot: restore the last session if present, else show the sample
+if(!restoreAutosave()) loadSample();
 setTool("select");
 updateHint();
 </script>

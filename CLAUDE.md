@@ -134,6 +134,17 @@ document is `strings.svg`. The **Strings (harp)** panel section drives this:
 Headless verification of all of the above is in `test-hedit.sh` (and the ad-hoc
 harnesses it inspired); run it after any change to the strings logic.
 
+## Persistence
+
+The working document is auto-saved to `localStorage` (`hedit:autosave:svg`/`:name`) so a
+browser reload restores it instead of dropping back to the sample. `serializeDoc()` is the
+shared serializer (used by both **Save** and autosave). A `MutationObserver` on
+`contentGroup` (re-attached in `buildLayers`) debounce-calls `persist()` on any change;
+boot does `if(!restoreAutosave()) loadSample()`; **New** calls `clearAutosave()`. All
+localStorage access is wrapped in try/catch, so an opaque/blocked origin just no-ops
+(falls back to the sample + manual Save/Open). Note: `file://` localStorage works in
+Chrome but can be flaky — serve over `http://localhost` for reliable autosave.
+
 ## Conventions
 
 - Vanilla JS, `"use strict"`, no frameworks or external libs — keep it that way; the single-file,
