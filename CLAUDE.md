@@ -182,6 +182,18 @@ localStorage access is wrapped in try/catch, so an opaque/blocked origin just no
 (falls back to the sample + manual Save/Open). Note: `file://` localStorage works in
 Chrome but can be flaky — serve over `http://localhost` for reliable autosave.
 
+## UI layout
+
+The panels are **collapsible `<details class="sec">` cards** (CSS `.sec`/`.sec-body`, primary
+action = `.btn-primary`). The **left column (`.props-left`) is the harp workflow** in pipeline
+order — numbered cards: JSON file (DP/BP/SP/WP import/export) → 1 Strings → 2 Spacing → 3 Align
+ends → 4 Fit curve → 5 Transform → Arrange (generic, the only non-harp card). The **right column
+(`.props`) is the Inspector** for the selected object: Style / Node / View / Help. Header is
+grouped (File · Undo/Redo · Fit/Delete). The far-left strip is the tool palette (V/N/P/R/E).
+All control IDs are unchanged across the redesign — JS wiring keys off ids, not structure, so
+moving a control between cards is safe. The harp pipeline + Maker.js capability map is in
+`HARP_PLAN.md`.
+
 ## Conventions
 
 - Vanilla JS, `"use strict"`, no frameworks or external libs — keep it that way; the single-file,
