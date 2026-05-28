@@ -185,6 +185,7 @@
         </div>
         <button id="vim-source-btn" title="Edit the harp JSON directly in an embedded vim editor; Apply parses it back into the curves">Edit JSON (vim)</button>
         <button id="js-source-btn" title="Open a vim JavaScript console that runs in hedit's scope: call stringLines(), addPins(), fitEndsCurve(), contentGroup, exportHarpJSON()... Run to eval, Undo (Ctrl+Z) to revert">JS console (vim)</button>
+        <button id="wp-edit-btn" title="Edit the WP waterfall profile (f -> r cross-section width scale) by dragging nodes">Edit WP curve…</button>
       </div>
     </details>
 
@@ -389,6 +390,21 @@
     </div>
     <div class="modal-body" style="padding:0">
       <iframe id="vim-frame" title="vim" style="width:100%; height:100%; border:0; display:block; background:#1e1f26"></iframe>
+    </div>
+  </div>
+</div>
+
+<div id="wp-modal" class="modal" hidden>
+  <div class="modal-box" style="width:min(560px,95vw)">
+    <div class="modal-head">
+      <h3>WP waterfall (f → r width scale)</h3>
+      <span class="hint" style="margin-left:8px">drag nodes · double-click curve to add · click node + Del to remove</span>
+      <div class="spacer"></div>
+      <button id="wp-reset" title="Reset to a flat WP (r=1)">Reset</button>
+      <button id="wp-close">Close</button>
+    </div>
+    <div class="modal-body">
+      <svg id="wp-plot" viewBox="0 0 520 280" style="width:100%; height:auto; background:var(--panel2); border-radius:6px; touch-action:none"></svg>
     </div>
   </div>
 </div>
@@ -1715,6 +1731,9 @@ document.getElementById("vim-close").onclick = closeVimSource;
 document.getElementById("js-source-btn").onclick = openJsEditor;
 document.getElementById("js-run").onclick = runJsConsole;
 document.getElementById("js-close").onclick = closeJsEditor;
+document.getElementById("wp-edit-btn").onclick = openWpEditor;
+document.getElementById("wp-close").onclick = closeWpEditor;
+document.getElementById("wp-reset").onclick = () => { harpWP = { nodes:[{f:0,r:1},{f:0.5,r:1},{f:1,r:1}] }; wpSel=-1; renderWpPlot(); setStatus("WP reset to flat (r=1)."); };
 document.getElementById("js-modal").addEventListener("mousedown", e => { if(e.target.id === "js-modal") closeJsEditor(); });
 document.getElementById("vim-modal").addEventListener("mousedown", e => { if(e.target.id === "vim-modal") closeVimSource(); });
 jsonInput.addEventListener("change", e => {
@@ -2176,6 +2195,7 @@ function buildHarpModel(){
     units: docUnits(),
     layout: { airGap: measuredAirGap(), rotationDeg: measuredRotationDeg(), alignment: harpAlignment, frame: frameXZ ? "RH-XZ" : "SVG" },
     strings,
+    wp: harpWP || undefined,   // persist the WP waterfall profile so autosave keeps it
   };
 }
 // write the model into an export <svg> as the first child
@@ -2194,6 +2214,7 @@ function applyHarpModel(model){
     if(model.layout.airGap != null) document.getElementById("string-gap").value = model.layout.airGap;
     harpAlignment = model.layout.alignment != null ? model.layout.alignment : null;
   }
+  if(model.wp && model.wp.nodes) harpWP = model.wp;   // restore WP waterfall profile
   const n = model.strings ? model.strings.length : 0;
   setStatus(`Loaded harp spec: ${n} strings, air gap ${model.layout ? model.layout.airGap : "?"} ${model.units||""}.`);
   return true;
@@ -2780,6 +2801,55 @@ function closeJsEditor(){
   document.getElementById("js-modal").hidden = true;
   document.getElementById("js-frame").srcdoc = "";
 }
+
+// --- WP waterfall editor: a draggable f->r cross-section-width profile ---
+const WP_PLOT = { w:520, h:280, ml:42, mr:18, mt:18, mb:30 };
+let wpDrag = null, wpSel = -1;
+function ensureWP(){ if(!harpWP || !harpWP.nodes || harpWP.nodes.length < 2) harpWP = { nodes:[{f:0,r:1},{f:0.5,r:1},{f:1,r:1}] }; harpWP.nodes.sort((a,b)=>a.f-b.f); }
+function wpRMax(){ return Math.max(1.2, ...harpWP.nodes.map(n=>n.r)); }
+function wpEval(f){ const n=harpWP.nodes; if(f<=n[0].f) return n[0].r; if(f>=n[n.length-1].f) return n[n.length-1].r;
+  for(let i=0;i<n.length-1;i++) if(f>=n[i].f && f<=n[i+1].f){ const t=(f-n[i].f)/((n[i+1].f-n[i].f)||1), s=t*t*(3-2*t); return n[i].r+(n[i+1].r-n[i].r)*s; } return 1; }
+function wpX(f){ return WP_PLOT.ml + f*(WP_PLOT.w-WP_PLOT.ml-WP_PLOT.mr); }
+function wpY(r){ return (WP_PLOT.h-WP_PLOT.mb) - (r/wpRMax())*(WP_PLOT.h-WP_PLOT.mt-WP_PLOT.mb); }
+function wpInvX(px){ return Math.max(0, Math.min(1, (px-WP_PLOT.ml)/(WP_PLOT.w-WP_PLOT.ml-WP_PLOT.mr))); }
+function wpInvY(py){ return Math.max(0, ((WP_PLOT.h-WP_PLOT.mb)-py)/(WP_PLOT.h-WP_PLOT.mt-WP_PLOT.mb)*wpRMax()); }
+function wpEvtXY(e){ const svg=document.getElementById("wp-plot"); const p=svg.createSVGPoint(); p.x=e.clientX; p.y=e.clientY; const u=p.matrixTransform(svg.getScreenCTM().inverse()); return { x:u.x, y:u.y }; }
+function renderWpPlot(){
+  const svg=document.getElementById("wp-plot"); while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const mk=(tag,a,txt)=>{ const e=document.createElementNS(SVGNS,tag); for(const k in a) e.setAttribute(k,a[k]); if(txt!=null) e.textContent=txt; svg.appendChild(e); return e; };
+  const rm=wpRMax();
+  for(let r=0;r<=rm+1e-9;r+=0.5){ mk("line",{x1:WP_PLOT.ml,y1:wpY(r),x2:WP_PLOT.w-WP_PLOT.mr,y2:wpY(r),stroke:"#3a3d4d","stroke-width":1}); mk("text",{x:8,y:wpY(r)+4,fill:"#9aa0b4","font-size":10},"r="+r); }
+  [0,0.25,0.5,0.75,1].forEach(f=>{ mk("line",{x1:wpX(f),y1:WP_PLOT.mt,x2:wpX(f),y2:WP_PLOT.h-WP_PLOT.mb,stroke:"#3a3d4d","stroke-width":1}); mk("text",{x:wpX(f)-7,y:WP_PLOT.h-WP_PLOT.mb+15,fill:"#9aa0b4","font-size":10},""+f); });
+  mk("text",{x:WP_PLOT.w/2,y:WP_PLOT.h-3,fill:"#9aa0b4","font-size":10},"f (bass → neck)");
+  let d="M "+fmt(wpX(0))+" "+fmt(wpY(wpEval(0))); for(let i=1;i<=120;i++){ const f=i/120; d+=" L "+fmt(wpX(f))+" "+fmt(wpY(wpEval(f))); }
+  mk("path",{d,fill:"none",stroke:"#6ea8fe","stroke-width":2});
+  harpWP.nodes.forEach((n,i)=>{ const c=mk("circle",{cx:fmt(wpX(n.f)),cy:fmt(wpY(n.r)),r:6,fill:i===wpSel?"#ffb454":"#7ee787",stroke:"#10131a","stroke-width":1,cursor:"grab"}); c.dataset.i=i; });
+}
+function openWpEditor(){ ensureWP(); wpSel=-1; document.getElementById("wp-modal").hidden=false; renderWpPlot(); setStatus("WP editor — drag nodes; double-click background to add, a node to remove."); }
+function closeWpEditor(){ document.getElementById("wp-modal").hidden=true; }
+(function wireWp(){
+  const svg=document.getElementById("wp-plot");
+  svg.addEventListener("mousedown", e => {
+    const t=e.target;
+    if(t.tagName==="circle" && t.dataset.i!=null){ wpDrag={i:+t.dataset.i}; wpSel=+t.dataset.i; renderWpPlot(); e.preventDefault(); }
+    else { wpSel=-1; renderWpPlot(); }
+  });
+  window.addEventListener("mousemove", e => {
+    if(!wpDrag) return; const n=harpWP.nodes, i=wpDrag.i, last=n.length-1, xy=wpEvtXY(e);
+    let f=wpInvX(xy.x); const r=wpInvY(xy.y);
+    if(i===0) f=0; else if(i===last) f=1; else f=Math.max(n[i-1].f+0.01, Math.min(n[i+1].f-0.01, f));
+    n[i].f=Math.round(f*1000)/1000; n[i].r=Math.round(r*1000)/1000; renderWpPlot();
+  });
+  window.addEventListener("mouseup", () => { wpDrag=null; });
+  svg.addEventListener("dblclick", e => {
+    const t=e.target;
+    if(t.tagName==="circle" && t.dataset.i!=null){ const i=+t.dataset.i; if(i>0 && i<harpWP.nodes.length-1){ harpWP.nodes.splice(i,1); wpSel=-1; renderWpPlot(); } return; }
+    const xy=wpEvtXY(e), f=Math.round(wpInvX(xy.x)*1000)/1000; if(f<=0||f>=1) return;
+    harpWP.nodes.push({ f, r:Math.round(wpInvY(xy.y)*1000)/1000 }); harpWP.nodes.sort((a,b)=>a.f-b.f); renderWpPlot();
+  });
+  document.getElementById("wp-modal").addEventListener("mousedown", e => { if(e.target.id==="wp-modal") closeWpEditor(); });
+})();
+
 
 // =====================================================================
 // SAMPLE CONTENT (so the editor is immediately usable / testable)
