@@ -4,3 +4,7 @@
 
 # Maker.js PoC deps
 harp-maker/node_modules/
+
+# python
+__pycache__/
+*.pyc
