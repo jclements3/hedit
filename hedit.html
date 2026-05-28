@@ -53,6 +53,9 @@
     pointer-events:none; z-index:10;
   }
   #stage{position:absolute; inset:0; width:100%; height:100%; cursor:default; touch-action:none}
+  #stage3d{position:absolute; inset:0; display:block; width:100%; height:100%; cursor:grab; touch-action:none}
+  #stage3d.dragging{cursor:grabbing}
+  #stage3d[hidden]{display:none}
   #stage.tool-pen{cursor:crosshair}
   #stage.tool-rect,#stage.tool-ellipse{cursor:crosshair}
   #stage.panning{cursor:grabbing}
@@ -295,6 +298,7 @@
 
   <div class="canvas-wrap">
     <svg id="stage" xmlns="http://www.w3.org/2000/svg"></svg>
+    <svg id="stage3d" xmlns="http://www.w3.org/2000/svg" hidden></svg>
   </div>
 
   <div class="props">
@@ -341,6 +345,7 @@
           <button id="zoom-in" title="Zoom in">+</button>
           <button id="zoom-fit" title="Fit &amp; center everything (F)">Fit</button>
         </div>
+        <button id="view3d-btn" title="Toggle a 3D orthographic view: left-drag rotate, right-drag pan, wheel zoom, Shift+left roll, double-click recenter">3D view</button>
         <div class="row"><label>Zoom</label><span id="zoom-label">100%</span></div>
         <div class="row">
           <label title="Editor canvas color (not saved in the SVG)">Canvas</label>
@@ -1489,6 +1494,127 @@ function newDoc(){
 }
 
 // =====================================================================
+// 3D VIEW  (orthographic 3D -> 2D projection of the content; rotatable).
+// Content is interpreted as 3D: X = x, Z = up (= y in +X/+Z frame, else -y),
+// Y = depth (0 for flat 2D elements). Left-drag orbits, right-drag pans,
+// wheel zooms, Shift+left rolls, double-click sets the rotation center.
+// =====================================================================
+const stage3d = document.getElementById("stage3d");
+let view3d = { on:false, yaw:0.6, pitch:-0.5, roll:0, zoom:1, panX:0, panY:0, cx:0, cy:0, cz:0, scene:null };
+
+function p2to3(x, y){ return [x, 0, (frameXZ ? 1 : -1) * y]; }   // 2D content -> 3D (Z up)
+function build3dScene(){
+  const polylines = [], dots = [];
+  const samplePath = (el) => {
+    segsToSubpaths(parsePathD(el.getAttribute("d") || "")).forEach(sub => {
+      const n = sub.nodes; if(!n.length) return;
+      const pts = [p2to3(n[0].x, n[0].y)];
+      const seg = (a, b, curve) => {
+        if(curve){ const p0={x:a.x,y:a.y}, p3={x:b.x,y:b.y}, p1=a.hasOut?{x:a.outX,y:a.outY}:p0, p2=b.hasIn?{x:b.inX,y:b.inY}:p3;
+          for(let s=1;s<=16;s++){ const c=cubicAt(p0,p1,p2,p3,s/16); pts.push(p2to3(c.x,c.y)); } }
+        else pts.push(p2to3(b.x, b.y));
+      };
+      for(let k=1;k<n.length;k++) seg(n[k-1], n[k], n[k].seg === "C");
+      if(sub.closed && n.length>1) seg(n[n.length-1], n[0], sub.closeSeg === "C");
+      polylines.push({ pts, stroke: getStyle(el,"stroke") || "#888" });
+    });
+  };
+  for(const el of contentGroup.children){
+    if(el.nodeType !== 1) continue;
+    const tag = el.tagName.toLowerCase(), g = a => parseFloat(el.getAttribute(a)) || 0;
+    const stroke = getStyle(el,"stroke") || "#888";
+    if(tag === "line") polylines.push({ pts:[p2to3(g("x1"),g("y1")), p2to3(g("x2"),g("y2"))], stroke });
+    else if(tag === "path") samplePath(el);
+    else if(tag === "rect"){ const x=g("x"),y=g("y"),w=g("width"),h=g("height");
+      polylines.push({ pts:[p2to3(x,y),p2to3(x+w,y),p2to3(x+w,y+h),p2to3(x,y+h),p2to3(x,y)], stroke }); }
+    else if(tag === "circle") dots.push({ p:p2to3(g("cx"),g("cy")), r:g("r"), fill:getStyle(el,"fill")||stroke });
+    else if(tag === "ellipse"){ const cx=g("cx"),cy=g("cy"),rx=g("rx"),ry=g("ry"), pts=[];
+      for(let s=0;s<=40;s++){ const a=2*Math.PI*s/40; pts.push(p2to3(cx+rx*Math.cos(a), cy+ry*Math.sin(a))); }
+      polylines.push({ pts, stroke }); }
+  }
+  return { polylines, dots };
+}
+function project3d(p){
+  const dx=p[0]-view3d.cx, dy=p[1]-view3d.cy, dz=p[2]-view3d.cz;
+  const cy=Math.cos(view3d.yaw), sy=Math.sin(view3d.yaw);          // yaw about Z (up)
+  let X=dx*cy-dy*sy, Y=dx*sy+dy*cy, Z=dz;
+  const cp=Math.cos(view3d.pitch), sp=Math.sin(view3d.pitch);      // pitch about X
+  const Y2=Y*cp-Z*sp, Z2=Y*sp+Z*cp;
+  let sx=X, sy2=-Z2;                                               // orthographic: X right, Z up
+  if(view3d.roll){ const cr=Math.cos(view3d.roll), sr=Math.sin(view3d.roll); const rx=sx*cr-sy2*sr, ry=sx*sr+sy2*cr; sx=rx; sy2=ry; }
+  return { x:sx, y:sy2 };
+}
+function size3d(){ const r = canvasWrap.getBoundingClientRect(); return { w: r.width || 800, h: r.height || 600 }; }   // div parent measures reliably (SVG clientWidth is flaky)
+function toScreen3d(pr){
+  const { w, h } = size3d();
+  return { x: w/2 + view3d.panX + pr.x*view3d.zoom, y: h/2 + view3d.panY + pr.y*view3d.zoom };
+}
+function allScenePoints(){ const a=[]; view3d.scene.polylines.forEach(pl=>pl.pts.forEach(p=>a.push(p))); view3d.scene.dots.forEach(d=>a.push(d.p)); return a; }
+function fit3d(){
+  const pts = allScenePoints(); if(!pts.length) return;
+  let mn=[Infinity,Infinity,Infinity], mx=[-Infinity,-Infinity,-Infinity];
+  pts.forEach(p=>{ for(let i=0;i<3;i++){ mn[i]=Math.min(mn[i],p[i]); mx[i]=Math.max(mx[i],p[i]); } });
+  view3d.cx=(mn[0]+mx[0])/2; view3d.cy=(mn[1]+mx[1])/2; view3d.cz=(mn[2]+mx[2])/2;
+  view3d.panX=0; view3d.panY=0; view3d.zoom=1;
+  let pmn=[Infinity,Infinity], pmx=[-Infinity,-Infinity];
+  pts.forEach(p=>{ const pr=project3d(p); pmn[0]=Math.min(pmn[0],pr.x);pmx[0]=Math.max(pmx[0],pr.x);pmn[1]=Math.min(pmn[1],pr.y);pmx[1]=Math.max(pmx[1],pr.y); });
+  const { w, h } = size3d();
+  view3d.zoom = 0.85 * Math.min(w/((pmx[0]-pmn[0])||1), h/((pmx[1]-pmn[1])||1));
+}
+function render3d(){
+  while(stage3d.firstChild) stage3d.removeChild(stage3d.firstChild);
+  if(!view3d.scene) return;
+  const { w, h } = size3d();   // force explicit size so the SVG element actually fills (CSS % on SVG is flaky)
+  stage3d.setAttribute("viewBox", `0 0 ${fmt(w)} ${fmt(h)}`);
+  stage3d.setAttribute("width", fmt(w)); stage3d.setAttribute("height", fmt(h));
+  for(const pl of view3d.scene.polylines){
+    const s = pl.pts.map(p => toScreen3d(project3d(p)));
+    const d = "M " + s.map(q => fmt(q.x)+" "+fmt(q.y)).join(" L ");
+    stage3d.appendChild(ovEl("path", { d, fill:"none", stroke:pl.stroke, "stroke-width":"1", "vector-effect":"non-scaling-stroke" }));
+  }
+  for(const dt of view3d.scene.dots){
+    const q = toScreen3d(project3d(dt.p));
+    stage3d.appendChild(ovEl("circle", { cx:fmt(q.x), cy:fmt(q.y), r:fmt(Math.max(1.5, dt.r*view3d.zoom)), fill:dt.fill, stroke:"none" }));
+  }
+}
+function enter3d(){
+  view3d.on = true; view3d.scene = build3dScene(); fit3d();
+  stage.style.display = "none"; stage3d.removeAttribute("hidden"); render3d();   // SVG has no .hidden IDL prop
+  const b=document.getElementById("view3d-btn"); if(b) b.textContent = "2D edit";
+  setStatus("3D view — left-drag rotate · right-drag pan · wheel zoom · Shift+left roll · double-click recenter.");
+}
+function exit3d(){
+  view3d.on = false; stage3d.setAttribute("hidden", ""); stage.style.display = "";
+  const b=document.getElementById("view3d-btn"); if(b) b.textContent = "3D view";
+  setStatus("2D edit.");
+}
+function toggle3d(){ view3d.on ? exit3d() : enter3d(); }
+// --- 3D mouse navigation ---
+let drag3d = null;
+stage3d.addEventListener("contextmenu", e => e.preventDefault());
+stage3d.addEventListener("mousedown", e => {
+  drag3d = { btn:e.button, shift:e.shiftKey, x:e.clientX, y:e.clientY, o:{ ...view3d } };
+  stage3d.classList.add("dragging"); e.preventDefault();
+});
+window.addEventListener("mousemove", e => {
+  if(!drag3d) return;
+  const dx=e.clientX-drag3d.x, dy=e.clientY-drag3d.y;
+  if(drag3d.btn === 0 && drag3d.shift){ view3d.roll = drag3d.o.roll + dx*0.01; }              // Shift+left: roll
+  else if(drag3d.btn === 0){ view3d.yaw = drag3d.o.yaw + dx*0.01; view3d.pitch = Math.max(-1.55, Math.min(1.55, drag3d.o.pitch + dy*0.01)); }  // left: orbit
+  else if(drag3d.btn === 2 && drag3d.shift){ view3d.zoom = Math.max(0.01, drag3d.o.zoom * Math.exp(-dy*0.005)); }   // Shift+right: zoom
+  else if(drag3d.btn === 2 || drag3d.btn === 1){ view3d.panX = drag3d.o.panX + dx; view3d.panY = drag3d.o.panY + dy; }  // right/middle: pan
+  render3d();
+});
+window.addEventListener("mouseup", () => { if(drag3d){ drag3d=null; stage3d.classList.remove("dragging"); } });
+stage3d.addEventListener("wheel", e => { e.preventDefault(); view3d.zoom *= (e.deltaY < 0 ? 1.1 : 1/1.1); render3d(); }, { passive:false });
+stage3d.addEventListener("dblclick", e => {   // set rotation center to the nearest model point under the cursor
+  if(!view3d.scene) return;
+  const r = stage3d.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+  let best=null; allScenePoints().forEach(p => { const q=toScreen3d(project3d(p)); const d=Math.hypot(q.x-mx,q.y-my); if(!best||d<best.d) best={d,p}; });
+  if(best){ const sz=size3d(); view3d.cx=best.p[0]; view3d.cy=best.p[1]; view3d.cz=best.p[2]; view3d.panX=mx-sz.w/2; view3d.panY=my-sz.h/2; render3d(); setStatus("Rotation center set."); }
+});
+
+// =====================================================================
 // FIT / ZOOM
 // =====================================================================
 function fitView(){
@@ -1536,6 +1662,7 @@ document.getElementById("btn-delete").onclick = deleteSelection;
 document.getElementById("zoom-in").onclick = () => zoomBy(0.8);
 document.getElementById("zoom-out").onclick = () => zoomBy(1.25);
 document.getElementById("zoom-fit").onclick = fitView;
+document.getElementById("view3d-btn").onclick = toggle3d;
 document.getElementById("node-delete").onclick = deleteSelectedNode;
 document.getElementById("node-corner").onclick = () => setSelectedNodeType("corner");
 document.getElementById("node-smooth").onclick = () => setSelectedNodeType("smooth");
@@ -1706,7 +1833,7 @@ window.addEventListener("keydown", e => {
 window.addEventListener("keyup", e => {
   if(e.code === "Space"){ spaceDown = false; stage.style.cursor = ""; }
 });
-window.addEventListener("resize", () => { applyView(); renderOverlay(); });
+window.addEventListener("resize", () => { applyView(); renderOverlay(); if(view3d.on) render3d(); });
 
 // =====================================================================
 // STRINGS (harp): parallel air-gap arrangement + spec table
