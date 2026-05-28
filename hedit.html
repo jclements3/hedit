@@ -2089,9 +2089,10 @@ function fitBottomsCurve(maxNodes){
   path.setAttribute("fill", "none");
   path.setAttribute("stroke", "#cc2222"); path.setAttribute("stroke-width", "1.5");
   contentGroup.appendChild(path);
-  selectElement(path);   // selected so "Bottoms on curve" can align to it immediately
-  renderOverlay();
-  setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} string bottoms. Now click "Bottoms on curve" to align.`);
+  // drop into node-editing the new curve so its anchors + handles are visible
+  // right away (enterNodeEdit also sets `selection`, so "Bottoms on curve" still works)
+  setTool("node"); enterNodeEdit(path); renderOverlay();
+  setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} string bottoms. Drag the green handles to tweak, or click "Bottoms on curve" to align.`);
 }
 
 // =====================================================================
