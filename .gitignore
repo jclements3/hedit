@@ -1,3 +1,6 @@
 # transient headless-test harness files created by test-hedit.sh
 ._test_harness.html
 ._verify.html
+
+# Maker.js PoC deps
+harp-maker/node_modules/
