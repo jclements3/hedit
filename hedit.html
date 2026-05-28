@@ -131,6 +131,7 @@
     <button id="btn-open" title="Open an SVG file">Open…</button>
     <button id="btn-save" title="Save in place to the opened file, else prompt (Ctrl+S)">Save</button>
     <button id="btn-save-as" title="Save to a new file / location (Ctrl+Shift+S)">Save As…</button>
+    <button id="btn-dxf" title="Export the drawing as DXF (2-D fabrication, mm)">DXF</button>
   </div>
   <input type="file" id="file-input" accept=".svg,image/svg+xml" hidden>
   <input type="file" id="json-input" accept=".json,application/json" hidden>
@@ -1436,6 +1437,7 @@ document.getElementById("btn-new").onclick = () => { if(confirm("Discard current
 document.getElementById("btn-open").onclick = openFile;
 document.getElementById("btn-save").onclick = saveSVG;
 document.getElementById("btn-save-as").onclick = saveAs;
+document.getElementById("btn-dxf").onclick = exportDXF;
 document.getElementById("btn-undo").onclick = undo;
 document.getElementById("btn-redo").onclick = redo;
 document.getElementById("btn-fit").onclick = fitView;
@@ -2265,6 +2267,65 @@ function exportHarpJSON(){
   if(harpWP) out.WP = harpWP;
   Object.keys(harpExtra).forEach(k => { if(k !== "_comment" && !(k in out)) out[k] = harpExtra[k]; });
   return JSON.stringify(out, null, 2);
+}
+
+// =====================================================================
+// DXF EXPORT  (2-D fabrication). Samples content into DXF LINE + CIRCLE
+// entities, mm units. Emits Y-up (CAD convention): if the harp is already in
+// the +X/+Z frame its stored coords are Y-up; otherwise flip y-down -> y-up.
+// =====================================================================
+function buildDXF(){
+  const STEP = 24;
+  const segs = [], circles = [];
+  function addPath(el){
+    segsToSubpaths(parsePathD(el.getAttribute("d") || "")).forEach(sub => {
+      const n = sub.nodes; if(!n.length) return;
+      const pts = [[n[0].x, n[0].y]];
+      const sampleSeg = (a, b, curve) => {
+        if(curve){
+          const p0={x:a.x,y:a.y}, p3={x:b.x,y:b.y};
+          const p1 = a.hasOut?{x:a.outX,y:a.outY}:p0, p2 = b.hasIn?{x:b.inX,y:b.inY}:p3;
+          for(let s=1;s<=STEP;s++){ const c=cubicAt(p0,p1,p2,p3,s/STEP); pts.push([c.x,c.y]); }
+        } else pts.push([b.x, b.y]);
+      };
+      for(let k=1;k<n.length;k++) sampleSeg(n[k-1], n[k], n[k].seg === "C");
+      if(sub.closed && n.length>1) sampleSeg(n[n.length-1], n[0], sub.closeSeg === "C");
+      for(let k=1;k<pts.length;k++) segs.push([pts[k-1], pts[k]]);
+    });
+  }
+  for(const el of contentGroup.children){
+    if(el.nodeType !== 1) continue;
+    if(el.getAttribute("data-role") === "s-axis") continue;   // reference guide, not geometry
+    const g = a => parseFloat(el.getAttribute(a)) || 0;
+    switch(el.tagName.toLowerCase()){
+      case "line": segs.push([[g("x1"),g("y1")],[g("x2"),g("y2")]]); break;
+      case "path": addPath(el); break;
+      case "rect": { const x=g("x"),y=g("y"),w=g("width"),h=g("height");
+        [[x,y],[x+w,y],[x+w,y+h],[x,y+h],[x,y]].reduce((p,c)=>{ if(p) segs.push([p,c]); return c; }, null); break; }
+      case "circle": circles.push([g("cx"),g("cy"),g("r")]); break;
+      case "ellipse": { const cx=g("cx"),cy=g("cy"),rx=g("rx"),ry=g("ry"); let prev=null;
+        for(let s=0;s<=72;s++){ const a=2*Math.PI*s/72, p=[cx+rx*Math.cos(a),cy+ry*Math.sin(a)]; if(prev) segs.push([prev,p]); prev=p; } break; }
+      case "polyline": case "polygon": {
+        const pts=(el.getAttribute("points")||"").trim().split(/\s+/).filter(Boolean).map(s=>s.split(/[, ]+/).map(Number));
+        for(let k=1;k<pts.length;k++) segs.push([pts[k-1],pts[k]]);
+        if(el.tagName.toLowerCase()==="polygon" && pts.length>1) segs.push([pts[pts.length-1],pts[0]]); break; }
+    }
+  }
+  const ys = []; segs.forEach(s => ys.push(s[0][1], s[1][1])); circles.forEach(c => ys.push(c[1]));
+  const maxY = ys.length ? Math.max(...ys) : 0;
+  const fy = frameXZ ? (y => y) : (y => maxY - y);   // CAD Y-up
+  const out = ["0","SECTION","2","HEADER","9","$INSUNITS","70","4","9","$MEASUREMENT","70","1","0","ENDSEC",
+               "0","SECTION","2","ENTITIES"];
+  segs.forEach(([a,b]) => out.push("0","LINE","8","0","10",fmt(a[0]),"20",fmt(fy(a[1])),"30","0","11",fmt(b[0]),"21",fmt(fy(b[1])),"31","0"));
+  circles.forEach(([cx,cy,r]) => out.push("0","CIRCLE","8","0","10",fmt(cx),"20",fmt(fy(cy)),"30","0","40",fmt(r)));
+  out.push("0","ENDSEC","0","EOF");
+  return { text: out.join("\n") + "\n", lines: segs.length, circles: circles.length };
+}
+function exportDXF(){
+  const { text, lines, circles } = buildDXF();
+  const name = (elFilename.textContent || "harp").replace(/\.svg$/i, "") + ".dxf";
+  downloadText(text, name, "application/dxf");
+  setStatus(`Exported ${name}: ${lines} line + ${circles} circle entities (mm).`);
 }
 
 // =====================================================================
