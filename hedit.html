@@ -1116,9 +1116,12 @@ function loadSVGText(text, name){
   // metadata
   let vb = root.getAttribute("viewBox");
   const w = root.getAttribute("width"), h = root.getAttribute("height");
-  // import children
+  const harpMeta = root.querySelector('metadata[id="hedit-harp"]');
+  // import children (metadata is kept out of the content layer; it's re-emitted on save)
   [...root.childNodes].forEach(n => {
-    if(n.nodeType === 1) contentGroup.appendChild(document.importNode(n, true));
+    if(n.nodeType !== 1) return;
+    if(n.nodeName.toLowerCase() === "metadata") return;
+    contentGroup.appendChild(document.importNode(n, true));
   });
   if(!vb){
     const nw = parseFloat(w) || 0, nh = parseFloat(h) || 0;
@@ -1135,6 +1138,11 @@ function loadSVGText(text, name){
   clearSelection(); renderOverlay();
   elFilename.textContent = name || "untitled.svg";
   setStatus("Loaded " + (name||"") + " — " + contentGroup.children.length + " top-level objects.");
+  harpAlignment = null;
+  if(harpMeta){
+    try { applyHarpModel(JSON.parse(harpMeta.textContent || "{}")); }
+    catch(e){ setStatus("Loaded, but the embedded harp spec was unreadable."); }
+  }
 }
 function saveSVG(){
   const out = document.createElementNS(SVGNS, "svg");
@@ -1143,7 +1151,11 @@ function saveSVG(){
   if(doc.viewBox) out.setAttribute("viewBox", doc.viewBox);
   if(doc.width) out.setAttribute("width", doc.width);
   if(doc.height) out.setAttribute("height", doc.height);
-  [...contentGroup.children].forEach(c => out.appendChild(c.cloneNode(true)));
+  [...contentGroup.children].forEach(c => {
+    if(c.nodeName.toLowerCase() === "metadata") return;   // rebuilt fresh below
+    out.appendChild(c.cloneNode(true));
+  });
+  writeHarpMetadata(out);   // embed the complete harp definition (no-op if no strings)
   const body = new XMLSerializer().serializeToString(out);
   const text = '<?xml version="1.0" encoding="UTF-8"?>\n' + body + "\n";
   const blob = new Blob([text], { type:"image/svg+xml" });
@@ -1161,6 +1173,7 @@ function newDoc(){
   applyView();
   undoStack.length = 0; redoStack.length = 0;
   clearSelection(); renderOverlay();
+  harpAlignment = null;
   elFilename.textContent = "untitled.svg";
   setStatus("New document (800×600).");
 }
@@ -1434,6 +1447,7 @@ function alignStrings(mode){
     else if(mode === "bottom") placeString(i.el, target - i.len, i.len);
     else                       placeString(i.el, target - i.len/2, i.len);
   });
+  harpAlignment = mode;
   pathModel = null; renderOverlay();
   setStatus(`Aligned ${lines.length} strings (${mode}). Air gap & lengths preserved.`);
 }
@@ -1463,6 +1477,7 @@ function alignStringsToCurve(end){
     if(end === "bottom") placeString(el, cy - i.len, i.len);
     else                 placeString(el, cy, i.len);
   });
+  harpAlignment = "curve-" + end;
   pathModel = null; renderOverlay();
   setStatus(`Aligned ${lines.length} string ${end} ends to the curve. Air gap & lengths preserved.`);
 }
@@ -1548,6 +1563,97 @@ function openStringsTable(){
 function closeStringsTable(){
   document.getElementById("strings-modal").hidden = true;
   renderOverlay();
+}
+
+// =====================================================================
+// HARP MODEL  (the complete harp definition, embedded in the saved SVG as a
+// <metadata id="hedit-harp"> JSON block so the file is fully self-contained)
+// =====================================================================
+let harpAlignment = null;   // last alignment applied (advisory metadata)
+const numAttr = v => { const f = parseFloat(v); return isFinite(f) ? f : null; };
+const round3 = n => Math.round(n * 1000) / 1000;
+
+// perpendicular edge-to-edge gaps between adjacent (parallel) strings
+function perpGapList(lines){
+  const info = lines.map(el => {
+    const x1 = numAttr(el.getAttribute("x1")) || 0, y1 = numAttr(el.getAttribute("y1")) || 0;
+    const x2 = numAttr(el.getAttribute("x2")) || 0, y2 = numAttr(el.getAttribute("y2")) || 0;
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+    return { p:{ x:x1, y:y1 }, dir:{ x:dx/L, y:dy/L }, r:effectiveStrokeWidth(el) / 2 };
+  });
+  const n = { x:-info[0].dir.y, y:info[0].dir.x };   // S-axis: normal to the strings
+  info.sort((a,b) => (a.p.x*n.x + a.p.y*n.y) - (b.p.x*n.x + b.p.y*n.y));
+  const gaps = [];
+  for(let k = 1; k < info.length; k++){
+    const a = info[k-1], b = info[k];
+    gaps.push(Math.abs((b.p.x-a.p.x)*n.x + (b.p.y-a.p.y)*n.y) - a.r - b.r);
+  }
+  return gaps;
+}
+function measuredAirGap(){
+  const ls = stringLines();
+  if(ls.length < 2) return readStringGap();
+  const g = perpGapList(ls).sort((a,b) => a - b);
+  return g.length ? round3(g[Math.floor(g.length/2)]) : readStringGap();   // median
+}
+function measuredRotationDeg(){
+  const ls = stringLines();
+  if(!ls.length) return 0;
+  const el = ls[0];
+  const dx = (numAttr(el.getAttribute("x2"))||0) - (numAttr(el.getAttribute("x1"))||0);
+  const dy = (numAttr(el.getAttribute("y2"))||0) - (numAttr(el.getAttribute("y1"))||0);
+  return round3(-Math.atan2(dx, dy) * 180 / Math.PI);   // 0 = upright; + = clockwise (matches rotateStrings)
+}
+function docUnits(){
+  const m = String(doc.width || "").match(/[a-z%]+$/i);
+  return m ? m[0] : "user";
+}
+
+// build the full harp model from the current strings + measured layout
+function buildHarpModel(){
+  const lines = stringLines();
+  if(!lines.length) return null;
+  const strings = lines.map(el => ({
+    num:  el.getAttribute("data-num")  || "",
+    note: el.getAttribute("data-note") || "",
+    color: toHex(getStyle(el, "stroke") || "#000000"),
+    dia:  numAttr(el.getAttribute("data-dia") || getStyle(el, "stroke-width")),
+    len:  numAttr(el.getAttribute("data-len")),
+    ten:  numAttr(el.getAttribute("data-ten")),
+    core: el.getAttribute("data-core") || "",
+    wrap: el.getAttribute("data-wrap") || "",
+    cdia: numAttr(el.getAttribute("data-cdia")),
+    wdia: numAttr(el.getAttribute("data-wdia")),
+    x:    numAttr(el.getAttribute("x1")),
+    y1:   numAttr(el.getAttribute("y1")),
+    y2:   numAttr(el.getAttribute("y2")),
+  }));
+  return {
+    hedit: "harp", version: 1,
+    units: docUnits(),
+    layout: { airGap: measuredAirGap(), rotationDeg: measuredRotationDeg(), alignment: harpAlignment },
+    strings,
+  };
+}
+// write the model into an export <svg> as the first child
+function writeHarpMetadata(out){
+  const model = buildHarpModel();
+  if(!model) return;
+  const md = document.createElementNS(SVGNS, "metadata");
+  md.setAttribute("id", "hedit-harp");
+  md.textContent = JSON.stringify(model);   // serializer escapes & < > ; JSON re-parses cleanly
+  out.insertBefore(md, out.firstChild);
+}
+// restore UI/state from an embedded model on load (lines themselves are trusted as-is)
+function applyHarpModel(model){
+  if(!model || model.hedit !== "harp") return false;
+  if(model.layout){
+    if(model.layout.airGap != null) document.getElementById("string-gap").value = model.layout.airGap;
+    harpAlignment = model.layout.alignment != null ? model.layout.alignment : null;
+  }
+  const n = model.strings ? model.strings.length : 0;
+  setStatus(`Loaded harp spec: ${n} strings, air gap ${model.layout ? model.layout.airGap : "?"} ${model.units||""}.`);
+  return true;
 }
 
 // =====================================================================

@@ -95,6 +95,15 @@ document is `strings.svg`. The **Strings (harp)** panel section drives this:
   taken from `data-len` (fallback: `|y2-y1|`). Curve alignment samples a selected
   `<path>` and maps each string's chosen end to the path's y at that string's x
   (nearest-x sampling; assumes the curve is roughly monotonic in x).
+- **Embedded spec** — the complete harp definition (per-string specs + measured
+  layout: air gap, rotation, alignment) is serialized to a `<metadata id="hedit-harp">`
+  JSON block on **Save** (`buildHarpModel`/`writeHarpMetadata`) and read on **Open**
+  (`applyHarpModel`), so the SVG is fully self-contained — reloading a different harp
+  is just opening a different SVG. The metadata lives *only* in saved files: it's kept
+  out of `contentGroup` on load and rebuilt fresh on save (so it never duplicates and
+  the content layer stays purely graphical). Layout values are *measured from geometry*
+  at save time, so they survive undo/manual edits. Don't use `<script>` for this —
+  `sanitizeSVG` strips it.
 - **Select all strings** (`selectAllStrings`) — selects every `<line>` as a group.
 - **Rotate group** (`rotateStrings`) — rigid rotation of all string endpoints about
   the group's bounding-box center. Because a rigid rotation preserves all distances
