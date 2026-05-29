@@ -44,8 +44,7 @@
   .tool.active{background:var(--accent); color:#10131a; border-color:var(--accent)}
   .tool.active small{color:#10131a}
   .tool svg{width:18px;height:18px}
-  .canvas-wrap{flex:1; position:relative; min-width:0; background:
-      repeating-conic-gradient(#2a2c36 0% 25%, #23252e 0% 50%) 50% / 22px 22px;}
+  .canvas-wrap{flex:0 0 25%; position:relative; min-width:300px; background:#faf8f3;}
   .canvas-wrap.dragover::after{
     content:"Drop SVG to open"; position:absolute; inset:0; display:flex;
     align-items:center; justify-content:center; font-size:15px; color:var(--accent);
@@ -59,20 +58,24 @@
   #stage.tool-pen{cursor:crosshair}
   #stage.tool-rect,#stage.tool-ellipse{cursor:crosshair}
   #stage.panning{cursor:grabbing}
+  /* strings, S-axis (<line>) and pins/sensor dots (<circle>) are physics-derived — click-through, not hand-selectable. Overlay handles live in #overlay, so they keep their events. */
+  #content line, #content circle{ pointer-events:none; }
   .props{
-    flex:0 0 226px; background:var(--panel); border-left:1px solid var(--line);
-    padding:10px; overflow:auto; display:flex; flex-direction:column; gap:12px;
+    flex:1 1 0; min-width:240px; background:var(--panel);
+    padding:8px; overflow:auto; display:grid; grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:6px; align-content:start; align-items:start;
   }
-  .props-left{ border-left:none; border-right:1px solid var(--line); }
+  .props button, .props .btn{padding:3px 8px; font-size:11px}
+  .props-left{ border-left:none; border-right:none; }
   .props h3{margin:0 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted)}
   .props h3.harp{color:var(--accent2)}
-  .row{display:flex; align-items:center; gap:8px; justify-content:space-between}
+  .row{display:flex; align-items:center; gap:8px}
   .row label{color:var(--muted); font-size:12px}
   input[type=color]{width:38px; height:26px; padding:0; border:1px solid var(--line); border-radius:4px; background:none; cursor:pointer}
-  input[type=number]{width:64px; background:var(--panel2); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:3px 6px}
+  input[type=number]{width:56px; background:var(--panel2); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:2px 5px}
   input[type=range]{flex:1}
-  .seg{display:flex; gap:6px}
-  .seg button{flex:1}
+  .seg{display:flex; gap:6px; flex-wrap:wrap}
+  .seg button{flex:0 0 auto}
   .hint{color:var(--muted); font-size:11px; line-height:1.6}
   .hint b{color:var(--fg)}
   footer{
@@ -109,9 +112,9 @@
   header .divider{width:1px; align-self:stretch; background:var(--line); margin:0 6px}
   button.danger:hover{border-color:var(--close); color:var(--close)}
   /* collapsible section cards (props panels) */
-  .props{gap:8px}
-  details.sec{background:var(--panel2); border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:0 0 auto}
-  details.sec>summary{list-style:none; cursor:pointer; padding:7px 10px; font-size:11px; text-transform:uppercase;
+  .props{gap:6px}
+  details.sec{background:none; border:none; border-radius:0; overflow:hidden; flex:0 0 auto}
+  details.sec>summary{list-style:none; cursor:pointer; padding:4px 9px; font-size:11px; text-transform:uppercase;
     letter-spacing:1px; color:var(--muted); display:flex; align-items:center; gap:7px; user-select:none}
   details.sec>summary::-webkit-details-marker{display:none}
   details.sec>summary::before{content:"\25B8"; font-size:9px; color:var(--muted)}
@@ -120,7 +123,8 @@
   details.sec>summary .step{display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px;
     padding:0 4px; border-radius:8px; background:var(--line); color:var(--fg); font-size:9px; letter-spacing:0}
   details.sec.harp[open]>summary .step{background:var(--accent2); color:#10131a}
-  .sec-body{padding:8px 10px 10px; display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line)}
+  .sec-body{padding:3px 4px 6px; display:flex; flex-direction:column; gap:4px}
+  .sec-body>button{align-self:flex-start}
   .sec-body .seg{margin:0}
   .btn-primary{background:var(--accent); color:#10131a; border-color:var(--accent); font-weight:600}
   .btn-primary:hover{filter:brightness(1.08); border-color:var(--accent)}
@@ -141,6 +145,7 @@
   <span class="filename" id="filename">untitled.svg</span>
   <div class="spacer"></div>
   <div class="hgroup">
+    <button id="btn-reset" class="danger" title="Reset the design: remove air gap, alignment, S-axis, fitted curves, pins &amp; dots — back to the bare strings on the x=0 axis (undoable)">Reset</button>
     <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
     <button id="btn-redo" title="Redo (Ctrl+Y)">Redo</button>
   </div>
@@ -227,23 +232,48 @@
     </details>
 
     <details class="sec harp" open>
-      <summary><span class="step">4</span> Fit curve to ends</summary>
+      <summary><span class="step">4</span> Dots</summary>
+      <div class="sec-body">
+        <label class="checkrow" title="Pin dot per string — 3 air-gaps up-and-to-the-right of the top"><input type="checkbox" id="dot-pin"> Pins</label>
+        <label class="checkrow" title="Flat dot at the string tip (the open/flat note)"><input type="checkbox" id="dot-flat"> Flats</label>
+        <label class="checkrow" title="Natural dot 0.0561·L below the tip"><input type="checkbox" id="dot-natural"> Naturals</label>
+        <label class="checkrow" title="Sharp dot 0.1091·L below the tip"><input type="checkbox" id="dot-sharp"> Sharps</label>
+        <label class="checkrow" title="Midi dot 0.125·L below the tip"><input type="checkbox" id="dot-midi"> Midi</label>
+        <label class="checkrow" title="Eyelet dot at the string bottom (soundboard attachment)"><input type="checkbox" id="dot-eyelet"> Eyelets</label>
+      </div>
+    </details>
+
+    <details class="sec harp" open>
+      <summary><span class="step">5</span> Curves</summary>
       <div class="sec-body">
         <div class="row">
-          <label title="Max on-curve nodes (smooth C2 spline; endpoints pinned)">Max nodes</label>
-          <input type="number" id="fit-nodes" min="2" step="1" value="8">
-        </div>
-        <div class="seg">
-          <button id="fit-bottoms-btn" class="btn-primary" title="Fit a smooth C2 curve through the BOTTOM ends of the selected lines (or all strings)">Fit bottoms</button>
-          <button id="fit-tops-btn" class="btn-primary" title="Fit a smooth C2 curve through the TOP ends of the selected lines (or all strings)">Fit tops</button>
-        </div>
-        <button id="clear-curve-btn" class="danger" title="Delete the fitted curve(s) (bottom and top)">Clear fitted curves</button>
-        <div class="row" style="margin-top:8px">
-          <label title="Shift the selected path/curve (or the fitted curves) vertically">Shift</label>
-          <input type="number" id="shift-amt" step="1" value="13">
+          <label title="Which point-set to fit a smooth C2 curve through">Fit</label>
+          <select id="fit-source">
+            <option value="bottoms">String bottoms</option>
+            <option value="tops">String tops</option>
+            <option value="pin">Pins</option>
+            <option value="flat">Flats</option>
+            <option value="natural">Naturals</option>
+            <option value="sharp">Sharps</option>
+            <option value="midi">Midi</option>
+            <option value="eyelet">Eyelets</option>
+          </select>
         </div>
         <div class="row">
-          <label title="Use the string air gap as the shift step instead of the amount">× air gap</label>
+          <label title="Max on-curve nodes (smooth C2 spline; endpoints pinned)">Max nodes</label>
+          <input type="number" id="fit-nodes" min="2" step="1" value="5">
+        </div>
+        <button id="fit-btn" class="btn-primary" title="Fit a smooth C2 curve through the chosen point-set">Fit curve</button>
+        <div class="row"><label title="Rest the string ends on a fitted bottom/top curve (keeps each string's length &amp; the air gap)">Rest string ends on curve</label></div>
+        <div class="seg">
+          <button id="place-bottoms-btn" title="Drop the string BOTTOM ends onto the fitted bottom curve">Bottoms ↓ curve</button>
+          <button id="place-tops-btn" title="Raise the string TOP ends onto the fitted top curve">Tops ↑ curve</button>
+        </div>
+        <button id="clear-curve-btn" class="danger" title="Delete all fitted curves">Clear fitted curves</button>
+        <div class="row" style="margin-top:8px">
+          <label title="Shift the selected/active curve vertically, in mm">Shift</label>
+          <input type="number" id="shift-amt" step="1" value="25">
+          <label title="Use the string air gap as the shift step instead of the amount">×gap</label>
           <input type="checkbox" id="shift-gap">
         </div>
         <div class="seg">
@@ -254,16 +284,7 @@
     </details>
 
     <details class="sec harp">
-      <summary><span class="step">6</span> Pins &amp; sensors</summary>
-      <div class="sec-body">
-        <button id="add-pins-btn" title="Add a pin dot per string: from the top end, ~30° up-and-left, 3 air-gaps away">Add pins</button>
-        <button id="add-sensors-btn" title="Add natural/sharp/midi RGB dots along each string at the Paraguayan fractions (0.0561L / 0.1091L / 0.125L below the tip)">Add sensor dots (RGB)</button>
-        <button id="clear-annot-btn" class="danger" title="Remove all pins and sensor dots">Clear pins &amp; dots</button>
-      </div>
-    </details>
-
-    <details class="sec harp">
-      <summary><span class="step">5</span> Transform</summary>
+      <summary><span class="step">6</span> Transform</summary>
       <div class="sec-body">
         <div class="row">
           <label title="Rotate all strings (and the S axis) rigidly about their center; air gap preserved">Rotate (°)</label>
@@ -275,6 +296,25 @@
         </div>
         <button id="s-axis-btn" title="Draw the S axis: a faint reference line through the string centers along the spacing direction; it rotates with the strings">Set S axis</button>
         <button id="xz-btn" title="Put the harp in a right-handed +X/+Z frame: +X right, +Z up, Y into the page; origin at the bbox bottom-left, all coords positive; renders upright">Orient +X/+Z (RH)</button>
+      </div>
+    </details>
+
+    <details class="sec harp" open>
+      <summary><span class="step">+</span> Harp canvas (envelope)</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="−X space left of c1 (the origin): pillar / left shoulder">L</label>
+          <input type="number" id="canvas-ml" step="10" value="120">
+          <label title="+X space right of the highest string: rear / right shoulder">R</label>
+          <input type="number" id="canvas-mr" step="10" value="60">
+        </div>
+        <div class="row">
+          <label title="+Z space above the string tops: the neck + tuning-pin material">T</label>
+          <input type="number" id="canvas-mt" step="10" value="220">
+          <label title="−Z space below c1's bottom eyelet (the origin): the harp base">B</label>
+          <input type="number" id="canvas-mb" step="10" value="130">
+        </div>
+        <button id="harp-canvas-btn" class="btn-primary" title="Set the document canvas (viewBox) to the whole harp envelope — the content plus the L/R/T/B margins (pillar, shoulders, pin material, base). Keeps alignment on-canvas and reserves room for the body.">Set harp canvas</button>
       </div>
     </details>
 
@@ -348,10 +388,12 @@
         </div>
         <button id="view3d-btn" title="Toggle a 3D orthographic view: left-drag rotate, right-drag pan, wheel zoom, Shift+left roll, double-click recenter">3D view</button>
         <div class="seg" style="margin-top:4px">
-          <button id="v3d-front" title="Front (X-Z)">Front</button>
-          <button id="v3d-side" title="Side (Y-Z)">Side</button>
-          <button id="v3d-top" title="Top (X-Y)">Top</button>
+          <button id="v3d-side" title="Side — look down the Y axis (X-Z plane)">Side</button>
+          <button id="v3d-front" title="Front — look down the X axis (Y-Z plane)">Front</button>
+          <button id="v3d-top" title="Top — look down the Z axis (X-Y plane)">Top</button>
           <button id="v3d-iso" title="Isometric">Iso</button>
+          <button id="v3d-rear" title="Rear — look down the −X axis">Rear</button>
+          <button id="v3d-bottom" title="Bottom — look up the Z axis">Bottom</button>
         </div>
         <div class="row"><label>Zoom</label><span id="zoom-label">100%</span></div>
         <div class="row">
@@ -783,8 +825,14 @@ function toggleSelection(el){
   pathModel = null; selectedNode = null;
   readStyleFromSelection(); updateSelCount();
 }
+// strings & S-axis (<line>) and pins/sensor dots (<circle>) are physics-derived — only curves/shapes are hand-selectable
+function isSelectable(el){
+  if(!el || el.nodeType !== 1) return false;
+  const t = el.tagName.toLowerCase();
+  return t !== "line" && t !== "circle";
+}
 function selectAll(){
-  selected = [...contentGroup.children].filter(n => n.nodeType === 1);
+  selected = [...contentGroup.children].filter(isSelectable);
   selection = selected.length ? selected[selected.length-1] : null;
   pathModel = null; selectedNode = null;
   readStyleFromSelection(); updateSelCount();
@@ -876,6 +924,7 @@ function renderOverlay(){
   if(tool === "node" && pathModel){
     drawNodeEditor(aR, cR);
   }
+  if(typeof syncDotCheckboxes === "function") syncDotCheckboxes();
 }
 
 function drawBBox(el){
@@ -1074,8 +1123,9 @@ function onDown(e){
     if(isContentEl(t) && t.tagName.toLowerCase() === "path"){
       enterNodeEdit(t); renderOverlay(); return;
     }
-    // clicked empty: keep model but deselect node
-    selectedNode = null; renderOverlay(); return;
+    // clicked off the path (empty canvas or a non-path element): exit node-edit
+    // so the nodes/handles overlay clears
+    pathModel = null; selectedNode = null; renderOverlay(); return;
   }
 
   if(tool === "pen"){ penDown(e, u); return; }
@@ -1166,7 +1216,7 @@ function finishMarquee(){
   if(rx1 - rx0 < 1 && ry1 - ry0 < 1){ updateSelCount(); return; } // a click, not a drag
   if(!drag.additive) selected = [];
   for(const el of contentGroup.children){
-    if(el.nodeType !== 1) continue;
+    if(!isSelectable(el)) continue;
     const bb = visualBounds(el, false);
     if(!bb) continue;
     const hit = !(bb.maxX < rx0 || bb.minX > rx1 || bb.maxY < ry0 || bb.minY > ry1);
@@ -1614,9 +1664,11 @@ function toggle3d(){ view3d.on ? exit3d() : enter3d(); }
 function set3dPreset(name){
   if(!view3d.on) enter3d();
   view3d.roll = 0;
-  if(name === "front"){ view3d.yaw = 0; view3d.pitch = 0; }
-  else if(name === "side"){ view3d.yaw = Math.PI/2; view3d.pitch = 0; }
-  else if(name === "top"){ view3d.yaw = 0; view3d.pitch = -Math.PI/2 + 0.001; }
+  if(name === "side"){ view3d.yaw = 0; view3d.pitch = 0; }                          // down +Y (X-Z plane)
+  else if(name === "front"){ view3d.yaw = Math.PI/2; view3d.pitch = 0; }            // down +X (Y-Z plane)
+  else if(name === "rear"){ view3d.yaw = -Math.PI/2; view3d.pitch = 0; }            // down −X
+  else if(name === "top"){ view3d.yaw = 0; view3d.pitch = -Math.PI/2 + 0.001; }     // down +Z
+  else if(name === "bottom"){ view3d.yaw = 0; view3d.pitch = Math.PI/2 - 0.001; }   // up Z (down −Z)
   else { view3d.yaw = 0.7; view3d.pitch = -0.6; }   // iso
   fit3d(); render3d(); setStatus("3D " + name + " view.");
 }
@@ -1671,6 +1723,41 @@ function fitView(){
   }
   applyView(); renderOverlay();
 }
+function harpCanvasMargins(){
+  const num = id => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : Math.max(0, v); };
+  return { l:num("canvas-ml"), r:num("canvas-mr"), t:num("canvas-mt"), b:num("canvas-mb") };
+}
+// Set the document canvas (viewBox) to the whole harp envelope: the current content
+// bbox expanded by the four margins (L/R = pillar/shoulders, T = pin material, B = base).
+// Frame-aware: the content-local bbox is mapped to user space via contentGroup's own
+// transform — the same mapping fitView uses — so it's correct in the +X/+Z frame too.
+function setHarpCanvas(){
+  // frame around the STRINGS (not all content — the cream backdrop fills the canvas,
+  // so contentGroup.getBBox would re-margin itself each call)
+  const ss = stringLines();
+  if(!ss.length){ setStatus("No strings to frame — load strings first."); return; }
+  let mnx=Infinity, mny=Infinity, mxx=-Infinity, mxy=-Infinity;
+  ss.forEach(el => { for(const k of ["1","2"]){
+    const x=parseFloat(el.getAttribute("x"+k))||0, y=parseFloat(el.getAttribute("y"+k))||0;
+    mnx=Math.min(mnx,x); mxx=Math.max(mxx,x); mny=Math.min(mny,y); mxy=Math.max(mxy,y);
+  } });
+  let bb = { x:mnx, y:mny, width:mxx-mnx, height:mxy-mny };
+  const t = contentGroup.getAttribute("transform");
+  const mm = t && t.match(/matrix\(\s*([-\d.eE+]+)[ ,]+([-\d.eE+]+)[ ,]+([-\d.eE+]+)[ ,]+([-\d.eE+]+)[ ,]+([-\d.eE+]+)[ ,]+([-\d.eE+]+)\s*\)/);
+  if(mm){
+    const a=+mm[1],b=+mm[2],c=+mm[3],d=+mm[4],e=+mm[5],f=+mm[6];
+    const xf=(x,y)=>[a*x+c*y+e, b*x+d*y+f];
+    const pts=[[bb.x,bb.y],[bb.x+bb.width,bb.y],[bb.x+bb.width,bb.y+bb.height],[bb.x,bb.y+bb.height]].map(([x,y])=>xf(x,y));
+    const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+    bb={ x:Math.min(...xs), y:Math.min(...ys), width:Math.max(...xs)-Math.min(...xs), height:Math.max(...ys)-Math.min(...ys) };
+  }
+  const m = harpCanvasMargins();
+  const x = bb.x - m.l, y = bb.y - m.t, w = bb.width + m.l + m.r, h = bb.height + m.t + m.b;
+  doc = { viewBox:`${fmt(x)} ${fmt(y)} ${fmt(w)} ${fmt(h)}`, width:fmt(w)+"mm", height:fmt(h)+"mm" };
+  view = { x, y, w, h };
+  applyView(); renderOverlay();
+  setStatus(`Harp canvas = ${fmt(w)}×${fmt(h)} (margins L${fmt(m.l)} R${fmt(m.r)} T${fmt(m.t)} B${fmt(m.b)}). The saved viewBox now spans the whole harp envelope.`);
+}
 function zoomBy(f){
   const cx = view.x + view.w/2, cy = view.y + view.h/2;
   view.w *= f; view.h *= f;
@@ -1686,6 +1773,7 @@ document.getElementById("btn-open").onclick = openFile;
 document.getElementById("btn-save").onclick = saveSVG;
 document.getElementById("btn-save-as").onclick = saveAs;
 document.getElementById("btn-dxf").onclick = exportDXF;
+document.getElementById("btn-reset").onclick = resetDesign;
 document.getElementById("btn-undo").onclick = undo;
 document.getElementById("btn-redo").onclick = redo;
 document.getElementById("btn-fit").onclick = fitView;
@@ -1694,10 +1782,12 @@ document.getElementById("zoom-in").onclick = () => zoomBy(0.8);
 document.getElementById("zoom-out").onclick = () => zoomBy(1.25);
 document.getElementById("zoom-fit").onclick = fitView;
 document.getElementById("view3d-btn").onclick = toggle3d;
-document.getElementById("v3d-front").onclick = () => set3dPreset("front");
 document.getElementById("v3d-side").onclick = () => set3dPreset("side");
+document.getElementById("v3d-front").onclick = () => set3dPreset("front");
 document.getElementById("v3d-top").onclick = () => set3dPreset("top");
 document.getElementById("v3d-iso").onclick = () => set3dPreset("iso");
+document.getElementById("v3d-rear").onclick = () => set3dPreset("rear");
+document.getElementById("v3d-bottom").onclick = () => set3dPreset("bottom");
 document.getElementById("node-delete").onclick = deleteSelectedNode;
 document.getElementById("node-corner").onclick = () => setSelectedNodeType("corner");
 document.getElementById("node-smooth").onclick = () => setSelectedNodeType("smooth");
@@ -1718,15 +1808,18 @@ document.getElementById("align-bottom").onclick = () => alignStrings("bottom");
 document.getElementById("align-curve-top").onclick = () => alignStringsToCurve("top");
 document.getElementById("align-curve-bottom").onclick = () => alignStringsToCurve("bottom");
 document.getElementById("xz-btn").onclick = orientXZ;
-const readFitNodes = () => { const v = parseInt(document.getElementById("fit-nodes").value, 10); return isNaN(v) ? 8 : Math.max(2, v); };
-document.getElementById("fit-bottoms-btn").onclick = () => fitEndsCurve("bottoms", readFitNodes());
-document.getElementById("fit-tops-btn").onclick = () => fitEndsCurve("tops", readFitNodes());
+document.getElementById("harp-canvas-btn").onclick = setHarpCanvas;
+const readFitNodes = () => { const v = parseInt(document.getElementById("fit-nodes").value, 10); return isNaN(v) ? 5 : Math.max(2, v); };
+document.getElementById("fit-btn").onclick = () => fitCurve(document.getElementById("fit-source").value, readFitNodes());
+document.getElementById("place-bottoms-btn").onclick = () => placeStringsOnFittedCurve("bottom");
+document.getElementById("place-tops-btn").onclick = () => placeStringsOnFittedCurve("top");
 document.getElementById("clear-curve-btn").onclick = clearFitCurves;
 document.getElementById("shift-up-btn").onclick = () => shiftCurves(true);
 document.getElementById("shift-down-btn").onclick = () => shiftCurves(false);
-document.getElementById("add-pins-btn").onclick = addPins;
-document.getElementById("add-sensors-btn").onclick = addSensorDots;
-document.getElementById("clear-annot-btn").onclick = clearAnnotations;
+["pin","flat","natural","sharp","midi","eyelet"].forEach(role => {
+  const cb = document.getElementById("dot-" + role);
+  if(cb) cb.onchange = () => toggleDotLayer(role, cb.checked);
+});
 // ---- editor canvas background (view-only; persisted, not saved in the SVG) ----
 const CANVAS_BG_KEY = "hedit:canvasbg";
 const canvasWrap = document.querySelector(".canvas-wrap");
@@ -1879,6 +1972,16 @@ window.addEventListener("resize", () => { applyView(); renderOverlay(); if(view3
 // =====================================================================
 // the strings themselves (excludes reference lines like the S axis)
 function stringLines(){ return [...contentGroup.querySelectorAll("line")].filter(l => l.getAttribute("data-role") !== "s-axis"); }
+// The c1 bottom eyelet = the XZ origin and the S-axis rotation pivot. It's the
+// visually-lower end (frame-aware) of the string numbered 1. Null if there's no c1.
+function c1BottomEyelet(){
+  const c1 = stringLines().find(l => l.getAttribute("data-num") === "1");
+  if(!c1) return null;
+  const x1=parseFloat(c1.getAttribute("x1"))||0, y1=parseFloat(c1.getAttribute("y1"))||0;
+  const x2=parseFloat(c1.getAttribute("x2"))||0, y2=parseFloat(c1.getAttribute("y2"))||0;
+  const lowerIsP2 = yIsFlipped() ? (y2 <= y1) : (y2 >= y1);   // lower = larger screen-y
+  return lowerIsP2 ? { x:x2, y:y2 } : { x:x1, y:y1 };
+}
 // the S-axis reference line(s), if any
 function sAxisLines(){ return [...contentGroup.querySelectorAll('line[data-role="s-axis"]')]; }
 
@@ -1928,6 +2031,37 @@ function bakeLineTransform(el){
 }
 function readStringGap(){ const v = parseFloat(document.getElementById("string-gap").value); return isNaN(v)?0:v; }
 
+// Reset the whole design process back to the bare strings: drop the +X/+Z frame,
+// remove everything that isn't a string (S axis, fitted curves, DP/BP/SP rails,
+// pins, sensor dots), and rebuild each string vertical on the x=0 axis at its spec
+// length (no air gap, no alignment). Strings are re-appended in data-num order so a
+// later parallel air-gap (which sorts by x) re-spreads them correctly. Undoable.
+function resetDesign(){
+  const strings = stringLines();
+  if(!strings.length){ setStatus("No strings to reset."); return; }
+  pushUndo();
+  const activeDots = ALL_DOT_ROLES.filter(r => contentGroup.querySelector('circle[data-role="' + r + '"]'));   // dots are part of the strings — re-derive them after reset
+  if(frameXZ){ frameXZ = false; contentGroup.removeAttribute("transform"); syncFrameButton(); }
+  strings.forEach(bakeLineTransform);
+  const keep = new Set(strings);
+  [...contentGroup.children].forEach(el => { if(!keep.has(el)) el.remove(); });   // drop curves, S-axis, old dots
+  strings.sort((a,b) => (parseFloat(a.getAttribute("data-num"))||0) - (parseFloat(b.getAttribute("data-num"))||0));
+  const lenOf = el => parseFloat(el.getAttribute("data-len")) ||
+                Math.abs((parseFloat(el.getAttribute("y2"))||0) - (parseFloat(el.getAttribute("y1"))||0));
+  const Lmax = Math.max(...strings.map(lenOf));   // longest string (c1) anchors the bottom eyelet at the origin
+  strings.forEach(el => {
+    const len = lenOf(el);
+    // x=0 axis (no air gap); upright: tops level, hanging up to the c1 bottom eyelet at (0,0)
+    el.setAttribute("x1", "0"); el.setAttribute("x2", "0");
+    el.setAttribute("y1", fmt(-Lmax)); el.setAttribute("y2", fmt(len - Lmax));
+    contentGroup.appendChild(el);   // re-stack in string-number order
+  });
+  activeDots.forEach(placeDotRole);   // dots come back with the strings (their curves do not)
+  harpAlignment = null;
+  clearSelection(); pathModel = null; renderOverlay();
+  setStatus(`Reset to ${strings.length} bare strings on the x=0 axis (air gap, alignment, S-axis & fitted curves removed; dots kept). Undo to restore.`);
+}
+
 // make every string vertical and space them so the visible edge-to-edge gap
 // between adjacent strings is constant (each string's diameter is accounted for)
 function parallelAirGapStrings(gap){
@@ -1947,6 +2081,7 @@ function parallelAirGapStrings(gap){
     prevX = x;
   }
   pathModel = null;
+  refreshDots();
   renderOverlay();
   setStatus(`Enforced ${fmt(gap)} parallel air-gap across ${lines.length} strings.`);
 }
@@ -1974,14 +2109,19 @@ function rotateStrings(deg){
   const axis = sAxisLines();
   const all = lines.concat(axis);            // rotate strings + S axis together (rigidly)
   all.forEach(bakeLineTransform);
-  // pivot = center of the strings' bbox (S axis follows, but does not move the pivot)
-  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-  lines.forEach(el => {
-    const p = ["x1","y1","x2","y2"].map(a => parseFloat(el.getAttribute(a)) || 0);
-    minx = Math.min(minx, p[0], p[2]); maxx = Math.max(maxx, p[0], p[2]);
-    miny = Math.min(miny, p[1], p[3]); maxy = Math.max(maxy, p[1], p[3]);
-  });
-  const cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
+  // pivot = the c1 bottom eyelet (the XZ origin / S-axis rotation origin); fallback bbox center
+  let cx, cy;
+  const pivot = c1BottomEyelet();
+  if(pivot){ cx = pivot.x; cy = pivot.y; }
+  else {
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    lines.forEach(el => {
+      const p = ["x1","y1","x2","y2"].map(a => parseFloat(el.getAttribute(a)) || 0);
+      minx = Math.min(minx, p[0], p[2]); maxx = Math.max(maxx, p[0], p[2]);
+      miny = Math.min(miny, p[1], p[3]); maxy = Math.max(maxy, p[1], p[3]);
+    });
+    cx = (minx + maxx) / 2; cy = (miny + maxy) / 2;
+  }
   const a = deg * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
   const rot = (x, y) => ({ x: cx + (x-cx)*cos - (y-cy)*sin, y: cy + (x-cx)*sin + (y-cy)*cos });
   all.forEach(el => {
@@ -1991,8 +2131,8 @@ function rotateStrings(deg){
     el.setAttribute("x1", fmt(p1.x)); el.setAttribute("y1", fmt(p1.y));
     el.setAttribute("x2", fmt(p2.x)); el.setAttribute("y2", fmt(p2.y));
   });
-  pathModel = null; renderOverlay();
-  setStatus(`Rotated ${lines.length} strings${axis.length ? " + S axis" : ""} by ${fmt(deg)}° about their center. Parallel air gap preserved.`);
+  refreshDots(); pathModel = null; renderOverlay();
+  setStatus(`Rotated ${lines.length} strings${axis.length ? " + S axis" : ""} by ${fmt(deg)}° about the c1 bottom eyelet. Parallel air gap preserved.`);
 }
 
 // --- vertical alignment ---------------------------------------------
@@ -2020,23 +2160,26 @@ function alignStrings(mode){
   let target;
   if(m === "top")    target = Math.min(...g.map(i => i.top));
   else if(m === "bottom") target = Math.max(...g.map(i => i.bot));
-  else /* middle */  target = g.reduce((s,i) => s + (i.top + i.bot)/2, 0) / g.length;
+  else { // middle: anchor to c1's midpoint so c1's bottom eyelet stays on the origin (no up-drift)
+    const c1g = g.find(i => i.el.getAttribute("data-num") === "1");
+    target = c1g ? (c1g.top + c1g.bot) / 2 : g.reduce((s,i) => s + (i.top + i.bot)/2, 0) / g.length;
+  }
   g.forEach(i => {
     if(m === "top")         placeString(i.el, target, i.len);
     else if(m === "bottom") placeString(i.el, target - i.len, i.len);
     else                    placeString(i.el, target - i.len/2, i.len);
   });
   harpAlignment = mode;
-  pathModel = null; renderOverlay();
+  refreshDots(); pathModel = null; renderOverlay();
   setStatus(`Aligned ${lines.length} strings (${mode}). Air gap & lengths preserved.`);
 }
 
 // Align one end of every string onto a selected <path> curve (the other end
 // follows so each string keeps its length). `end` is "top" or "bottom".
-function alignStringsToCurve(end){
+function alignStringsToCurve(end, curveEl){
   const lines = stringLines();
   if(!lines.length){ setStatus("No strings to align."); return; }
-  const curve = selection && selection.tagName.toLowerCase() === "path" ? selection : null;
+  const curve = curveEl || (selection && selection.tagName.toLowerCase() === "path" ? selection : null);
   if(!curve){ setStatus("Select a path to use as the curve (Select tool), then click On curve."); return; }
   const total = curve.getTotalLength();
   if(!total){ setStatus("Selected path has no length."); return; }
@@ -2059,8 +2202,15 @@ function alignStringsToCurve(end){
     else               placeString(el, cy, i.len);
   });
   harpAlignment = "curve-" + end;
-  pathModel = null; renderOverlay();
+  refreshDots(); pathModel = null; renderOverlay();
   setStatus(`Aligned ${lines.length} string ${end} ends to the curve. Air gap & lengths preserved.`);
+}
+// Place the string ends onto the curve just fitted for that end (no selection needed).
+function placeStringsOnFittedCurve(end){
+  const role = end === "bottom" ? "bottom-curve" : "top-curve";
+  const curve = contentGroup.querySelector('path[data-role="' + role + '"]');
+  if(!curve){ setStatus(`No fitted ${end} curve yet — click "Fit ${end}s" first.`); return; }
+  alignStringsToCurve(end, curve);
 }
 
 // --- spec table -----------------------------------------------------
@@ -2301,11 +2451,12 @@ function orientXZ(){
   if(!bb || (!bb.width && !bb.height)){ setStatus("Nothing to orient."); return; }
   pushUndo();
   if(!frameXZ){
-    const minX = bb.x, maxY = bb.y + bb.height;
-    transformContentCoords(x => x - minX, y => maxY - y);   // X = x-minX (>=0), Z = maxY-y (>=0, up)
-    contentGroup.setAttribute("transform", `matrix(1 0 0 -1 ${fmt(minX)} ${fmt(maxY)})`);
+    const o = c1BottomEyelet() || { x: bb.x, y: bb.y + bb.height };
+    const ox = o.x, oz = o.y;
+    transformContentCoords(x => x - ox, y => oz - y);   // X = x-ox, Z = oz-y (up); origin = c1 bottom eyelet
+    contentGroup.setAttribute("transform", `matrix(1 0 0 -1 ${fmt(ox)} ${fmt(oz)})`);
     frameXZ = true;
-    setStatus("Oriented to +X/+Z (right-handed: +X right, +Z up, Y into page). Origin at bbox bottom-left; all X,Z >= 0.");
+    setStatus("Oriented to +X/+Z (right-handed: +X right, +Z up, Y into page). Origin at the c1 bottom eyelet; pillar/base extend into −X/−Z.");
   } else {
     const { minX, maxY } = frameParams();
     transformContentCoords(x => x + minX, y => maxY - y);   // inverse: x = X+minX, y = maxY-Z
@@ -2492,7 +2643,7 @@ const FIT_COLOR = { bottoms:"#cc2222",      tops:"#2255cc"   };   // red bottoms
 
 // remove the fitted curve(s) (both bottom and top) so you can re-fit cleanly
 function clearFitCurves(){
-  const paths = [...contentGroup.querySelectorAll('path[data-role="bottom-curve"],path[data-role="top-curve"]')];
+  const paths = [...contentGroup.querySelectorAll('path[data-role$="-curve"]')];
   if(!paths.length){ setStatus("No fitted curve to clear."); return; }
   pushUndo();
   paths.forEach(p => p.remove());
@@ -2504,23 +2655,34 @@ const clearBottomCurve = clearFitCurves;   // back-compat alias
 
 // Fit a smooth (C2) curve through the BOTTOM or TOP ends of the selected lines
 // (2+), else all strings. which = "bottoms" | "tops".
-function fitEndsCurve(which, maxNodes){
-  const isLine = el => el && el.tagName && el.tagName.toLowerCase() === "line" && el.getAttribute("data-role") !== "s-axis";
-  const selLines = selected.filter(isLine);
-  const usingSel = selLines.length >= 2;
-  const src = usingSel ? selLines : stringLines();
-  if(src.length < 2){ setStatus("Select 2+ lines (or load strings) to fit a curve to their ends."); return; }
-  const flip = yIsFlipped();
-  const wantLower = (which === "bottoms");
-  const pts = src.map(el => {
-    const a = [+el.getAttribute("x1"), +el.getAttribute("y1")], b = [+el.getAttribute("x2"), +el.getAttribute("y2")];
-    // visually-lower endpoint = larger screen-y (larger stored y unless flipped)
-    const lower = (!flip ? (a[1] >= b[1]) : (a[1] <= b[1])) ? a : b;
-    const upper = (lower === a) ? b : a;
-    return wantLower ? lower : upper;
-  }).sort((p,q) => p[0]-q[0]);
-  pushUndo();
-  const role = FIT_ROLE[which];
+// the point-set for a fit source: string bottoms/tops (visual ends) or a dot layer's centers
+function fitSourcePoints(source){
+  if(source === "bottoms" || source === "tops"){
+    const isLine = el => el && el.tagName && el.tagName.toLowerCase() === "line" && el.getAttribute("data-role") !== "s-axis";
+    const selLines = selected.filter(isLine);
+    const src = selLines.length >= 2 ? selLines : stringLines();
+    const flip = yIsFlipped(), wantLower = (source === "bottoms");
+    return src.map(el => {
+      const a = [+el.getAttribute("x1"), +el.getAttribute("y1")], b = [+el.getAttribute("x2"), +el.getAttribute("y2")];
+      const lower = (!flip ? (a[1] >= b[1]) : (a[1] <= b[1])) ? a : b;   // visually-lower end
+      return wantLower ? lower : (lower === a ? b : a);
+    }).sort((p,q) => p[0]-q[0]);
+  }
+  return [...contentGroup.querySelectorAll('circle[data-role="' + source + '"]')]
+    .map(c => [+c.getAttribute("cx"), +c.getAttribute("cy")]).sort((p,q) => p[0]-q[0]);
+}
+function curveRoleFor(source){ return source === "bottoms" ? "bottom-curve" : source === "tops" ? "top-curve" : source + "-curve"; }
+function curveColorFor(source){
+  const m = { bottoms:"#cc2222", tops:"#2255cc", pin:"#ffb454" };
+  if(m[source]) return m[source];
+  const s = SENSORS.find(x => x.role === source); return s ? s.color : "#7a1fa2";
+}
+// Fit a smooth (C2) curve through any point-set: string bottoms/tops, or a dot layer (pins/flats/naturals/sharps/midi).
+function fitCurve(source, maxNodes, skipUndo){
+  const pts = fitSourcePoints(source);
+  if(pts.length < 2){ setStatus(`Need 2+ ${source} points — add the dots (or load strings) first.`); return; }
+  if(!skipUndo) pushUndo();
+  const role = curveRoleFor(source);
   [...contentGroup.querySelectorAll('path[data-role="' + role + '"]')].forEach(p => p.remove());
   const curves = fitSmoothSpline(pts, maxNodes);   // C2 natural-spline: smooth, no kink/overshoot
   if(!curves.length){ setStatus("Could not fit a curve."); return; }
@@ -2531,19 +2693,22 @@ function fitEndsCurve(which, maxNodes){
   path.setAttribute("data-role", role);
   path.setAttribute("d", d);
   path.setAttribute("fill", "none");
-  path.setAttribute("stroke", FIT_COLOR[which]); path.setAttribute("stroke-width", "1.5");
+  path.setAttribute("stroke", curveColorFor(source)); path.setAttribute("stroke-width", "1.5");
   contentGroup.appendChild(path);
   setTool("node"); enterNodeEdit(path); renderOverlay();
-  setStatus(`Fitted ${curves.length} cubic segment(s) (${curves.length+1} nodes) through ${pts.length} ${which === "bottoms" ? "bottom" : "top"} ends${usingSel ? " (selected)" : ""}. Drag handles, or click "${which === "bottoms" ? "Bottoms" : "Tops"} on curve" to align.`);
+  setStatus(`Fitted ${curves.length} segment(s) through ${pts.length} ${source} points. Shift it for clearance, or rest string ends on it.`);
 }
-function fitBottomsCurve(maxNodes){ return fitEndsCurve("bottoms", maxNodes); }   // back-compat
+function fitEndsCurve(which, maxNodes){ return fitCurve(which, maxNodes); }   // back-compat
+function fitBottomsCurve(maxNodes){ return fitCurve("bottoms", maxNodes); }    // back-compat
 
 // ---- per-string annotations: tuning pins + RGB sensor dots ----
 // Paraguayan fractions: dot sits k*L below the tip (L = string length).
 const SENSORS = [
+  { role:"flat",    k: 0,          color:"#9b51e0" },   // violet — at the tip (the open/flat note)
   { role:"natural", k: 1 - 0.9439, color:"#e6261f" },   // R
   { role:"sharp",   k: 1 - 0.8909, color:"#3ad13a" },   // G
   { role:"midi",    k: 0.125,      color:"#2d7ff9" },   // B
+  { role:"eyelet",  k: 1,          color:"#00897b" },   // teal — at the string bottom (soundboard attachment)
 ];
 function stringEnds(el){   // visual top/bottom endpoints in stored coords
   const a = [+el.getAttribute("x1"), +el.getAttribute("y1")], b = [+el.getAttribute("x2"), +el.getAttribute("y2")];
@@ -2560,34 +2725,68 @@ function mkDot(cx, cy, r, role, fill, num){
 }
 function clearByRole(roles){ roles.forEach(r => [...contentGroup.querySelectorAll('[data-role="' + r + '"]')].forEach(e => e.remove())); }
 
-// a pin dot per string: from the top end, ~30 deg up-and-to-the-left, 3 air-gaps away
-function addPins(){
-  const strings = stringLines(); if(!strings.length){ setStatus("No strings to pin."); return; }
-  pushUndo(); clearByRole(["pin"]);
-  const flip = yIsFlipped(), dist = 3 * readStringGap();
-  const ang = (flip ? 30 : -30) * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);
-  strings.forEach(el => {
-    const { top, bot } = stringEnds(el);
-    let ux = top[0]-bot[0], uy = top[1]-bot[1]; const L = Math.hypot(ux,uy) || 1; ux/=L; uy/=L;   // up dir
-    const dx = ux*ca - uy*sa, dy = ux*sa + uy*ca;                                                  // rotate up by ang
-    mkDot(top[0] + dx*dist, top[1] + dy*dist, 2.5, "pin", "#ffb454", el.getAttribute("data-num"));
+const ALL_DOT_ROLES = ["pin","flat","natural","sharp","midi","eyelet"];
+// place ONE dot layer for every string (no undo/status). pins: 3 air-gaps up-right of the
+// top; flat at the tip; natural/sharp/midi at the Paraguayan fractions below the tip.
+function placeDotRole(role){
+  const strings = stringLines(); if(!strings.length) return;
+  clearByRole([role]);
+  if(role === "pin"){
+    const flip = yIsFlipped(), dist = 3 * readStringGap();
+    const ang = (flip ? -30 : 30) * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);   // up-and-to-the-RIGHT
+    strings.forEach(el => {
+      const { top, bot } = stringEnds(el);
+      let ux = top[0]-bot[0], uy = top[1]-bot[1]; const L = Math.hypot(ux,uy) || 1; ux/=L; uy/=L;
+      const dx = ux*ca - uy*sa, dy = ux*sa + uy*ca;
+      mkDot(top[0] + dx*dist, top[1] + dy*dist, 2.5, "pin", "#ffb454", el.getAttribute("data-num"));
+    });
+  } else {
+    const s = SENSORS.find(x => x.role === role); if(!s) return;
+    strings.forEach(el => {
+      const { top, bot } = stringEnds(el);
+      let dx = bot[0]-top[0], dy = bot[1]-top[1]; const L = Math.hypot(dx,dy) || 1; const ux = dx/L, uy = dy/L;
+      mkDot(top[0] + ux*(s.k*L), top[1] + uy*(s.k*L), 1.4, s.role, s.color, el.getAttribute("data-num"));
+    });
+  }
+}
+// checkbox handler: checking adds the dot layer AND fits + selects its curve (ready to Shift);
+// unchecking removes both the dots and the associated curve.
+function toggleDotLayer(role, on){
+  if(on && !stringLines().length){ setStatus("Load strings first."); syncDotCheckboxes(); return; }
+  pushUndo();
+  if(on){
+    placeDotRole(role);
+    const existing = contentGroup.querySelector('path[data-role="' + role + '-curve"]');
+    if(existing){   // a curve already exists (maybe shifted/edited) — re-select it, DON'T re-fit (keep edits)
+      setTool("node"); enterNodeEdit(existing); renderOverlay();
+      setStatus(`${role} dots on — its curve re-selected (edits kept). Shift/drag to adjust.`);
+    } else {        // no curve yet — fit one through these dots and select it
+      fitCurve(role, readFitNodes(), true);
+      setStatus(`Added ${role} dots and fitted its curve — selected, Shift to adjust.`);
+    }
+  } else {
+    clearByRole([role]);   // remove the DOTS only — the fitted curve is kept (your adjusted artifact)
+    renderOverlay();
+    setStatus(`Removed ${role} dots (curve kept — use "Clear fitted curves" to delete it).`);
+  }
+}
+// dots are derived from the strings — re-place every present dot layer (e.g. after the
+// strings move). Their curves are NOT re-fit (those are the user-adjusted artifacts).
+function refreshDots(){
+  ALL_DOT_ROLES.forEach(r => { if(contentGroup.querySelector('circle[data-role="' + r + '"]')) placeDotRole(r); });
+}
+// reflect which dot layers currently exist in the step-4 checkboxes
+function syncDotCheckboxes(){
+  ALL_DOT_ROLES.forEach(role => {
+    const cb = document.getElementById("dot-" + role);
+    if(cb) cb.checked = !!contentGroup.querySelector('circle[data-role="' + role + '"]');
   });
-  renderOverlay(); setStatus(`Added ${strings.length} pin dots (30° up-left, ${fmt(dist)} away).`);
 }
-// natural / sharp / midi RGB dots along each string at the Paraguayan fractions
-function addSensorDots(){
-  const strings = stringLines(); if(!strings.length){ setStatus("No strings for sensor dots."); return; }
-  pushUndo(); clearByRole(SENSORS.map(s => s.role));
-  strings.forEach(el => {
-    const { top, bot } = stringEnds(el);
-    let dx = bot[0]-top[0], dy = bot[1]-top[1]; const L = Math.hypot(dx,dy) || 1; const ux = dx/L, uy = dy/L;  // down dir
-    SENSORS.forEach(s => mkDot(top[0] + ux*(s.k*L), top[1] + uy*(s.k*L), 1.4, s.role, s.color, el.getAttribute("data-num")));
-  });
-  renderOverlay(); setStatus(`Added natural/sharp/midi dots on ${strings.length} strings.`);
-}
-function clearAnnotations(){
-  pushUndo(); clearByRole(["pin","natural","sharp","midi"]); renderOverlay(); setStatus("Cleared pins & sensor dots.");
-}
+// back-compat helpers (JS console)
+function addPins(){ pushUndo(); placeDotRole("pin"); renderOverlay(); syncDotCheckboxes(); setStatus("Added pin dots."); }
+function addSensorDots(){ pushUndo(); ["flat","natural","sharp","midi"].forEach(placeDotRole); renderOverlay(); syncDotCheckboxes(); setStatus("Added flat/natural/sharp/midi dots."); }
+function addAllDots(){ pushUndo(); ALL_DOT_ROLES.forEach(placeDotRole); renderOverlay(); syncDotCheckboxes(); setStatus("Added all dots."); }
+function clearAnnotations(){ pushUndo(); clearByRole(ALL_DOT_ROLES); renderOverlay(); syncDotCheckboxes(); setStatus("Cleared pins & dots."); }
 
 // shift the selected path(s), else the fitted curves, vertically (visual up/down)
 // by a specific amount or by the air gap
@@ -2597,17 +2796,24 @@ function shiftCurves(visualUp){
   const amt = (useGap ? readStringGap() : amtIn);
   if(!amt){ setStatus("Set a shift amount (or check air gap)."); return; }
   const dyStored = (yIsFlipped() ? 1 : -1) * amt * (visualUp ? 1 : -1);   // visual up/down -> stored y
-  let targets = selected.filter(el => el && el.tagName && el.tagName.toLowerCase() === "path");
-  if(!targets.length) targets = [...contentGroup.querySelectorAll('path[data-role="bottom-curve"],path[data-role="top-curve"]')];
-  if(!targets.length){ setStatus("Select a path/curve to shift (or fit one first)."); return; }
+  const isPath = el => el && el.tagName && el.tagName.toLowerCase() === "path";
+  // shift only the selected curve(s); else the one being edited (the last fitted) — never all of them
+  let targets = selected.filter(isPath);
+  if(!targets.length && pathModel && isPath(pathModel.el)) targets = [pathModel.el];
+  if(!targets.length){ setStatus("Select a curve to shift (or fit one — it becomes the active curve)."); return; }
   pushUndo();
   targets.forEach(el => {
     const subs = segsToSubpaths(parsePathD(el.getAttribute("d") || ""));
     subs.forEach(sub => sub.nodes.forEach(nd => { nd.y += dyStored; if(nd.hasIn) nd.inY += dyStored; if(nd.hasOut) nd.outY += dyStored; }));
     el.setAttribute("d", subsToD(subs));
   });
-  pathModel = null; clearSelection(); renderOverlay();
-  setStatus(`Shifted ${targets.length} path(s) ${visualUp ? "up" : "down"} by ${fmt(amt)}${useGap ? " (air gap)" : ""}.`);
+  // re-enter node-edit on the shifted curve so its handles reappear at the new position
+  // (and it stays the active shift target); for multiple, just keep them selected
+  selectedNode = null;
+  if(targets.length === 1){ setTool("node"); enterNodeEdit(targets[0]); }
+  else { pathModel = null; selected = targets.slice(); selection = targets[targets.length - 1]; readStyleFromSelection(); updateSelCount(); }
+  renderOverlay();
+  setStatus(`Shifted ${targets.length} curve(s) ${visualUp ? "up" : "down"} by ${fmt(amt)}${useGap ? " (air gap)" : ""}. Handles stay live — drag to adjust, or use the Node tool (N) + click a curve.`);
 }
 
 // =====================================================================
@@ -2895,8 +3101,25 @@ function loadSample(){
   setStatus("Sample document — switch to the Node tool (N) and drag a path's handles. Open… to load your own SVG.");
 }
 
-// boot: restore the last session if present, else show the sample
-if(!restoreAutosave()) loadSample();
+// Load strings.svg (the harp) as the default document. Falls back to the
+// built-in sample when it can't be fetched (e.g. opened over file:// or served
+// without strings.svg alongside).
+async function loadDefaultDoc(){
+  try {
+    const res = await fetch("strings.svg", { cache: "no-store" });
+    if(res.ok){
+      loadSVGText(await res.text(), "strings.svg");
+      setStatus("Loaded strings.svg — the harp. Open… to load a different SVG.");
+      return;
+    }
+  } catch(e){ /* not served alongside / file:// — fall through to the sample */ }
+  loadSample();
+}
+
+// boot: restore the last session if present, else load the harp.
+// ?fresh in the URL forces the harp and discards any cached session.
+if(new URLSearchParams(location.search).has("fresh")){ clearAutosave(); loadDefaultDoc(); }
+else if(!restoreAutosave()) loadDefaultDoc();
 setTool("select");
 updateHint();
 </script>
