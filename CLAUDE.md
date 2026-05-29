@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `hedit` is a browser-based SVG bezier/path editor. The entire application — markup, CSS, and
 logic — lives in a single self-contained file: **`hedit.html`**. There is no build step, no
-package manager, no dependencies, and no test suite.
+package manager, no dependencies, and no unit-test suite (verification is manual in the browser plus the `test-hedit.sh` headless smoke test).
 
 ## Running / developing
 
@@ -14,8 +14,11 @@ package manager, no dependencies, and no test suite.
   (`python3 -m http.server`) and load it. It boots with `loadSample()` content so it's immediately
   testable.
 - **Edit:** change `hedit.html` directly and reload the browser. No compilation.
-- **Verify:** there are no automated tests — verification is manual in the browser. Exercise each
+- **Verify:** there is no unit-test suite — verification is manual in the browser. Exercise each
   tool (V/N/P/R/E), then Save and re-Open the resulting SVG to confirm a round-trip.
+- **Headless smoke test:** `./test-hedit.sh [file.svg]` (defaults to `strings.svg`) loads the SVG
+  through hedit's real `loadSVGText()` in headless Chrome and reports object/tag counts, viewBox,
+  and bbox. Run after any change to load/sanitize or the strings logic.
 
 ## Architecture
 
@@ -79,7 +82,7 @@ hedit doubles as a harp string-layout tool. A "string" is a `<line>` in
 `contentGroup` whose `stroke-width` equals its diameter; spec metadata lives in
 `data-*` attributes (`data-num`, `data-note`, `data-len`, `data-ten`,
 `data-core`, `data-wrap`, `data-cdia`, `data-wdia`, `data-dia`). The reference
-document is `strings.svg`. The **Strings (harp)** panel section drives this:
+document is `strings.svg` (and `strings_bottomcurve.svg`, the bottoms-fitted variant). The **Strings (harp)** panel section drives this:
 
 - **Parallel air-gap** (`parallelAirGapStrings`) — makes every string vertical and
   re-spaces them so the *edge-to-edge* gap between adjacent strings is constant,
@@ -224,6 +227,20 @@ grouped (File · Undo/Redo · Fit/Delete). The far-left strip is the tool palett
 All control IDs are unchanged across the redesign — JS wiring keys off ids, not structure, so
 moving a control between cards is safe. The harp pipeline + Maker.js capability map is in
 `HARP_PLAN.md`.
+
+## harp-maker/ — Maker.js assembly (separate Node project)
+
+The *assembly* half of the workflow (hedit is the *authoring* half). `harp-maker/harp.js`
+imports hedit-authored curves (the `paraguayan_overrides.json` schema: DP/BP/SP node+handle
+chains, WP profile) plus the strings (from an SVG), builds a Maker.js model, and exports
+`harp.svg` + `harp.dxf` in millimeters. The JSON is Y-up mm — exactly Maker.js's native
+frame — so the rails import 1:1 with no flip. This is the *only* part of the repo with
+dependencies (`makerjs ^0.19.2` via `package.json`); `hedit.html` itself stays
+zero-dependency.
+
+    cd harp-maker && npm install
+    node harp.js [harp.json] [strings.svg]
+    # defaults: ../../paraguayan/paraguayan_overrides.json  and  ../strings.svg
 
 ## Conventions
 
