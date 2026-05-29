@@ -371,8 +371,9 @@
       <summary>Node (with N tool)</summary>
       <div class="sec-body">
         <div class="seg">
-          <button id="node-corner" title="Cusp / corner node (independent handles)">Corner</button>
-          <button id="node-smooth" title="Symmetric smooth node (collinear handles)">Smooth</button>
+          <button id="node-corner" title="Cusp / corner node — handles independent">Corner</button>
+          <button id="node-smooth" title="Smooth node — handles collinear (tangent), lengths independent">Smooth</button>
+          <button id="node-symmetric" title="Symmetric node — handles collinear AND equal length (mirror)">Symmetric</button>
         </div>
         <button id="node-delete" class="danger" title="Delete the selected node (Del)">Delete node</button>
       </div>
@@ -692,19 +693,21 @@ function detectSmooth(nd){
     const mi=Math.hypot(ix,iy), mo=Math.hypot(ox,oy);
     const cos = (mi && mo) ? (ix*ox+iy*oy)/(mi*mo) : 0;
     nd.smooth = cos < -0.999;   // within ~2.5 deg of collinear
-  } else nd.smooth = false;
+    nd.sym = nd.smooth && mi>0 && mo>0 && Math.abs(mi-mo) <= 0.02*Math.max(mi,mo);   // collinear AND ~equal length
+  } else { nd.smooth = false; nd.sym = false; }
   return nd;
 }
 // keep a smooth node's two handles collinear when one is dragged (opposite handle
 // follows the reverse direction, preserving its own length)
 function mirrorHandle(nd, moved){
+  // symmetric: the opposite handle equals the dragged one's length; smooth: it keeps its own length
   if(moved === "in"){
     const ix=nd.inX-nd.x, iy=nd.inY-nd.y, d=Math.hypot(ix,iy)||1;
-    const len=Math.hypot(nd.outX-nd.x, nd.outY-nd.y);
+    const len = nd.sym ? d : Math.hypot(nd.outX-nd.x, nd.outY-nd.y);
     nd.outX = nd.x - ix/d*len; nd.outY = nd.y - iy/d*len;
   } else {
     const ox=nd.outX-nd.x, oy=nd.outY-nd.y, d=Math.hypot(ox,oy)||1;
-    const len=Math.hypot(nd.inX-nd.x, nd.inY-nd.y);
+    const len = nd.sym ? d : Math.hypot(nd.inX-nd.x, nd.inY-nd.y);
     nd.inX = nd.x - ox/d*len; nd.inY = nd.y - oy/d*len;
   }
 }
@@ -1051,21 +1054,25 @@ function setSelectedNodeType(type){
   const nd = pathModel.subs[selectedNode.si].nodes[selectedNode.ni];
   pushUndo();
   if(type === "corner"){
-    nd.smooth = false;   // handles stay independent; dragging one won't move the other
+    nd.smooth = false; nd.sym = false;   // handles stay independent; dragging one won't move the other
     setStatus("Corner node — handles independent.");
-  } else if(type === "smooth"){
-    // make in/out collinear & equal length (average), and flag smooth (handles stay collinear on drag)
+  } else if(type === "smooth" || type === "symmetric"){
+    // align in/out to a shared tangent; symmetric forces equal length, smooth keeps each length
     if(nd.hasIn && nd.hasOut){
       const inV = { x:nd.inX-nd.x, y:nd.inY-nd.y };
       const outV = { x:nd.outX-nd.x, y:nd.outY-nd.y };
-      const len = (Math.hypot(inV.x,inV.y) + Math.hypot(outV.x,outV.y)) / 2;
+      const inLen = Math.hypot(inV.x,inV.y), outLen = Math.hypot(outV.x,outV.y);
       let dx = (-inV.x + outV.x), dy = (-inV.y + outV.y);
-      const dl = Math.hypot(dx,dy) || 1; dx/=dl; dy/=dl;
-      nd.outX = nd.x + dx*len; nd.outY = nd.y + dy*len;
-      nd.inX  = nd.x - dx*len; nd.inY  = nd.y - dy*len;
+      const dl = Math.hypot(dx,dy) || 1; dx/=dl; dy/=dl;   // shared tangent (out side)
+      const ol = type === "symmetric" ? (inLen+outLen)/2 : outLen;
+      const il = type === "symmetric" ? (inLen+outLen)/2 : inLen;
+      nd.outX = nd.x + dx*ol; nd.outY = nd.y + dy*ol;
+      nd.inX  = nd.x - dx*il; nd.inY  = nd.y - dy*il;
     }
-    nd.smooth = true;
-    setStatus("Smooth node — handles kept collinear when dragged.");
+    nd.smooth = true; nd.sym = (type === "symmetric");
+    setStatus(type === "symmetric"
+      ? "Symmetric node — handles collinear & equal length (mirror on drag)."
+      : "Smooth node — handles collinear, lengths independent.");
   }
   commitPathModel(); renderOverlay();
 }
@@ -1083,6 +1090,24 @@ stage.addEventListener("dblclick", onDblClick);
 stage.addEventListener("wheel", onWheel, { passive:false });
 stage.addEventListener("contextmenu", e => { if(tool==="pen" && penState){ e.preventDefault(); finishPen(true); } });
 
+// Nearest content <path> whose outline passes within tolPx (screen px) of the click.
+// Lets you select / node-edit a curve by clicking NEAR it, not exactly on its thin stroke.
+function nearestPathAt(clientX, clientY, tolPx){
+  let best = null;
+  for(const p of contentGroup.querySelectorAll("path")){
+    let total; try { total = p.getTotalLength(); } catch(e){ continue; }
+    if(!total) continue;
+    const m = p.getScreenCTM(); if(!m) continue;
+    const N = Math.min(300, Math.max(60, Math.ceil(total / 8)));
+    for(let i=0;i<=N;i++){
+      const q = p.getPointAtLength(total * i / N);
+      const sx = m.a*q.x + m.c*q.y + m.e, sy = m.b*q.x + m.d*q.y + m.f;
+      const d = Math.hypot(sx - clientX, sy - clientY);
+      if(!best || d < best.d) best = { d, el:p };
+    }
+  }
+  return (best && best.d <= tolPx) ? best.el : null;
+}
 function onDown(e){
   if(e.button === 1 || (e.button === 0 && spaceDown)){ // pan
     drag = { type:"pan", sx:e.clientX, sy:e.clientY, ox:view.x, oy:view.y };
@@ -1093,8 +1118,10 @@ function onDown(e){
   const u = evtUser(e);
 
   if(tool === "select"){
-    if(isContentEl(e.target)){
-      const tgt = e.target;
+    // direct hit on a selectable element, else grab the nearest curve within tolerance
+    let tgt = (isContentEl(e.target) && isSelectable(e.target)) ? e.target : null;
+    if(!tgt) tgt = nearestPathAt(e.clientX, e.clientY, HIT_PX * 2.5);
+    if(tgt){
       if(e.shiftKey){ toggleSelection(tgt); renderOverlay(); return; }
       if(!selected.includes(tgt)) selectElement(tgt);
       pushUndo();
@@ -1120,11 +1147,12 @@ function onDown(e){
       drag.startLocal = toLocal(pathModel.el, u);
       renderOverlay(); return;
     }
-    if(isContentEl(t) && t.tagName.toLowerCase() === "path"){
-      enterNodeEdit(t); renderOverlay(); return;
+    // direct hit on a path, else the nearest curve within tolerance
+    let np = (isContentEl(t) && t.tagName.toLowerCase() === "path") ? t : nearestPathAt(e.clientX, e.clientY, HIT_PX * 2.5);
+    if(np && np.tagName.toLowerCase() === "path"){
+      enterNodeEdit(np); renderOverlay(); return;
     }
-    // clicked off the path (empty canvas or a non-path element): exit node-edit
-    // so the nodes/handles overlay clears
+    // clicked well off any path: exit node-edit so the nodes/handles overlay clears
     pathModel = null; selectedNode = null; renderOverlay(); return;
   }
 
@@ -1791,6 +1819,7 @@ document.getElementById("v3d-bottom").onclick = () => set3dPreset("bottom");
 document.getElementById("node-delete").onclick = deleteSelectedNode;
 document.getElementById("node-corner").onclick = () => setSelectedNodeType("corner");
 document.getElementById("node-smooth").onclick = () => setSelectedNodeType("smooth");
+document.getElementById("node-symmetric").onclick = () => setSelectedNodeType("symmetric");
 function readGap(){ const v = parseFloat(document.getElementById("distribute-gap").value); return isNaN(v) ? 0 : v; }
 function readIncludeStroke(){ return document.getElementById("distribute-stroke").checked; }
 document.getElementById("dist-h").onclick = () => distribute("h", readGap(), readIncludeStroke());
@@ -2366,6 +2395,7 @@ function buildHarpModel(){
     layout: { airGap: measuredAirGap(), rotationDeg: measuredRotationDeg(), alignment: harpAlignment, frame: frameXZ ? "RH-XZ" : "SVG" },
     strings,
     wp: harpWP || undefined,   // persist the WP waterfall profile so autosave keeps it
+    extra: (harpExtra && Object.keys(harpExtra).length) ? harpExtra : undefined,   // column_width, _comment, ... (Paraguayan extras) — keep the SVG fully self-contained
   };
 }
 // write the model into an export <svg> as the first child
@@ -2385,6 +2415,7 @@ function applyHarpModel(model){
     harpAlignment = model.layout.alignment != null ? model.layout.alignment : null;
   }
   if(model.wp && model.wp.nodes) harpWP = model.wp;   // restore WP waterfall profile
+  if(model.extra && typeof model.extra === "object") harpExtra = model.extra;   // restore column_width, _comment, ...
   const n = model.strings ? model.strings.length : 0;
   setStatus(`Loaded harp spec: ${n} strings, air gap ${model.layout ? model.layout.airGap : "?"} ${model.units||""}.`);
   return true;
@@ -2754,21 +2785,10 @@ function placeDotRole(role){
 function toggleDotLayer(role, on){
   if(on && !stringLines().length){ setStatus("Load strings first."); syncDotCheckboxes(); return; }
   pushUndo();
-  if(on){
-    placeDotRole(role);
-    const existing = contentGroup.querySelector('path[data-role="' + role + '-curve"]');
-    if(existing){   // a curve already exists (maybe shifted/edited) — re-select it, DON'T re-fit (keep edits)
-      setTool("node"); enterNodeEdit(existing); renderOverlay();
-      setStatus(`${role} dots on — its curve re-selected (edits kept). Shift/drag to adjust.`);
-    } else {        // no curve yet — fit one through these dots and select it
-      fitCurve(role, readFitNodes(), true);
-      setStatus(`Added ${role} dots and fitted its curve — selected, Shift to adjust.`);
-    }
-  } else {
-    clearByRole([role]);   // remove the DOTS only — the fitted curve is kept (your adjusted artifact)
-    renderOverlay();
-    setStatus(`Removed ${role} dots (curve kept — use "Clear fitted curves" to delete it).`);
-  }
+  if(on) placeDotRole(role);    // dots are automatic; curves are NOT — fit them in step 5 (Curves) when needed
+  else clearByRole([role]);     // remove the DOTS only — any fitted curve for this layer is kept
+  renderOverlay();
+  setStatus(`${on ? "Added" : "Removed"} ${role} dots.`);
 }
 // dots are derived from the strings — re-place every present dot layer (e.g. after the
 // strings move). Their curves are NOT re-fit (those are the user-adjusted artifacts).
