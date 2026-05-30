@@ -283,6 +283,26 @@
       </div>
     </details>
 
+    <details class="sec harp" open>
+      <summary><span class="step">5b</span> Sides (Lamé)</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="How far the pillar curve bows toward −x from c1, in mm">Pillar bow</label>
+          <input type="number" id="pillar-bow" step="1" value="60">
+          <label title="Superellipse exponent: 2 = ellipse, &gt;2 = squarer">n</label>
+          <input type="number" id="pillar-n" step="0.1" min="1.05" value="2.5">
+        </div>
+        <button id="add-pillar-btn" class="btn-primary" title="Lamé left-side curve from the SB (bottom) curve to the neck/top curve at c1's x, bowing −x by 'Pillar bow' mm. Needs a bottom-curve and a top/pin/midi-curve.">Add pillar</button>
+        <div class="row" style="margin-top:8px">
+          <label title="How far the shoulder curve bows toward +x from the last string, in mm">Shoulder bow</label>
+          <input type="number" id="shoulder-bow" step="1" value="40">
+          <label title="Superellipse exponent: 2 = ellipse, &gt;2 = squarer">n</label>
+          <input type="number" id="shoulder-n" step="0.1" min="1.05" value="2.5">
+        </div>
+        <button id="add-shoulder-btn" class="btn-primary" title="Lamé right-side curve from the SB (bottom) curve to the neck/top curve at the last string's x, bowing +x by 'Shoulder bow' mm.">Add shoulder</button>
+      </div>
+    </details>
+
     <details class="sec harp">
       <summary><span class="step">6</span> Transform</summary>
       <div class="sec-body">
@@ -1820,6 +1840,8 @@ document.getElementById("node-delete").onclick = deleteSelectedNode;
 document.getElementById("node-corner").onclick = () => setSelectedNodeType("corner");
 document.getElementById("node-smooth").onclick = () => setSelectedNodeType("smooth");
 document.getElementById("node-symmetric").onclick = () => setSelectedNodeType("symmetric");
+document.getElementById("add-pillar-btn").onclick = () => addLameSide("left");
+document.getElementById("add-shoulder-btn").onclick = () => addLameSide("right");
 function readGap(){ const v = parseFloat(document.getElementById("distribute-gap").value); return isNaN(v) ? 0 : v; }
 function readIncludeStroke(){ return document.getElementById("distribute-stroke").checked; }
 document.getElementById("dist-h").onclick = () => distribute("h", readGap(), readIncludeStroke());
@@ -2731,6 +2753,84 @@ function fitCurve(source, maxNodes, skipUndo){
 }
 function fitEndsCurve(which, maxNodes){ return fitCurve(which, maxNodes); }   // back-compat
 function fitBottomsCurve(maxNodes){ return fitCurve("bottoms", maxNodes); }    // back-compat
+
+// ---- Lamé (superellipse) side curves: pillar (−x of c1) and shoulder (+x of last string) ----
+// (X/a)^n + (Y/b)^n = 1 ; we walk the LEFT or RIGHT half so the curve passes through
+// (x_s, y_top) and (x_s, y_bot) and bulges out by `a` perpendicular to the endpoint line.
+function sampleCurveYAtX(path, x){
+  if(!path) return null;
+  let total; try { total = path.getTotalLength(); } catch(e){ return null; }
+  if(!total) return null;
+  const N = Math.max(300, Math.ceil(total));
+  let best = null;
+  for(let i = 0; i <= N; i++){
+    const q = path.getPointAtLength(total * i / N);
+    const d = Math.abs(q.x - x);
+    if(!best || d < best.d) best = { d, y: q.y };
+  }
+  return best ? best.y : null;
+}
+function sideStringForSide(side){
+  const lines = stringLines(); if(!lines.length) return null;
+  if(side === "left") return lines.find(l => l.getAttribute("data-num") === "1") || null;
+  let max = null, maxN = -Infinity;
+  for(const l of lines){ const n = parseInt(l.getAttribute("data-num"), 10); if(Number.isFinite(n) && n > maxN){ maxN = n; max = l; } }
+  return max;
+}
+function findFittedCurveByRoles(roles){
+  for(const r of roles){
+    const p = contentGroup.querySelector('path[data-role="' + r + '"]');
+    if(p) return p;
+  }
+  return null;
+}
+function lameSidePoints(xs, yTop, yBot, side, a, n, count){
+  const cy = (yTop + yBot) / 2, bSigned = (yBot - yTop) / 2;
+  const dir = (side === "left") ? -1 : 1;
+  const N = Math.max(20, count|0);
+  const pts = [];
+  for(let i = 0; i <= N; i++){
+    const theta = Math.PI * i / N;             // 0 → top, π → bottom
+    const c = Math.cos(theta);                 // +1 → 0 → −1
+    const Xrel = Math.pow(Math.max(0, 1 - Math.pow(Math.abs(c), n)), 1 / n);
+    pts.push([xs + dir * a * Xrel, cy - bSigned * c]);
+  }
+  return pts;
+}
+function addLameSide(side){
+  if(!stringLines().length){ setStatus("Load strings first."); return; }
+  const sEl = sideStringForSide(side);
+  if(!sEl){ setStatus("Could not find the " + (side === "left" ? "c1" : "last") + " string."); return; }
+  const xs = parseFloat(sEl.getAttribute("x1")) || 0;
+  const bot = findFittedCurveByRoles(["bottom-curve","sb-curve","soundboard-curve"]);
+  if(!bot){ setStatus("Need a soundboard (bottom) curve first — fit it in step 5."); return; }
+  const top = findFittedCurveByRoles(["top-curve","pin-curve","neck-curve","midi-curve"]);
+  if(!top){ setStatus("Need a neck/top curve first — fit pins or string tops in step 5."); return; }
+  const yBot = sampleCurveYAtX(bot, xs), yTop = sampleCurveYAtX(top, xs);
+  if(yBot == null || yTop == null){ setStatus("Could not sample the curves at x = " + fmt(xs) + "."); return; }
+  const bowInput = document.getElementById(side === "left" ? "pillar-bow" : "shoulder-bow");
+  const nInput   = document.getElementById(side === "left" ? "pillar-n"   : "shoulder-n");
+  const a = Math.max(0.001, parseFloat(bowInput.value) || 0);
+  const n = Math.max(1.05, parseFloat(nInput.value) || 2.5);
+  const pts = lameSidePoints(xs, yTop, yBot, side, a, n, 49);
+  const curves = fitSmoothSpline(pts, 9);
+  if(!curves.length){ setStatus("Could not fit the Lamé curve."); return; }
+  pushUndo();
+  const role = (side === "left") ? "pillar-curve" : "shoulder-curve";
+  [...contentGroup.querySelectorAll('path[data-role="' + role + '"]')].forEach(p => p.remove());
+  let d = "M " + fmt(curves[0][0][0]) + " " + fmt(curves[0][0][1]);
+  for(const c of curves)
+    d += " C " + fmt(c[1][0]) + " " + fmt(c[1][1]) + " " + fmt(c[2][0]) + " " + fmt(c[2][1]) + " " + fmt(c[3][0]) + " " + fmt(c[3][1]);
+  const path = document.createElementNS(SVGNS, "path");
+  path.setAttribute("data-role", role);
+  path.setAttribute("d", d);
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", side === "left" ? "#8a4d00" : "#005f73");
+  path.setAttribute("stroke-width", "1.5");
+  contentGroup.appendChild(path);
+  setTool("node"); enterNodeEdit(path); renderOverlay();
+  setStatus(`${side === "left" ? "Pillar" : "Shoulder"} (Lamé n=${fmt(n)}, bow ${fmt(a)} mm) added — drag handles to adjust.`);
+}
 
 // ---- per-string annotations: tuning pins + RGB sensor dots ----
 // Paraguayan fractions: dot sits k*L below the tip (L = string length).
