@@ -126,6 +126,12 @@
   .sec-body{padding:3px 4px 6px; display:flex; flex-direction:column; gap:4px}
   .sec-body>button{align-self:flex-start}
   .sec-body .seg{margin:0}
+  .files-list{max-height:260px; overflow:auto; display:flex; flex-direction:column; gap:1px; margin-top:2px}
+  .files-list .fdir{opacity:.55; margin-top:5px; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.04em}
+  .files-list .frow{display:flex; align-items:center; gap:4px}
+  .files-list .fname{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px}
+  .files-list .frow button{padding:0 5px; font-size:10px; line-height:16px}
+  .files-empty{opacity:.5; font-size:11px; padding:4px 0}
   .btn-primary{background:var(--accent); color:#10131a; border-color:var(--accent); font-weight:600}
   .btn-primary:hover{filter:brightness(1.08); border-color:var(--accent)}
 </style>
@@ -138,10 +144,20 @@
     <button id="btn-open" title="Open an SVG file">Open…</button>
     <button id="btn-save" title="Save in place to the opened file, else prompt (Ctrl+S)">Save</button>
     <button id="btn-save-as" title="Save to a new file / location (Ctrl+Shift+S)">Save As…</button>
+    <button id="btn-folder" title="Choose a default folder where Save writes SVG / part files (no dialog each time)">Folder…</button>
     <button id="btn-dxf" title="Export the drawing as DXF (2-D fabrication, mm)">DXF</button>
+  </div>
+  <div class="hgroup">
+    <button id="btn-import" title="Import an SVG outline on top of the current document (e.g. a traced part)">Import…</button>
+    <button id="btn-bg" title="Load a reference photo behind the drawing (a tracing underlay; never saved)">Image…</button>
+    <label class="bgtoggle" title="Show / hide the reference image so you can focus on the outline"><input type="checkbox" id="bg-show" checked> Ref</label>
+    <input type="range" id="bg-opacity" min="0" max="100" value="60" title="Reference image opacity" style="width:70px;flex:0 0 auto">
+    <button id="btn-bg-clear" title="Remove the reference image">Clear img</button>
   </div>
   <input type="file" id="file-input" accept=".svg,image/svg+xml" hidden>
   <input type="file" id="json-input" accept=".json,application/json" hidden>
+  <input type="file" id="bg-input" accept="image/*" hidden>
+  <input type="file" id="import-input" accept=".svg,image/svg+xml" hidden>
   <span class="filename" id="filename">untitled.svg</span>
   <div class="spacer"></div>
   <div class="hgroup">
@@ -181,6 +197,15 @@
   </div>
 
   <div class="props props-left">
+    <details class="sec" id="files-sec" open>
+      <summary><span class="step">📁</span> Files (folder browse)</summary>
+      <div class="sec-body">
+        <button id="files-pick" title="Choose a folder; hedit lists its SVG parts and images below to Open / Import / load as reference — no OS file dialog per file">Browse folder…</button>
+        <input id="files-filter" type="text" placeholder="filter by name…" style="display:none">
+        <div id="files-list" class="files-list"></div>
+      </div>
+    </details>
+
     <details class="sec harp" open>
       <summary><span class="step">JSON</span> Harp file (DP/BP/SP/WP)</summary>
       <div class="sec-body">
@@ -1455,16 +1480,35 @@ function loadSVGText(text, name){
   const w = root.getAttribute("width"), h = root.getAttribute("height");
   const harpMeta = root.querySelector('metadata[id="hedit-harp"]');
   // import children (metadata is kept out of the content layer; it's re-emitted on save)
-  let frameOnLoad = false, frameTransform = null;
+  let frameOnLoad = false, frameTransform = null, droppedBg = 0;
+  // Drop a tracer backdrop: an unstroked rect that fills (≈) the whole canvas
+  // (e.g. the traced parts' <rect fill="#202020"/>). Scoped to full-canvas so it
+  // can never remove legitimate art. cw/ch come from the viewBox (else width/height).
+  const cdim = vb ? vb.split(/[\s,]+/).map(Number) : null;
+  const cw = (cdim && cdim.length === 4 ? cdim[2] : parseFloat(w)) || 0;
+  const ch = (cdim && cdim.length === 4 ? cdim[3] : parseFloat(h)) || 0;
+  const isCanvasBackdrop = el => {
+    if(!isBackdropRect(el)) return false;
+    const rx = parseFloat(el.getAttribute("x") || "0"), ry = parseFloat(el.getAttribute("y") || "0");
+    const rw = parseFloat(el.getAttribute("width") || "0"), rh = parseFloat(el.getAttribute("height") || "0");
+    if(!(rw > 0 && rh > 0) || Math.abs(rx) > 1 || Math.abs(ry) > 1) return false;
+    if(!cw || !ch) return true;   // no canvas dims known: treat an origin-anchored fill rect as a backdrop
+    const near = (a, b) => Math.abs(a - b) <= Math.max(1, b * 0.02);
+    return near(rw, cw) && near(rh, ch);
+  };
+  const importChild = c => {
+    if(isCanvasBackdrop(c)){ droppedBg++; return; }
+    contentGroup.appendChild(document.importNode(c, true));
+  };
   [...root.childNodes].forEach(n => {
     if(n.nodeType !== 1) return;
     const nm = n.nodeName.toLowerCase();
     if(nm === "metadata") return;
     if(nm === "g" && n.getAttribute && n.getAttribute("id") === "hedit-frame"){
       frameOnLoad = true; frameTransform = n.getAttribute("transform");   // unwrap: children are X-Z coords
-      [...n.childNodes].forEach(c => { if(c.nodeType === 1) contentGroup.appendChild(document.importNode(c, true)); });
+      [...n.childNodes].forEach(c => { if(c.nodeType === 1) importChild(c); });
     } else {
-      contentGroup.appendChild(document.importNode(n, true));
+      importChild(n);
     }
   });
   if(!vb){
@@ -1481,7 +1525,7 @@ function loadSVGText(text, name){
   undoStack.length = 0; redoStack.length = 0;
   clearSelection(); renderOverlay();
   elFilename.textContent = name || "untitled.svg";
-  setStatus("Loaded " + (name||"") + " — " + contentGroup.children.length + " top-level objects.");
+  setStatus("Loaded " + (name||"") + " — " + contentGroup.children.length + " top-level objects" + (droppedBg ? " (dropped a full-canvas backdrop)" : "") + ".");
   harpAlignment = null;
   frameXZ = frameOnLoad;
   if(frameXZ && frameTransform) contentGroup.setAttribute("transform", frameTransform);
@@ -1533,6 +1577,172 @@ async function writeHandle(handle, text){
   await w.write(new Blob([text], { type:"image/svg+xml" }));
   await w.close();
 }
+
+// ---- default save folder ------------------------------------------------
+// A user-chosen folder where Save drops SVG / traced-part files without a
+// dialog each time. The FileSystemDirectoryHandle is persisted in IndexedDB
+// (it survives reloads; permission is re-confirmed once per session on first
+// write). Only SVG saves use it — DXF/JSON exports still go to the download
+// folder. Chromium only (Firefox lacks showDirectoryPicker -> button no-ops).
+let saveDir = null;
+const SDIR_DB = "hedit", SDIR_STORE = "handles", SDIR_KEY = "saveDir";
+function idbOpen(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(SDIR_DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(SDIR_STORE);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function idbPut(key, val){
+  const db = await idbOpen();
+  try { await new Promise((res, rej) => {
+    const tx = db.transaction(SDIR_STORE, "readwrite");
+    tx.objectStore(SDIR_STORE).put(val, key);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  }); } finally { db.close(); }
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  try { return await new Promise((res, rej) => {
+    const tx = db.transaction(SDIR_STORE, "readonly");
+    const rq = tx.objectStore(SDIR_STORE).get(key);
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+  }); } finally { db.close(); }
+}
+function syncFolderButton(){
+  const b = document.getElementById("btn-folder");
+  if(!b) return;
+  b.textContent = saveDir ? ("📁 " + saveDir.name) : "Folder…";
+  b.title = saveDir
+    ? ("Default save folder: " + saveDir.name + " — Save writes SVGs here. Click to change.")
+    : "Choose a default folder where Save writes SVG / part files (no dialog each time).";
+}
+async function chooseSaveFolder(){
+  if(!window.showDirectoryPicker){ setStatus("This browser has no folder picker — use Save As instead."); return; }
+  try {
+    const dir = await window.showDirectoryPicker({ id:"hedit-savedir", mode:"readwrite", startIn: saveDir || "documents" });
+    saveDir = dir;
+    try { await idbPut(SDIR_KEY, dir); } catch(e){}
+    syncFolderButton();
+    setStatus("Default save folder set to “" + dir.name + "”. Save writes SVGs here.");
+  } catch(e){ if(e && e.name === "AbortError") return; setStatus("Could not set folder: " + e.message); }
+}
+// write `text` as `name` into the default folder; returns the new file handle.
+async function writeToSaveDir(name, text){
+  if(!(await ensureWritable(saveDir))) throw new Error("folder permission denied");
+  const fh = await saveDir.getFileHandle(name, { create:true });
+  await writeHandle(fh, text);
+  return fh;
+}
+// restore a previously-chosen folder on boot (permission re-checked on first save)
+(async function restoreSaveDir(){
+  try { const h = await idbGet(SDIR_KEY); if(h){ saveDir = h; syncFolderButton(); } } catch(e){}
+})();
+
+// ---- in-app folder browser ----------------------------------------------
+// Pick a folder once (showDirectoryPicker), then list its SVG/image files in a
+// panel and Open/Import/load-as-reference by click — no OS file dialog per file,
+// so it works regardless of Chrome's native picker (Recent view / portal). The
+// directory handle persists in IndexedDB (reuses idbGet/idbPut). Chromium only.
+let browseDir = null;
+const BROWSE_KEY = "browseDir";
+const IMG_RE = /\.(png|jpe?g|webp|gif|bmp|avif)$/i;
+const SVG_RE = /\.svg$/i;
+const FILES_CAP = 500;   // don't render unbounded lists (e.g. a folder of 1500 frames)
+
+async function dirReadable(handle, forWrite){
+  const opts = { mode: forWrite ? "readwrite" : "read" };
+  try {
+    if((await handle.queryPermission(opts)) === "granted") return true;
+    if((await handle.requestPermission(opts)) === "granted") return true;   // needs a user gesture
+  } catch(e){}
+  return false;
+}
+async function* walkDir(handle, prefix){
+  for await (const entry of handle.values()){
+    if(entry.kind === "file") yield { name: prefix + entry.name, sub: prefix, handle: entry };
+    else if(entry.kind === "directory") yield* walkDir(entry, prefix + entry.name + "/");
+  }
+}
+function mkFileBtn(txt, title, fn){
+  const b = document.createElement("button");
+  b.textContent = txt; b.title = title;
+  b.addEventListener("click", fn);
+  return b;
+}
+async function pickBrowseFolder(){
+  if(!window.showDirectoryPicker){ setStatus("This browser has no folder picker — use Open… instead."); return; }
+  try {
+    const dir = await window.showDirectoryPicker({ id:"hedit-browsedir", mode:"readwrite", startIn: browseDir || saveDir || "documents" });
+    browseDir = dir;
+    try { await idbPut(BROWSE_KEY, dir); } catch(e){}
+    await renderBrowseList();
+    setStatus("Browsing “" + dir.name + "”.");
+  } catch(e){ if(e && e.name === "AbortError") return; setStatus("Could not open folder: " + e.message); }
+}
+let browseEntries = [];
+async function renderBrowseList(){
+  const list = document.getElementById("files-list");
+  const filterEl = document.getElementById("files-filter");
+  if(!list) return;
+  if(!browseDir){ list.innerHTML = '<div class="files-empty">No folder chosen.</div>'; if(filterEl) filterEl.style.display = "none"; return; }
+  if(!(await dirReadable(browseDir, true))){ list.innerHTML = '<div class="files-empty">Permission needed — click “Browse folder…”.</div>'; return; }
+  list.innerHTML = '<div class="files-empty">Reading…</div>';
+  browseEntries = [];
+  try {
+    for await (const f of walkDir(browseDir, "")){
+      if(SVG_RE.test(f.name) || IMG_RE.test(f.name)) browseEntries.push(f);
+      if(browseEntries.length >= FILES_CAP) break;
+    }
+  } catch(e){ list.innerHTML = '<div class="files-empty">Could not read folder: ' + e.message + '</div>'; return; }
+  browseEntries.sort((a,b) => a.name.localeCompare(b.name));
+  if(filterEl) filterEl.style.display = browseEntries.length > 12 ? "" : "none";
+  paintBrowseList();
+}
+function paintBrowseList(){
+  const list = document.getElementById("files-list");
+  const q = (document.getElementById("files-filter")?.value || "").trim().toLowerCase();
+  if(!list) return;
+  const rows = browseEntries.filter(f => !q || f.name.toLowerCase().includes(q));
+  if(!rows.length){ list.innerHTML = '<div class="files-empty">' + (browseEntries.length ? "No match." : "No SVG/image files here.") + '</div>'; return; }
+  list.innerHTML = "";
+  let curSub = null;
+  for(const f of rows){
+    if(f.sub !== curSub){ curSub = f.sub; const d = document.createElement("div"); d.className = "fdir"; d.textContent = curSub || "/"; list.appendChild(d); }
+    const row = document.createElement("div"); row.className = "frow";
+    const nm = document.createElement("span"); nm.className = "fname"; nm.textContent = f.name.split("/").pop(); nm.title = f.name;
+    row.appendChild(nm);
+    if(SVG_RE.test(f.name)){
+      row.appendChild(mkFileBtn("Open", "Open as the document (Save writes back here)", () => browseOpen(f.handle)));
+      row.appendChild(mkFileBtn("Import", "Add on top of the current document", () => browseImport(f.handle)));
+    } else {
+      row.appendChild(mkFileBtn("Ref", "Load as the reference image underlay", () => browseRef(f.handle)));
+    }
+    list.appendChild(row);
+  }
+  if(browseEntries.length >= FILES_CAP) { const d = document.createElement("div"); d.className = "files-empty"; d.textContent = "Showing first " + FILES_CAP + " — use the filter to narrow."; list.appendChild(d); }
+}
+async function browseOpen(handle){
+  try { const f = await handle.getFile(); loadSVGText(await f.text(), f.name); fileHandle = handle; elFilename.textContent = f.name; }
+  catch(e){ setStatus("Open failed: " + e.message); }
+}
+async function browseImport(handle){
+  try { const f = await handle.getFile(); importSVGText(await f.text(), f.name); }
+  catch(e){ setStatus("Import failed: " + e.message); }
+}
+async function browseRef(handle){
+  try { loadBgImageFromFile(await handle.getFile()); }
+  catch(e){ setStatus("Reference load failed: " + e.message); }
+}
+// restore the browse folder on boot and auto-list if permission is already granted
+(async function restoreBrowseDir(){
+  try {
+    const h = await idbGet(BROWSE_KEY); if(!h) return;
+    browseDir = h;
+    if((await h.queryPermission({ mode:"read" })) === "granted") renderBrowseList();
+  } catch(e){}
+})();
 function downloadText(text, name, type){
   const blob = new Blob([text], { type: type || "text/plain" });
   const a = document.createElement("a");
@@ -1555,6 +1765,21 @@ async function saveSVG(){
       return;
     } catch(e){ setStatus("In-place save failed (" + e.message + ") — opening Save As."); }
   }
+  // no in-place target, but a default folder is set: write straight into it.
+  if(saveDir){
+    let name = (elFilename.textContent || "").trim();
+    if(!name || name === "untitled.svg"){
+      name = (prompt("File name for this part / harp (saved to “" + saveDir.name + "”):", "part.svg") || "").trim();
+      if(!name) return;   // cancelled
+    }
+    if(!/\.svg$/i.test(name)) name += ".svg";
+    try {
+      fileHandle = await writeToSaveDir(name, text);   // future Saves write in place
+      elFilename.textContent = name;
+      setStatus("Saved " + name + " to “" + saveDir.name + "”.");
+      return;
+    } catch(e){ setStatus("Folder save failed (" + e.message + ") — opening Save As."); }
+  }
   if(window.showSaveFilePicker){ return saveAs(); }
   downloadSVG(text, elFilename.textContent);
   setStatus("Downloaded " + (elFilename.textContent || "untitled.svg") + " to your browser's download folder.");
@@ -1567,6 +1792,7 @@ async function saveAs(){
     try {
       const handle = await window.showSaveFilePicker({
         id: "hedit-svg",   // shares the last-used folder with Open
+        startIn: saveDir || undefined,   // default into the chosen folder if set
         suggestedName: elFilename.textContent || "untitled.svg",
         types: FILE_TYPES,
       });
@@ -1597,6 +1823,131 @@ function persist(){
 }
 function schedulePersist(){ clearTimeout(persistTimer); persistTimer = setTimeout(persist, 400); }
 function clearAutosave(){ try { localStorage.removeItem(AUTOSAVE_KEY); localStorage.removeItem(AUTOSAVE_NAME); } catch(e){} }
+
+// =====================================================================
+// BACKGROUND REFERENCE IMAGE (raster underlay; never saved into the part SVG)
+// =====================================================================
+// bg state lives OUTSIDE contentGroup, so serializeDoc()/saveSVG() never see it.
+// It is persisted to its OWN localStorage keys (not the autosave SVG).
+const BG_DATAURL_KEY = "hedit:bg:dataurl";
+const BG_SIZE_KEY = "hedit:bg:size";
+let bgState = { opacity: 60, visible: true };
+
+function applyBgGroupStyle(){
+  if(!bgGroup) return;
+  bgGroup.setAttribute("opacity", bgState.visible ? (bgState.opacity / 100) : 0);
+}
+function setBgImage(dataURL, natW, natH, fitTo){
+  if(!bgGroup) return;
+  let img = bgGroup.querySelector("#bg-image");
+  if(!img){
+    img = document.createElementNS(SVGNS, "image");
+    img.setAttribute("id", "bg-image");
+    bgGroup.appendChild(img);
+  }
+  img.setAttribute("x", "0"); img.setAttribute("y", "0");
+  img.setAttribute("width", fmt(natW)); img.setAttribute("height", fmt(natH));
+  img.setAttribute("preserveAspectRatio", "none");
+  img.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", dataURL);
+  img.setAttribute("href", dataURL);
+  applyBgGroupStyle();
+  if(fitTo){
+    // size the document like an opened SVG and fit the view to the image
+    doc = { viewBox: `0 0 ${fmt(natW)} ${fmt(natH)}`, width: fmt(natW), height: fmt(natH) };
+    view = { x:0, y:0, w:natW, h:natH };
+    applyView(); renderOverlay();
+  }
+}
+function loadBgImageFromFile(file){
+  const r = new FileReader();
+  r.onload = () => {
+    const dataURL = r.result;
+    const probe = new Image();
+    probe.onload = () => {
+      const natW = probe.naturalWidth || probe.width;
+      const natH = probe.naturalHeight || probe.height;
+      setBgImage(dataURL, natW, natH, true);
+      persistBg(dataURL, natW, natH);
+      setStatus("Reference image loaded (" + natW + "x" + natH + ").");
+    };
+    probe.onerror = () => setStatus("Could not read that image.");
+    probe.src = dataURL;
+  };
+  r.readAsDataURL(file);
+}
+function clearBgImage(){
+  if(bgGroup){ const img = bgGroup.querySelector("#bg-image"); if(img) img.remove(); }
+  try{ localStorage.removeItem(BG_DATAURL_KEY); localStorage.removeItem(BG_SIZE_KEY); }catch(e){}
+  setStatus("Reference image cleared.");
+}
+function persistBg(dataURL, natW, natH){
+  try{
+    localStorage.setItem(BG_DATAURL_KEY, dataURL);
+    localStorage.setItem(BG_SIZE_KEY, JSON.stringify({ w:natW, h:natH }));
+  }catch(e){ /* quota/blocked: no-op */ }
+}
+function restoreBg(){
+  try{
+    const dataURL = localStorage.getItem(BG_DATAURL_KEY);
+    if(!dataURL) return;
+    const sz = JSON.parse(localStorage.getItem(BG_SIZE_KEY) || "null");
+    if(!sz) return;
+    setBgImage(dataURL, sz.w, sz.h, false);   // no refit on boot (keep the user's working view)
+  }catch(e){ /* opaque/blocked origin: no-op */ }
+}
+
+// =====================================================================
+// IMPORT SVG  (add drawable children on top of the current document)
+// =====================================================================
+// Unlike Open (which replaces), this APPENDS into contentGroup so a traced
+// outline can be dropped over the current background/work. Same sanitizeSVG()
+// path as load. Leaves fileHandle untouched so Save target isn't hijacked.
+// A tracer/backdrop rect is an unstroked rectangle (no stroke, or stroke:none /
+// transparent). Real traced parts are stroked paths/lines, so dropping these on
+// import keeps the un-removable "black box" out from in front of the reference photo.
+function isBackdropRect(el){
+  if(!el || el.nodeType !== 1 || el.tagName.toLowerCase() !== "rect") return false;
+  const s = (el.getAttribute("stroke") || "").trim().toLowerCase();
+  const hasStroke = s && s !== "none" && s !== "transparent";
+  return !hasStroke;
+}
+function importSVGText(text, name){
+  const parsed = new DOMParser().parseFromString(text, "image/svg+xml");
+  const err = parsed.querySelector("parsererror");
+  if(err){ setStatus("Import parse error - not a valid SVG."); return; }
+  const root = parsed.querySelector("svg");
+  if(!root){ setStatus("No <svg> root found in import."); return; }
+  sanitizeSVG(root);
+  const frameG = root.querySelector("#hedit-frame");          // unwrap a +X/+Z frame if present
+  const srcNodes = frameG ? [...frameG.childNodes] : [...root.childNodes];
+  const skip = new Set(["metadata","script","defs","title","desc"]);
+  pushUndo();
+  let n = 0, dropped = 0;
+  for(const node of srcNodes){
+    if(node.nodeType !== 1) continue;
+    if(skip.has(node.tagName.toLowerCase())) continue;
+    if(node.id === "hedit-frame") continue;
+    if(isBackdropRect(node)){ dropped++; continue; }            // drop the tracer's dark backdrop
+    const im = document.importNode(node, true);
+    if(im.querySelectorAll) im.querySelectorAll("rect").forEach(r => { if(isBackdropRect(r)){ r.remove(); dropped++; } });  // nested backdrop
+    contentGroup.appendChild(im);
+    n++;
+  }
+  renderOverlay(); updateSelCount();
+  setStatus("Imported " + n + " element(s) from " + (name || "SVG") + (dropped ? " (dropped " + dropped + " backdrop rect" + (dropped > 1 ? "s" : "") + ")" : "") + ".");
+}
+async function importFile(){
+  if(window.showOpenFilePicker){
+    try{
+      const [h] = await window.showOpenFilePicker({ id:"hedit-svg", multiple:false, types: FILE_TYPES });
+      const f = await h.getFile();
+      importSVGText(await f.text(), f.name);   // NOTE: do not touch fileHandle
+    }catch(e){ if(e && e.name !== "AbortError") setStatus("Import failed: " + e.message); }
+    return;
+  }
+  document.getElementById("import-input").click();   // fallback for browsers without the API
+}
+
 function restoreAutosave(){
   let svg; try { svg = localStorage.getItem(AUTOSAVE_KEY); } catch(e){ return false; }
   if(!svg) return false;
@@ -1830,7 +2181,34 @@ document.getElementById("btn-new").onclick = () => { if(confirm("Discard current
 document.getElementById("btn-open").onclick = openFile;
 document.getElementById("btn-save").onclick = saveSVG;
 document.getElementById("btn-save-as").onclick = saveAs;
+document.getElementById("btn-folder").onclick = chooseSaveFolder;
+document.getElementById("files-pick").onclick = pickBrowseFolder;
+document.getElementById("files-filter").addEventListener("input", paintBrowseList);
 document.getElementById("btn-dxf").onclick = exportDXF;
+// import (add on top) + background reference image (controls are static markup
+// in the header). Lookups are guarded so a missing control can't abort boot.
+{
+  const bImp = document.getElementById("btn-import");
+  if(bImp) bImp.onclick = importFile;
+  const importInput = document.getElementById("import-input");
+  if(importInput) importInput.addEventListener("change", e => {
+    const f = e.target.files[0];
+    if(f){ const r = new FileReader(); r.onload = () => importSVGText(r.result, f.name); r.readAsText(f); }
+    importInput.value = "";
+  });
+  const bgInput = document.getElementById("bg-input");
+  if(bgInput){
+    const bBg = document.getElementById("btn-bg");
+    if(bBg) bBg.onclick = () => bgInput.click();
+    bgInput.addEventListener("change", e => { const f = e.target.files[0]; if(f) loadBgImageFromFile(f); bgInput.value = ""; });
+  }
+  const op = document.getElementById("bg-opacity");
+  if(op) op.addEventListener("input", e => { bgState.opacity = +e.target.value; applyBgGroupStyle(); });
+  const sh = document.getElementById("bg-show");
+  if(sh) sh.addEventListener("change", e => { bgState.visible = e.target.checked; applyBgGroupStyle(); });
+  const bClr = document.getElementById("btn-bg-clear");
+  if(bClr) bClr.onclick = clearBgImage;
+}
 document.getElementById("btn-reset").onclick = resetDesign;
 document.getElementById("btn-undo").onclick = undo;
 document.getElementById("btn-redo").onclick = redo;
@@ -3247,96 +3625,12 @@ async function loadDefaultDoc(){
 }
 
 // =====================================================================
-// REFERENCE-IMAGE UNDERLAY  +  SELECT/RESIZE HANDLES   (added)
-//   - bgGroup (#bg) holds a raster <image> shown behind content. It lives
-//     OUTSIDE contentGroup, so serializeDoc()/Save never include it.
-//   - 8 resize handles wrap the selection bbox; dragging scales the
-//     selected element(s) via a transform about the opposite anchor.
+// SELECT / RESIZE HANDLES
+//   8 resize handles wrap the selection bbox; dragging scales the
+//   selected element(s) via a transform about the opposite anchor.
+//   (The reference-image underlay + SVG import live earlier in the file,
+//    under "BACKGROUND REFERENCE IMAGE" / "IMPORT SVG".)
 // =====================================================================
-const BG_URL_KEY = "hedit:bg:url", BG_WH_KEY = "hedit:bg:wh";
-
-// ---- background reference image ----
-function setBgFromDataURL(url, w, h, fit){
-  if(!bgGroup) return;
-  bgGroup.innerHTML = "";
-  const im = document.createElementNS(SVGNS, "image");
-  im.setAttribute("id", "bg-image");
-  im.setAttribute("href", url);
-  im.setAttributeNS("http://www.w3.org/1999/xlink", "href", url);
-  im.setAttribute("x", 0); im.setAttribute("y", 0);
-  im.setAttribute("width", w); im.setAttribute("height", h);
-  im.setAttribute("preserveAspectRatio", "none");
-  bgGroup.appendChild(im);
-  setBgOpacity();
-  if(fit){ view.x = 0; view.y = 0; view.w = w; view.h = h; applyView(); renderOverlay(); }
-  try { localStorage.setItem(BG_URL_KEY, url); localStorage.setItem(BG_WH_KEY, w + "x" + h); } catch(e){}
-}
-function setBgOpacity(){
-  if(!bgGroup) return;
-  const s = document.getElementById("bg-opacity");
-  bgGroup.setAttribute("opacity", s ? (s.value / 100) : 0.6);
-}
-function clearBg(){
-  if(bgGroup) bgGroup.innerHTML = "";
-  try { localStorage.removeItem(BG_URL_KEY); localStorage.removeItem(BG_WH_KEY); } catch(e){}
-  setStatus("Background image removed.");
-}
-function restoreBg(){
-  try {
-    const url = localStorage.getItem(BG_URL_KEY); if(!url) return;
-    const wh = (localStorage.getItem(BG_WH_KEY) || "100x100").split("x");
-    setBgFromDataURL(url, +wh[0] || 100, +wh[1] || 100, false);
-  } catch(e){}
-}
-function loadRefImage(){
-  const inp = document.createElement("input");
-  inp.type = "file"; inp.accept = "image/*";
-  inp.onchange = () => {
-    const f = inp.files && inp.files[0]; if(!f) return;
-    const rd = new FileReader();
-    rd.onload = () => {
-      const img = new Image();
-      img.onload = () => { setBgFromDataURL(rd.result, img.naturalWidth, img.naturalHeight, true);
-        setStatus("Loaded reference image (" + img.naturalWidth + "x" + img.naturalHeight + ") — trace over it; it is not saved."); };
-      img.src = rd.result;
-    };
-    rd.readAsDataURL(f);
-  };
-  inp.click();
-}
-
-// ---- import an SVG and ADD it on top (keep current content + bg) ----
-function importSVGFile(){
-  const inp = document.createElement("input");
-  inp.type = "file"; inp.accept = ".svg,image/svg+xml";
-  inp.onchange = () => {
-    const f = inp.files && inp.files[0]; if(!f) return;
-    const rd = new FileReader();
-    rd.onload = () => { try { importSVGText(rd.result); } catch(e){ setStatus("Import failed: " + e.message); } };
-    rd.readAsText(f);
-  };
-  inp.click();
-}
-function importSVGText(text){
-  const doc = new DOMParser().parseFromString(text, "image/svg+xml");
-  const svg = doc.querySelector("svg");
-  if(!svg){ setStatus("Import: no <svg> element found."); return; }
-  svg.querySelectorAll("script").forEach(n => n.remove());
-  pushUndo();
-  let n = 0;
-  Array.from(svg.children).forEach(ch => {
-    const tag = ch.tagName.toLowerCase();
-    if(tag === "metadata" || tag === "defs" || tag === "title" || tag === "desc") return;
-    // skip a full-canvas background rect (e.g. the tracer's dark backdrop)
-    if(tag === "rect" && !ch.getAttribute("stroke")) return;
-    const im = document.importNode(ch, true);
-    if(im.getAttributeNames) im.getAttributeNames().forEach(a => { if(/^on/i.test(a)) im.removeAttribute(a); });
-    contentGroup.appendChild(im); n++;
-  });
-  renderOverlay();
-  if(typeof schedulePersist === "function") schedulePersist();
-  setStatus("Imported " + n + " element(s) on top — select & resize/edit them.");
-}
 
 // ---- resize handles ----
 // combined bbox of the current selection, in stage-USER coords
@@ -3402,27 +3696,9 @@ function resizeMove(e, u){
   renderOverlay();
 }
 
-// ---- toolbar buttons (added next to DXF) ----
-(function addRefImageUI(){
-  const ref = document.getElementById("btn-dxf");
-  if(!ref || !ref.parentNode) return;
-  const bar = ref.parentNode;
-  const mk = (id, txt, title) => { const b = document.createElement("button"); b.id = id; b.textContent = txt; b.title = title; return b; };
-  const bImg = mk("btn-img", "Image…", "Load a reference photo as a background underlay (not saved)");
-  const bImp = mk("btn-import", "Import…", "Import an SVG and add it on top of the current document");
-  const bClr = mk("btn-bgclear", "Clear img", "Remove the background reference image");
-  const op = document.createElement("input");
-  op.type = "range"; op.id = "bg-opacity"; op.min = 0; op.max = 100; op.value = 60;
-  op.title = "Background image opacity"; op.style.width = "70px"; op.style.flex = "0 0 auto";
-  bar.insertBefore(bImg, ref.nextSibling);
-  bar.insertBefore(op,   bImg.nextSibling);
-  bar.insertBefore(bImp, op.nextSibling);
-  bar.insertBefore(bClr, bImp.nextSibling);
-  bImg.addEventListener("click", loadRefImage);
-  bImp.addEventListener("click", importSVGFile);
-  bClr.addEventListener("click", clearBg);
-  op.addEventListener("input", setBgOpacity);
-})();
+// (Reference-image / Import toolbar buttons are now static markup in the header,
+//  wired in the main event-wiring block; the old dynamic addRefImageUI() builder
+//  was removed when the bg-image feature was consolidated onto setBgImage().)
 
 // boot: restore the last session if present, else load the harp.
 // ?fresh in the URL forces the harp and discards any cached session.
