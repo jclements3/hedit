@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="299" height="402" viewBox="0 0 299 402">
+  <rect width="299" height="402" fill="#202020"/>
+  <g id="gold" fill="none" stroke="#caa64a" stroke-width="1.5">
+    <path d="M70,3 L73,4 L76,9 L73,14 L68,16 L66,14 L66,7 L70,3 Z"/>
+    <path d="M25,8 L29,10 L29,17 L35,23 L33,27 L29,27 L20,20 L20,15 L25,8 Z"/>
+    <path d="M153,24 L159,27 L159,31 L157,33 L148,33 L147,29 L153,24 Z"/>
+    <path d="M25,34 L40,41 L42,45 L38,48 L26,49 L23,46 L23,37 L25,34 Z"/>
+    <path d="M76,50 L82,57 L77,62 L73,62 L71,60 L71,56 L76,50 Z"/>
+    <path d="M36,52 L43,53 L46,58 L32,71 L25,71 L13,67 L10,64 L13,60 L26,62 L31,61 L36,52 Z"/>
+    <path d="M158,66 L163,68 L164,73 L155,77 L151,72 L158,66 Z"/>
+  </g>
+</svg>
