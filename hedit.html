@@ -536,8 +536,13 @@ function buildLayers(){
   contentGroup.setAttribute("id", "content");
   overlayGroup = document.createElementNS(SVGNS, "g");
   overlayGroup.setAttribute("id", "overlay");
+  bgGroup = document.createElementNS(SVGNS, "g");          // reference image underlay (never saved)
+  bgGroup.setAttribute("id", "bg");
+  bgGroup.style.pointerEvents = "none";                     // reference only, not hit-tested
+  stage.appendChild(bgGroup);                               // first child -> renders behind content
   stage.appendChild(contentGroup);
   stage.appendChild(overlayGroup);
+  if(typeof restoreBg === "function") restoreBg();
   // (re)attach the autosave observer to the fresh content layer
   if(window.MutationObserver){
     if(contentObserver) contentObserver.disconnect();
@@ -546,6 +551,7 @@ function buildLayers(){
   }
 }
 let contentObserver = null;
+let bgGroup = null;            // <g id="bg"> reference-image layer (excluded from Save)
 
 // ---- coordinate helpers ----
 function applyView(){
@@ -943,6 +949,7 @@ function renderOverlay(){
 
   if(tool === "select"){
     selected.forEach(drawBBox);
+    drawResizeHandles(scale);
   }
   if(tool === "node" && pathModel){
     drawNodeEditor(aR, cR);
@@ -1138,6 +1145,7 @@ function onDown(e){
   const u = evtUser(e);
 
   if(tool === "select"){
+    if(e.target && e.target.dataset && e.target.dataset.rz){ startResize(e, u); return; }
     // direct hit on a selectable element, else grab the nearest curve within tolerance
     let tgt = (isContentEl(e.target) && isSelectable(e.target)) ? e.target : null;
     if(!tgt) tgt = nearestPathAt(e.clientX, e.clientY, HIT_PX * 2.5);
@@ -1193,6 +1201,8 @@ function onMove(e){
     applyView(); renderOverlay(); return;
   }
   const u = evtUser(e);
+
+  if(drag.type === "resize"){ resizeMove(e, u); return; }
 
   if(drag.type === "move"){
     const v = screenVecToContent(u.x - drag.start.x, u.y - drag.start.y);
@@ -3235,6 +3245,184 @@ async function loadDefaultDoc(){
   } catch(e){ /* not served alongside / file:// — fall through to the sample */ }
   loadSample();
 }
+
+// =====================================================================
+// REFERENCE-IMAGE UNDERLAY  +  SELECT/RESIZE HANDLES   (added)
+//   - bgGroup (#bg) holds a raster <image> shown behind content. It lives
+//     OUTSIDE contentGroup, so serializeDoc()/Save never include it.
+//   - 8 resize handles wrap the selection bbox; dragging scales the
+//     selected element(s) via a transform about the opposite anchor.
+// =====================================================================
+const BG_URL_KEY = "hedit:bg:url", BG_WH_KEY = "hedit:bg:wh";
+
+// ---- background reference image ----
+function setBgFromDataURL(url, w, h, fit){
+  if(!bgGroup) return;
+  bgGroup.innerHTML = "";
+  const im = document.createElementNS(SVGNS, "image");
+  im.setAttribute("id", "bg-image");
+  im.setAttribute("href", url);
+  im.setAttributeNS("http://www.w3.org/1999/xlink", "href", url);
+  im.setAttribute("x", 0); im.setAttribute("y", 0);
+  im.setAttribute("width", w); im.setAttribute("height", h);
+  im.setAttribute("preserveAspectRatio", "none");
+  bgGroup.appendChild(im);
+  setBgOpacity();
+  if(fit){ view.x = 0; view.y = 0; view.w = w; view.h = h; applyView(); renderOverlay(); }
+  try { localStorage.setItem(BG_URL_KEY, url); localStorage.setItem(BG_WH_KEY, w + "x" + h); } catch(e){}
+}
+function setBgOpacity(){
+  if(!bgGroup) return;
+  const s = document.getElementById("bg-opacity");
+  bgGroup.setAttribute("opacity", s ? (s.value / 100) : 0.6);
+}
+function clearBg(){
+  if(bgGroup) bgGroup.innerHTML = "";
+  try { localStorage.removeItem(BG_URL_KEY); localStorage.removeItem(BG_WH_KEY); } catch(e){}
+  setStatus("Background image removed.");
+}
+function restoreBg(){
+  try {
+    const url = localStorage.getItem(BG_URL_KEY); if(!url) return;
+    const wh = (localStorage.getItem(BG_WH_KEY) || "100x100").split("x");
+    setBgFromDataURL(url, +wh[0] || 100, +wh[1] || 100, false);
+  } catch(e){}
+}
+function loadRefImage(){
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      const img = new Image();
+      img.onload = () => { setBgFromDataURL(rd.result, img.naturalWidth, img.naturalHeight, true);
+        setStatus("Loaded reference image (" + img.naturalWidth + "x" + img.naturalHeight + ") — trace over it; it is not saved."); };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(f);
+  };
+  inp.click();
+}
+
+// ---- import an SVG and ADD it on top (keep current content + bg) ----
+function importSVGFile(){
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".svg,image/svg+xml";
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { try { importSVGText(rd.result); } catch(e){ setStatus("Import failed: " + e.message); } };
+    rd.readAsText(f);
+  };
+  inp.click();
+}
+function importSVGText(text){
+  const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+  const svg = doc.querySelector("svg");
+  if(!svg){ setStatus("Import: no <svg> element found."); return; }
+  svg.querySelectorAll("script").forEach(n => n.remove());
+  pushUndo();
+  let n = 0;
+  Array.from(svg.children).forEach(ch => {
+    const tag = ch.tagName.toLowerCase();
+    if(tag === "metadata" || tag === "defs" || tag === "title" || tag === "desc") return;
+    // skip a full-canvas background rect (e.g. the tracer's dark backdrop)
+    if(tag === "rect" && !ch.getAttribute("stroke")) return;
+    const im = document.importNode(ch, true);
+    if(im.getAttributeNames) im.getAttributeNames().forEach(a => { if(/^on/i.test(a)) im.removeAttribute(a); });
+    contentGroup.appendChild(im); n++;
+  });
+  renderOverlay();
+  if(typeof schedulePersist === "function") schedulePersist();
+  setStatus("Imported " + n + " element(s) on top — select & resize/edit them.");
+}
+
+// ---- resize handles ----
+// combined bbox of the current selection, in stage-USER coords
+function selBBoxUser(){
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity, any = false;
+  for(const el of selected){
+    let bb; try { bb = el.getBBox(); } catch(e){ continue; }
+    const m = el.getCTM();
+    [[bb.x,bb.y],[bb.x+bb.width,bb.y],[bb.x+bb.width,bb.y+bb.height],[bb.x,bb.y+bb.height]]
+      .forEach(([x,y]) => { const p = stage.createSVGPoint(); p.x = x; p.y = y;
+        const u = m ? p.matrixTransform(m) : { x, y };
+        minx = Math.min(minx, u.x); miny = Math.min(miny, u.y);
+        maxx = Math.max(maxx, u.x); maxy = Math.max(maxy, u.y); any = true; });
+  }
+  return any ? { minx, miny, maxx, maxy } : null;
+}
+// the 8 handles (USER space): position, opposite anchor, which axes scale
+function rzHandles(bb){
+  const cx = (bb.minx + bb.maxx) / 2, cy = (bb.miny + bb.maxy) / 2;
+  return [
+    { name:"nw", x:bb.minx, y:bb.miny, ax:bb.maxx, ay:bb.maxy, sx:true,  sy:true,  cur:"nwse-resize" },
+    { name:"n",  x:cx,      y:bb.miny, ax:cx,      ay:bb.maxy, sx:false, sy:true,  cur:"ns-resize"   },
+    { name:"ne", x:bb.maxx, y:bb.miny, ax:bb.minx, ay:bb.maxy, sx:true,  sy:true,  cur:"nesw-resize" },
+    { name:"e",  x:bb.maxx, y:cy,      ax:bb.minx, ay:cy,      sx:true,  sy:false, cur:"ew-resize"   },
+    { name:"se", x:bb.maxx, y:bb.maxy, ax:bb.minx, ay:bb.miny, sx:true,  sy:true,  cur:"nwse-resize" },
+    { name:"s",  x:cx,      y:bb.maxy, ax:cx,      ay:bb.miny, sx:false, sy:true,  cur:"ns-resize"   },
+    { name:"sw", x:bb.minx, y:bb.maxy, ax:bb.maxx, ay:bb.miny, sx:true,  sy:true,  cur:"nesw-resize" },
+    { name:"w",  x:bb.minx, y:cy,      ax:bb.maxx, ay:cy,      sx:true,  sy:false, cur:"ew-resize"   },
+  ];
+}
+function drawResizeHandles(scale){
+  if(tool !== "select" || !selected.length) return;
+  const bb = selBBoxUser(); if(!bb) return;
+  const r = HANDLE_PX / (scale || 1);
+  for(const h of rzHandles(bb)){
+    const sq = ovEl("rect", { x:h.x - r, y:h.y - r, width:r*2, height:r*2 }, "ov-rz");
+    sq.dataset.rz = h.name;
+    sq.setAttribute("style", "fill:#fff;stroke:#3b82f6;stroke-width:1;vector-effect:non-scaling-stroke;cursor:" + h.cur);
+    overlayGroup.appendChild(sq);
+  }
+}
+function startResize(e, u){
+  const bb = selBBoxUser(); if(!bb) return;
+  const h = rzHandles(bb).find(k => k.name === e.target.dataset.rz); if(!h) return;
+  pushUndo();
+  drag = { type:"resize", h, ax:h.ax, ay:h.ay, aC: toContent({ x:h.ax, y:h.ay }),
+           items: selected.map(el => ({ el, orig: el.getAttribute("transform") || "" })) };
+}
+function resizeMove(e, u){
+  const h = drag.h;
+  let sx = 1, sy = 1;
+  if(h.sx){ const d0 = h.x - drag.ax; if(Math.abs(d0) > 1e-6) sx = (u.x - drag.ax) / d0; }
+  if(h.sy){ const d0 = h.y - drag.ay; if(Math.abs(d0) > 1e-6) sy = (u.y - drag.ay) / d0; }
+  if(e.shiftKey && h.sx && h.sy){ const s = Math.max(Math.abs(sx), Math.abs(sy));
+    sx = (sx < 0 ? -s : s); sy = (sy < 0 ? -s : s); }
+  if(Math.abs(sx) < 1e-3) sx = sx < 0 ? -1e-3 : 1e-3;
+  if(Math.abs(sy) < 1e-3) sy = sy < 0 ? -1e-3 : 1e-3;
+  const a = drag.aC;
+  for(const it of drag.items){
+    it.el.setAttribute("transform",
+      `translate(${fmt(a.x)} ${fmt(a.y)}) scale(${fmt(sx)} ${fmt(sy)}) translate(${fmt(-a.x)} ${fmt(-a.y)}) ${it.orig}`.trim());
+  }
+  renderOverlay();
+}
+
+// ---- toolbar buttons (added next to DXF) ----
+(function addRefImageUI(){
+  const ref = document.getElementById("btn-dxf");
+  if(!ref || !ref.parentNode) return;
+  const bar = ref.parentNode;
+  const mk = (id, txt, title) => { const b = document.createElement("button"); b.id = id; b.textContent = txt; b.title = title; return b; };
+  const bImg = mk("btn-img", "Image…", "Load a reference photo as a background underlay (not saved)");
+  const bImp = mk("btn-import", "Import…", "Import an SVG and add it on top of the current document");
+  const bClr = mk("btn-bgclear", "Clear img", "Remove the background reference image");
+  const op = document.createElement("input");
+  op.type = "range"; op.id = "bg-opacity"; op.min = 0; op.max = 100; op.value = 60;
+  op.title = "Background image opacity"; op.style.width = "70px"; op.style.flex = "0 0 auto";
+  bar.insertBefore(bImg, ref.nextSibling);
+  bar.insertBefore(op,   bImg.nextSibling);
+  bar.insertBefore(bImp, op.nextSibling);
+  bar.insertBefore(bClr, bImp.nextSibling);
+  bImg.addEventListener("click", loadRefImage);
+  bImp.addEventListener("click", importSVGFile);
+  bClr.addEventListener("click", clearBg);
+  op.addEventListener("input", setBgOpacity);
+})();
 
 // boot: restore the last session if present, else load the harp.
 // ?fresh in the URL forces the harp and discards any cached session.
