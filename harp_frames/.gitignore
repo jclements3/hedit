@@ -1,0 +1,7 @@
+# Regenerable frame dumps (re-extract from the .mp4 with ffmpeg); keep only contact sheets
+raw/
+dedup/
+linkage/
+linkage2/
+t79/
+parts/
