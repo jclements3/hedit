@@ -329,6 +329,19 @@
       </div>
     </details>
 
+    <details class="sec harp" open>
+      <summary><span class="step">5c</span> Ladder (rungs)</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="Dedicated support rungs spaced along the pillar (bass) side curve — CF buckling needs ~8">Pillar rungs</label>
+          <input type="number" id="ladder-pillar-rungs" min="0" step="1" value="8">
+          <label title="Dedicated support rungs along the shoulder (treble) side curve">Shoulder</label>
+          <input type="number" id="ladder-shoulder-rungs" min="0" step="1" value="3">
+        </div>
+        <button id="fit-ladder-btn" class="btn-primary" title="Lace the frame into a ladder: a neck rung at each string TOP (string OD tangent to the rung's LEFT, 9 o'clock), an eyelet rung at each string BOTTOM (centered, drilled bore = string OD), plus support rungs spaced along the pillar &amp; shoulder side curves. Needs strings; uses pillar-curve / shoulder-curve if present.">Fit ladder rungs</button>
+      </div>
+    </details>
+
     <details class="sec harp">
       <summary><span class="step">6</span> Transform</summary>
       <div class="sec-body">
@@ -2231,6 +2244,7 @@ document.getElementById("node-smooth").onclick = () => setSelectedNodeType("smoo
 document.getElementById("node-symmetric").onclick = () => setSelectedNodeType("symmetric");
 document.getElementById("add-pillar-btn").onclick = () => addLameSide("left");
 document.getElementById("add-shoulder-btn").onclick = () => addLameSide("right");
+document.getElementById("fit-ladder-btn").onclick = fitLadderRungs;
 function readGap(){ const v = parseFloat(document.getElementById("distribute-gap").value); return isNaN(v) ? 0 : v; }
 function readIncludeStroke(){ return document.getElementById("distribute-stroke").checked; }
 document.getElementById("dist-h").onclick = () => distribute("h", readGap(), readIncludeStroke());
@@ -3264,6 +3278,57 @@ function addLameSide(side){
   contentGroup.appendChild(path);
   setTool("node"); enterNodeEdit(path); renderOverlay();
   setStatus(`${side === "left" ? "Pillar" : "Shoulder"} (Lamé n=${fmt(n)}, bow ${fmt(a)} mm) added — drag handles to adjust.`);
+}
+
+// ===== Ladder frame: lacing rungs ====================================================
+// Neck rung at each string TOP (string OD tangent to the rung's LEFT / 9 o'clock); eyelet rung
+// at each string BOTTOM (centered, drilled bore = string OD); plus dedicated support rungs spaced
+// along the pillar (bass) and shoulder (treble) side curves. Rungs are <circle data-role="rung-*">,
+// so stringLines()/air-gap/alignment/harp-model all ignore them. CF sizing (see analysis): neck
+// 3 mm; eyelet = string OD + ~2.7 mm wall (clamped 5-8 mm); supports 8 mm. The pillar needs ~8
+// rungs for CF buckling FoS>=3; the shoulder ~3 (stability/lacing).
+const LADDER_BRASS = "#e0b86e", LADDER_EDGE = "#b8973f";
+function mkRung(cx, cy, r, role, fill){
+  const c = document.createElementNS(SVGNS, "circle");
+  c.setAttribute("data-role", role);
+  c.setAttribute("cx", fmt(cx)); c.setAttribute("cy", fmt(cy)); c.setAttribute("r", fmt(r));
+  c.setAttribute("fill", fill); c.setAttribute("stroke", LADDER_EDGE); c.setAttribute("stroke-width", "0.5");
+  contentGroup.appendChild(c);
+}
+function sbRungOD(stringDia){ return Math.max(5, Math.min(8, stringDia + 5.4)); }   // drilled bore + ~2.7 mm wall
+function supportRungsAlong(role, n, outRole){
+  const p = contentGroup.querySelector('path[data-role="' + role + '"]');
+  if(!p || n < 1) return 0;
+  const total = p.getTotalLength();
+  for(let k = 1; k <= n; k++){ const q = p.getPointAtLength(total * k / (n + 1)); mkRung(q.x, q.y, 4, outRole, LADDER_BRASS); }
+  return n;
+}
+function readIntId(id, dflt){ const el = document.getElementById(id); return Math.max(0, parseInt(el ? el.value : dflt, 10) || 0); }
+function fitLadderRungs(){
+  const strings = stringLines();
+  if(strings.length < 2){ setStatus("Load strings first (step 1)."); return; }
+  pushUndo();
+  [...contentGroup.querySelectorAll('[data-role^="rung-"]')].forEach(e => e.remove());   // idempotent
+  const S = strings.map(l => ({ ends: stringEnds(l), dia: effectiveStrokeWidth(l), num: +l.getAttribute("data-num") || 0 }))
+                   .sort((p, q) => (p.num - q.num) || (p.ends.top[0] - q.ends.top[0]));
+  const NECK = 3;
+  for(let i = 0; i < S.length; i++){                       // neck rungs: string tangent to the rung's LEFT
+    const cur = S[i].ends.top, ref = (S[i+1] || S[i-1]).ends.top, sgn = S[i+1] ? 1 : -1;
+    const dx = (ref[0] - cur[0]) * sgn, dy = (ref[1] - cur[1]) * sgn, m = Math.hypot(dx, dy) || 1;
+    const off = S[i].dia / 2 + NECK / 2;                   // centre-to-centre = string r + rung r (tangent)
+    mkRung(cur[0] + dx/m*off, cur[1] + dy/m*off, NECK/2, "rung-neck", LADDER_BRASS);
+  }
+  for(const s of S){                                       // eyelet rungs: centred on the bottom + drilled bore
+    const od = sbRungOD(s.dia), b = s.ends.bot;
+    mkRung(b[0], b[1], od/2, "rung-eyelet", LADDER_BRASS);
+    mkRung(b[0], b[1], s.dia/2, "rung-eyelet-hole", "none");
+  }
+  const nP = supportRungsAlong("pillar-curve",   readIntId("ladder-pillar-rungs", 8), "rung-pillar");
+  const nS = supportRungsAlong("shoulder-curve", readIntId("ladder-shoulder-rungs", 3), "rung-shoulder");
+  pathModel = null; renderOverlay();
+  setStatus(`Ladder: ${S.length} neck + ${S.length} eyelet rungs`
+    + (nP ? `, ${nP} pillar` : "") + (nS ? `, ${nS} shoulder` : "")
+    + " support" + ((nP || nS) ? "" : " (no pillar/shoulder curve yet — add them in 5b)") + ".");
 }
 
 // ---- per-string annotations: tuning pins + RGB sensor dots ----
