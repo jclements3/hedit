@@ -40,51 +40,51 @@ L = grommet_y − pin_y · tension schedule linear C1→G7 · ΣT = **1496 lbf =
 |# |Note|L (mm)|T (lbf)|T (N)|Ø (mm)|c-c (mm)|
 |--|----|------|-------|-----|------|--------|
 |1 |C1  |1514.9|52.69  |234.4|1.676 |14.6    |
-|2 |D1  |1489.7|51.79  |230.4|1.549 |14.6    |
-|3 |E1  |1464.4|50.88  |226.3|1.448 |14.5    |
-|4 |F1  |1439.2|49.97  |222.3|1.270 |14.4    |
-|5 |G1  |1408.9|49.07  |218.3|1.219 |14.2    |
-|6 |A1  |1378.6|48.16  |214.2|1.219 |14.2    |
-|7 |B1  |1348.3|47.25  |210.2|1.016 |14.1    |
-|8 |C2  |1318.0|46.34  |206.2|1.016 |14.0    |
-|9 |D2  |1282.6|45.44  |202.1|0.914 |14.0    |
-|10|E2  |1242.2|44.53  |198.1|2.642 |14.8    |
-|11|F2  |1222.0|43.62  |194.0|2.489 |15.6    |
-|12|G2  |1186.7|42.72  |190.0|2.337 |15.4    |
-|13|A2  |1110.9|41.81  |186.0|2.184 |15.3    |
-|14|B2  |1055.4|40.90  |181.9|2.057 |15.1    |
-|15|C3  |989.8 |40.00  |177.9|2.057 |15.1    |
-|16|D3  |924.1 |39.09  |173.9|1.930 |15.0    |
-|17|E3  |863.5 |38.18  |169.8|1.676 |14.8    |
-|18|F3  |792.8 |37.28  |165.8|1.676 |14.7    |
-|19|G3  |732.2 |36.37  |161.8|1.549 |14.6    |
-|20|A3  |666.6 |35.46  |157.7|1.549 |14.5    |
-|21|B3  |621.1 |34.56  |153.7|1.270 |14.4    |
-|22|C4  |570.6 |33.65  |149.7|1.270 |14.3    |
-|23|D4  |525.2 |32.74  |145.6|1.270 |14.3    |
-|24|E4  |484.8 |31.83  |141.6|1.143 |14.2    |
-|25|F4  |449.4 |30.93  |137.6|1.143 |14.1    |
-|26|G4  |414.1 |30.02  |133.5|1.143 |14.1    |
-|27|A4  |383.8 |29.11  |129.5|1.016 |14.1    |
-|28|B4  |353.5 |28.21  |125.5|1.016 |14.0    |
-|29|C5  |328.2 |27.30  |121.4|1.016 |14.0    |
-|30|D5  |303.0 |26.39  |117.4|0.914 |14.0    |
-|31|E5  |277.7 |25.49  |113.4|0.914 |13.9    |
-|32|F5  |262.6 |24.58  |109.3|0.914 |13.9    |
-|33|G5  |237.3 |23.67  |105.3|0.813 |13.9    |
-|34|A5  |222.2 |22.77  |101.3|0.813 |13.8    |
-|35|B5  |207.0 |21.86  |97.2 |0.813 |13.8    |
-|36|C6  |191.9 |20.95  |93.2 |0.813 |13.8    |
-|37|D6  |176.7 |20.04  |89.2 |0.762 |13.8    |
-|38|E6  |161.6 |19.14  |85.1 |0.762 |13.8    |
-|39|F6  |146.4 |18.23  |81.1 |0.762 |13.8    |
-|40|G6  |131.3 |17.32  |77.1 |0.711 |13.7    |
-|41|A6  |121.2 |16.42  |73.0 |0.711 |13.7    |
-|42|B6  |111.1 |15.51  |69.0 |0.660 |13.7    |
-|43|C7  |101.0 |14.60  |65.0 |0.635 |13.6    |
-|44|D7  |90.9  |13.70  |60.9 |0.635 |13.6    |
-|45|E7  |80.8  |12.79  |56.9 |0.635 |13.6    |
-|46|F7  |70.7  |11.88  |52.9 |0.635 |13.6    |
+|2 |D1  |1448.7|51.79  |230.4|1.549 |14.6    |
+|3 |E1  |1384.9|50.88  |226.3|1.448 |14.5    |
+|4 |F1  |1323.6|49.97  |222.3|1.270 |14.4    |
+|5 |G1  |1264.5|49.07  |218.3|1.219 |14.2    |
+|6 |A1  |1207.6|48.16  |214.2|1.219 |14.2    |
+|7 |B1  |1152.9|47.25  |210.2|1.016 |14.1    |
+|8 |C2  |1100.1|46.34  |206.2|1.016 |14.0    |
+|9 |D2  |1049.3|45.44  |202.1|0.914 |14.0    |
+|10|E2  |1000.4|44.53  |198.1|2.642 |14.8    |
+|11|F2  |953.2 |43.62  |194.0|2.489 |15.6    |
+|12|G2  |907.8 |42.72  |190.0|2.337 |15.4    |
+|13|A2  |864.0 |41.81  |186.0|2.184 |15.3    |
+|14|B2  |821.7 |40.90  |181.9|2.057 |15.1    |
+|15|C3  |781.0 |40.00  |177.9|2.057 |15.1    |
+|16|D3  |741.7 |39.09  |173.9|1.930 |15.0    |
+|17|E3  |703.8 |38.18  |169.8|1.676 |14.8    |
+|18|F3  |667.2 |37.28  |165.8|1.676 |14.7    |
+|19|G3  |632.0 |36.37  |161.8|1.549 |14.6    |
+|20|A3  |597.9 |35.46  |157.7|1.549 |14.5    |
+|21|B3  |565.0 |34.56  |153.7|1.270 |14.4    |
+|22|C4  |533.2 |33.65  |149.7|1.270 |14.3    |
+|23|D4  |502.6 |32.74  |145.6|1.270 |14.3    |
+|24|E4  |472.9 |31.83  |141.6|1.143 |14.2    |
+|25|F4  |444.3 |30.93  |137.6|1.143 |14.1    |
+|26|G4  |416.6 |30.02  |133.5|1.143 |14.1    |
+|27|A4  |389.8 |29.11  |129.5|1.016 |14.1    |
+|28|B4  |363.9 |28.21  |125.5|1.016 |14.0    |
+|29|C5  |338.9 |27.30  |121.4|1.016 |14.0    |
+|30|D5  |314.7 |26.39  |117.4|0.914 |14.0    |
+|31|E5  |291.2 |25.49  |113.4|0.914 |13.9    |
+|32|F5  |268.6 |24.58  |109.3|0.914 |13.9    |
+|33|G5  |246.6 |23.67  |105.3|0.813 |13.9    |
+|34|A5  |225.3 |22.77  |101.3|0.813 |13.8    |
+|35|B5  |204.7 |21.86  |97.2 |0.813 |13.8    |
+|36|C6  |184.7 |20.95  |93.2 |0.813 |13.8    |
+|37|D6  |165.4 |20.04  |89.2 |0.762 |13.8    |
+|38|E6  |146.6 |19.14  |85.1 |0.762 |13.8    |
+|39|F6  |128.5 |18.23  |81.1 |0.762 |13.8    |
+|40|G6  |110.8 |17.32  |77.1 |0.711 |13.7    |
+|41|A6  |93.7  |16.42  |73.0 |0.711 |13.7    |
+|42|B6  |77.2  |15.51  |69.0 |0.660 |13.7    |
+|43|C7  |61.1  |14.60  |65.0 |0.635 |13.6    |
+|44|D7  |45.5  |13.70  |60.9 |0.635 |13.6    |
+|45|E7  |30.3  |12.79  |56.9 |0.635 |13.6    |
+|46|F7  |15.6  |11.88  |52.9 |0.635 |13.6    |
 |47|G7  |60.6  |10.98  |48.8 |0.635 |13.6    |
 
 -----
@@ -95,34 +95,25 @@ String band → tip quintics (N,S) → **CF-re-solved** deflection-governed bar 
 
 -----
 
-## 4. Structural analysis (CF) — fresh solve
+## 4. Structural analysis (CF) — reduced
 
-2D frame FE (Euler–Bernoulli beam elements; neck bar + soundboard bar closed by the pillar and shoulder struts; per-string closing loads applied along the raked string lines). The design is **deflection-governed**; stress is negligible. CF's modulus (135 GPa) is *lower* than 304 SS (193 GPa), so this is a genuine re-size, not a material relabel.
+Loads are material-independent; only stiffness changes with the swap to CF. The frame is **deflection-governed** (stress is trivial), so the entire CF re-size follows from one ratio — no separate FE solve is required here.
 
-**Key result:** elastic deflection scales as 1/E, so at fixed geometry CF closes 193/135 = **1.43× more** than stainless. To hold the same gap-closure budget, the **bar heights are scaled ×1.127** (= 1.43^⅓, since I ∝ H³). The bars therefore **grow ~13%, they do not shrink** — peak 81.1 → **91.4 mm**, ends 16.7 → **18.8 mm**. CF's payoff is mass and creep, not a smaller frame.
+**The one move:** elastic closure ∝ 1/E, so at fixed geometry CF closes 193/135 = **1.43× more** than 304 SS. Restore the stainless gap-closure budget by scaling bar height **×1.127** (= 1.43^⅓, since I ∝ H³). So CF bars **grow ~13%, they do not shrink** — ends 16.7 → **18.8 mm**, peak 81.1 → **91.4 mm** (applied in the §7 generator). CF's payoff is mass and no-creep, not a smaller frame.
 
-|Item                       |304 SS (ref)        |**CF (this revision, re-sized)**        |
-|---------------------------|--------------------|----------------------------------------|
-|Closing load / ladder      |6655 N (6606 raked) |same — load is material-independent     |
-|Lateral shear (rake)       |811 N toward pillar |same                                    |
-|Bar max stress σ           |39–42 MPa           |~40 MPa                                 |
-|**Bar FoS (stress)**       |5.1 (vs yield 215)  |**45 vs UTS 1800 · 22 vs first-ply 900**|
-|**Bar heights (ends → peak)**|16.7 → 81.1 mm    |**18.8 → 91.4 mm** (×1.127 for deflection parity)|
-|**Gap closure**            |≤0.5 mm/ladder (design pt)|**held to the same value by the re-size**|
-|Pillar (24 mm + 6 rungs)   |in-plane FoS 3.0    |stress trivial; **buckling/stability governs — lacing essential** (lower E ⇒ more so)|
-|Pillar (un-laced)          |FoS 0.11            |worse in CF — **6 cross-rungs mandatory**|
-|Shoulder (short)           |FoS 60+             |stress trivial; fine                    |
-|**Rung (transverse, ≥3 mm)**|weld margin OK     |**shear/ILSS-governed, FoS ~3+** (not the 1800 MPa axial number)|
-|**Junction (rung↔rail)**   |weld               |**woven/wrapped node, size to FoS ≥3 vs ILSS 70**|
+|Quantity                |Value                              |Note                                   |
+|------------------------|-----------------------------------|---------------------------------------|
+|Closing load / ladder   |6655 N (6606 N after 7° rake)      |from ΣT; material-independent          |
+|Lateral shear (rake)    |811 N toward pillar                |geometry only                          |
+|Bar max stress σ        |~40 MPa                            |FoS ~22 vs first-ply 900, ~45 vs UTS 1800 — negligible|
+|**Bar-height scale**    |**×1.127** (193/135 = 1.43, ∛)     |deflection parity with the SS design   |
+|**Bar heights ends→peak**|**18.8 → 91.4 mm**                |= SS 16.7 → 81.1 ×1.127                 |
+|Pillar (24 mm + 6 rungs)|**lacing/stability-governed**      |stress trivial; lower E ⇒ rungs even more essential|
+|Rungs / rung↔rail nodes |**ILSS-governed, target FoS ≥ 3** vs 70 MPa|woven/wrapped node; rail axial strength never appears at a transverse rung|
 
-**Governing conclusions:**
-- Deflection sets the bar. The CF heights above (§7 generator updated to match) hold the stainless deflection budget; stress carries ~45× margin.
-- **CF does not let the geometry shrink** — its lower modulus requires ~13% taller bars for the same stiffness. Mass still drops to ~2.5 kg (§6) because density falls 8.0 → 1.55, far outweighing the size increase.
-- Rungs and rung↔rail junctions are **interlaminar-shear limited**; the rail's axial strength never appears at a short transverse rung. Resolve with woven/interlaced nodes (warp = rails, weft = rungs) or wrapped tows; target FoS ≥ 3 vs ILSS.
-- The pillar fails by **stability**, not strength; the 6 cross-rungs are non-negotiable.
-- **No creep:** unlike the rejected zinc/cast options, CF holds permanent tension without long-term relaxation or sag.
+**Conclusions:** deflection sets the bar (stress carries ~20–45× margin); the pillar fails by **stability**, not strength, so the 6 cross-rungs are non-negotiable; rung↔rail junctions are interlaminar-shear limited (size to ILSS, not the 1800 MPa axial number); and unlike the rejected cast metals, CF **does not creep** under permanent tension.
 
-**Analysis note / open item:** the deflection re-size (×1.127) follows purely from the E-ratio and is solver-independent. The *absolute* closure of an independent frame model is sensitive to the pillar/shoulder lacing stiffness, which the archive specifies only as a result (the original frame-FE solver is not included — §7 hardcodes its output). A fully standalone CF closure value should be confirmed against that solver or a lacing-resolved model before fabrication.
+**Caveat (why this is *reduced*, not a full solve):** the ×1.127 re-size is purely the E-ratio and is solver-independent. The *absolute* gap closure depends on pillar/shoulder lacing stiffness; the original frame-FE solver is not in this repo (§7 hardcodes the SS height profile, scaled ×1.127 for CF). Confirm a standalone closure value against a lacing-resolved model before fabrication.
 
 ## 5. String connections (CF)
 
@@ -138,12 +129,12 @@ the string Ø, with a knot (2× Ø) below. Brass takes the bearing; CF is not lo
 
 |Item                                   |Qty|Mass                  |
 |---------------------------------------|---|----------------------|
-|Closed-frame plate, CF/epoxy 6.35 mm (CF-sized bars)|2 |**≈ 2.47 kg**|
+|Closed-frame plate, CF/epoxy 6.35 mm (CF-sized bars)|2 |**≈ 2.50 kg**|
 |Rungs — CF rod (neck/soundboard/pillar)|100|≈ 0.1 kg              |
 |Brass/bronze wear shoes + eyelets      |~94|≈ 0.05 kg             |
-|**Bare frame**                         |   |**≈ 2.5 kg (5.6 lb)** |
+|**Bare frame**                         |   |**≈ 2.56 kg (5.7 lb)**|
 |+ tuners (1.2) + pickups (0.7) + strings (0.5)| | |
-|**Rigged**                             |   |**≈ 4.9 kg (11 lb)**  |
+|**Rigged**                             |   |**≈ 5.0 kg (11 lb)**  |
 
 vs the stainless record: bare frame **11.7 kg → ~2.4 kg (~5× lighter)**; rigged 14.5 kg → ~4.8 kg. (Stiffness-parity 9.1 mm plates → bare ~3.4 kg, still ~3.5× lighter.) The earlier "~6 kg CF" estimate assumed much thicker plates; at deflection-governed thickness it lands far lighter.
 
@@ -185,16 +176,18 @@ SB_RUNG_OD         = 8.0         # CF rod; BRASS EYELET drilled to string OD; st
 RHO_CF             = 1.55e-3     # g/mm^3  CF/epoxy (was 8.0e-3 SS)
 RHO_BRASS          = 8.5e-3      # wear shoes / eyelets only
 
-# ----- string lengths: REAL measured C1->G7 scale from strings.svg (canonical harp reference) -----
-# A prior edit clobbered these with np.linspace(1514.93,60.61,N) -- a straight ramp wrong by up to
-# 310 mm. These are the actual (irregular) measured lengths, data-num 1..47 = C1..G7.
+# ----- string data from the erand47 archive (StringSpec: L = grommet_y - pin_y), data-num 1..47 = C1..G7
+# AUTHORITATIVE length scale (matches erand47_profile_v2.svg). Avoid two earlier regressions:
+# (a) np.linspace(1514.93,60.61,N) -- a straight ramp; (b) strings.svg lengths (1514.9,1489.7,...) --
+# that is the *Paraguayan* harp, a different instrument. The treble tail is non-monotonic
+# (F7=15.59 then G7=60.61); preserved verbatim (15.59 mm looks unphysical -- open data-check item).
 L = np.array([
- 1514.9,1489.7,1464.4,1439.2,1408.9,1378.6,1348.3,1318.0,
- 1282.6,1242.2,1222.0,1186.7,1110.9,1055.4,989.8,924.1,
- 863.5,792.8,732.2,666.6,621.1,570.6,525.2,484.8,
- 449.4,414.1,383.8,353.5,328.2,303.0,277.7,262.6,
- 237.3,222.2,207.0,191.9,176.7,161.6,146.4,131.3,
- 121.2,111.1,101.0,90.9,80.8,70.7,60.6])
+ 1514.93,1448.69,1384.93,1323.57,1264.50,1207.63,1152.87,1100.13,
+ 1049.33,1000.39,953.23,907.78,863.97,821.73,781.00,741.71,
+ 703.81,667.24,631.95,597.88,564.99,533.23,502.55,472.91,
+ 444.27,416.59,389.82,363.94,338.90,314.68,291.24,268.55,
+ 246.58,225.31,204.70,184.74,165.39,146.64,128.46,110.83,
+ 93.74,77.15,61.06,45.45,30.30,15.59,60.61])
 assert L.size==N_STRINGS, "L must have N_STRINGS entries"
 TENSION_LBF = np.linspace(52.693,10.976,N_STRINGS)              # linear tension schedule
 DIA = np.array([1.676,1.549,1.448,1.270,1.219,1.219,1.016,1.016,0.914,2.642,2.489,2.337,

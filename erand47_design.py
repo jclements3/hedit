@@ -29,16 +29,19 @@ SB_RUNG_OD         = 8.0         # CF rod; BRASS EYELET drilled to string OD; st
 RHO_CF             = 1.55e-3     # g/mm^3  CF/epoxy (was 8.0e-3 SS)
 RHO_BRASS          = 8.5e-3      # wear shoes / eyelets only
 
-# ----- string lengths: REAL measured C1->G7 scale from strings.svg (canonical harp reference) -----
-# A prior edit clobbered these with np.linspace(1514.93,60.61,N) -- a straight ramp wrong by up to
-# 310 mm. These are the actual (irregular) measured lengths, data-num 1..47 = C1..G7.
+# ----- string data from the erand47 archive (StringSpec: L = grommet_y - pin_y), data-num 1..47 = C1..G7
+# This is the AUTHORITATIVE length scale (confirmed against erand47_profile_v2.svg). Two earlier
+# regressions to avoid: (a) np.linspace(1514.93,60.61,N) -- a straight ramp; (b) substituting
+# strings.svg lengths (1514.9,1489.7,...) -- those are the *Paraguayan* harp, a different instrument.
+# NB: the treble tail is non-monotonic (F7=15.59 then G7=60.61); preserved verbatim from the archive
+# (15.59 mm looks unphysical -- flagged as an open data-check item, not silently "fixed").
 L = np.array([
- 1514.9,1489.7,1464.4,1439.2,1408.9,1378.6,1348.3,1318.0,
- 1282.6,1242.2,1222.0,1186.7,1110.9,1055.4,989.8,924.1,
- 863.5,792.8,732.2,666.6,621.1,570.6,525.2,484.8,
- 449.4,414.1,383.8,353.5,328.2,303.0,277.7,262.6,
- 237.3,222.2,207.0,191.9,176.7,161.6,146.4,131.3,
- 121.2,111.1,101.0,90.9,80.8,70.7,60.6])
+ 1514.93,1448.69,1384.93,1323.57,1264.50,1207.63,1152.87,1100.13,
+ 1049.33,1000.39,953.23,907.78,863.97,821.73,781.00,741.71,
+ 703.81,667.24,631.95,597.88,564.99,533.23,502.55,472.91,
+ 444.27,416.59,389.82,363.94,338.90,314.68,291.24,268.55,
+ 246.58,225.31,204.70,184.74,165.39,146.64,128.46,110.83,
+ 93.74,77.15,61.06,45.45,30.30,15.59,60.61])
 assert L.size==N_STRINGS, "L must have N_STRINGS entries"
 TENSION_LBF = np.linspace(52.693,10.976,N_STRINGS)              # linear tension schedule
 DIA = np.array([1.676,1.549,1.448,1.270,1.219,1.219,1.016,1.016,0.914,2.642,2.489,2.337,
