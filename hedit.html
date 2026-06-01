@@ -330,7 +330,7 @@
     </details>
 
     <details class="sec harp" open>
-      <summary><span class="step">5c</span> Ladder (rungs)</summary>
+      <summary><span class="step">5c</span> Ladder (frame + rungs)</summary>
       <div class="sec-body">
         <div class="row">
           <label title="Dedicated support rungs spaced along the pillar (bass) side curve — CF buckling needs ~8">Pillar rungs</label>
@@ -338,7 +338,7 @@
           <label title="Dedicated support rungs along the shoulder (treble) side curve">Shoulder</label>
           <input type="number" id="ladder-shoulder-rungs" min="0" step="1" value="3">
         </div>
-        <button id="fit-ladder-btn" class="btn-primary" title="Lace the frame into a ladder: a neck rung at each string TOP (string OD tangent to the rung's LEFT, 9 o'clock), an eyelet rung at each string BOTTOM (centered, drilled bore = string OD), plus support rungs spaced along the pillar &amp; shoulder side curves. Needs strings; uses pillar-curve / shoulder-curve if present.">Fit ladder rungs</button>
+        <button id="fit-ladder-btn" class="btn-primary" title="Build the CF ladder frame from the step-5 neck (top) + eyelet (bottom) curves: outer path NT-RO-EB-PO and inner path NB-RI-ET-PI, spread = the deflection-governed CF bar height (18.8-91.4 mm). Then laces it with rungs (neck tangent-left, eyelet centered+drilled; pillar/shoulder supports if those side curves exist).">Fit ladder frame</button>
       </div>
     </details>
 
@@ -2244,7 +2244,7 @@ document.getElementById("node-smooth").onclick = () => setSelectedNodeType("smoo
 document.getElementById("node-symmetric").onclick = () => setSelectedNodeType("symmetric");
 document.getElementById("add-pillar-btn").onclick = () => addLameSide("left");
 document.getElementById("add-shoulder-btn").onclick = () => addLameSide("right");
-document.getElementById("fit-ladder-btn").onclick = fitLadderRungs;
+document.getElementById("fit-ladder-btn").onclick = fitLadderFrame;
 function readGap(){ const v = parseFloat(document.getElementById("distribute-gap").value); return isNaN(v) ? 0 : v; }
 function readIncludeStroke(){ return document.getElementById("distribute-stroke").checked; }
 document.getElementById("dist-h").onclick = () => distribute("h", readGap(), readIncludeStroke());
@@ -3329,6 +3329,87 @@ function fitLadderRungs(){
   setStatus(`Ladder: ${S.length} neck + ${S.length} eyelet rungs`
     + (nP ? `, ${nP} pillar` : "") + (nS ? `, ${nS} shoulder` : "")
     + " support" + ((nP || nS) ? "" : " (no pillar/shoulder curve yet — add them in 5b)") + ".");
+}
+
+// ===== Ladder FRAME: the CF rail band ================================================
+// Builds the two frame paths the design calls for:
+//   outer = NT (neck top) - RO (rear/shoulder outer) - EB (eyelet bottom) - PO (pillar outer)
+//   inner = NB (neck bottom) - RI (rear inner) - ET (eyelet top) - PI (pillar inner)
+// from the step-5 neck (top-curve) and eyelet (bottom-curve) CENTRELINES. The spread between
+// outer and inner = the CF bar height carrying the string tension: the deflection-parity profile
+// (ends 18.8, peak 91.4 mm) for the rails; the pillar/shoulder bows (5b inputs) shape the end caps.
+const ERAND47_BARH = [18.8,29.4,41.0,49.3,56.1,61.6,66.5,70.5,74.1,77.2,79.9,82.2,84.2,86.0,87.4,88.5,89.6,90.3,90.8,91.1,91.4,91.4,91.1,90.7,90.1,89.4,88.5,87.4,86.2,84.7,83.1,81.4,79.4,77.3,74.9,72.4,69.6,66.6,63.2,59.5,55.4,50.9,45.8,39.9,32.8,23.3,18.8];
+function barHeightAt(frac){                       // mm, frac 0..1 along bass->treble
+  const x = Math.max(0, Math.min(1, frac)) * (ERAND47_BARH.length - 1), i = Math.floor(x), f = x - i;
+  return i >= ERAND47_BARH.length - 1 ? ERAND47_BARH[i] : ERAND47_BARH[i]*(1-f) + ERAND47_BARH[i+1]*f;
+}
+function samplePathTangents(path, N){
+  const total = path.getTotalLength(), out = [];
+  for(let k = 0; k <= N; k++){
+    const s = total*k/N, p = path.getPointAtLength(s);
+    const a = path.getPointAtLength(Math.max(0, s-0.5)), b = path.getPointAtLength(Math.min(total, s+0.5));
+    let tx = b.x-a.x, ty = b.y-a.y; const m = Math.hypot(tx, ty) || 1;
+    out.push({ x:p.x, y:p.y, tx:tx/m, ty:ty/m, frac:k/N });
+  }
+  return out;
+}
+// offset a centreline +-H/2; outer = side AWAY from the string field centre
+function railEdges(samples, field){
+  const O = [], I = [];
+  for(const s of samples){
+    const h = barHeightAt(s.frac) / 2;
+    let nx = -s.ty, ny = s.tx;
+    if((s.x+nx-field[0])**2 + (s.y+ny-field[1])**2 < (s.x-nx-field[0])**2 + (s.y-ny-field[1])**2){ nx = -nx; ny = -ny; }
+    O.push([s.x+nx*h, s.y+ny*h]); I.push([s.x-nx*h, s.y-ny*h]);
+  }
+  return { O, I };
+}
+const Ls = pts => pts.map(p => "L " + fmt(p[0]) + " " + fmt(p[1])).join(" ");
+function capC(A, B, outx, bow){                   // cubic A->B bulging by `bow` toward outx (+-1 in x)
+  const k = 1.333 * Math.max(2, bow);
+  return "C " + fmt(A[0]+outx*k) + " " + fmt(A[1]) + " " + fmt(B[0]+outx*k) + " " + fmt(B[1]) + " " + fmt(B[0]) + " " + fmt(B[1]);
+}
+function mkFramePath(d, role, fill, stroke, ref){
+  const p = document.createElementNS(SVGNS, "path");
+  p.setAttribute("data-role", role); p.setAttribute("d", d);
+  p.setAttribute("fill", fill); if(fill === "evenodd-band"){ p.setAttribute("fill", "#5b5b5b"); p.setAttribute("fill-rule", "evenodd"); p.setAttribute("fill-opacity", "0.85"); }
+  p.setAttribute("stroke", stroke); p.setAttribute("stroke-width", "1");
+  contentGroup.insertBefore(p, ref);              // behind the strings/rungs
+  return p;
+}
+function fitLadderFrame(){
+  const neck = contentGroup.querySelector('path[data-role="top-curve"]');
+  const eye  = contentGroup.querySelector('path[data-role="bottom-curve"]');
+  if(!neck || !eye){ setStatus("Need the neck (top) and eyelet (bottom) curves first — fit them in step 5."); return; }
+  pushUndo();
+  contentGroup.querySelectorAll('[data-role^="frame-"]').forEach(e => e.remove());
+  const N = 120;
+  const ns = samplePathTangents(neck, N), es = samplePathTangents(eye, N);
+  // string-field centre, to orient "outer" away from the strings
+  const fx = (ns[0].x + ns[N].x + es[0].x + es[N].x) / 4, fy = (ns[0].y + ns[N].y + es[0].y + es[N].y) / 4;
+  const nk = railEdges(ns, [fx, fy]);             // nk.O = NT, nk.I = NB
+  const ey = railEdges(es, [fx, fy]);             // ey.O = EB, ey.I = ET
+  // which end is bass (x smaller)? assume index 0 = bass (curves fit bass->treble); set cap directions
+  const bassOutX = (ns[0].x <= ns[N].x) ? -1 : +1, trebOutX = -bassOutX;
+  const pbow = Math.max(2, parseFloat((document.getElementById("pillar-bow")||{}).value) || 60);
+  const sbow = Math.max(2, parseFloat((document.getElementById("shoulder-bow")||{}).value) || 40);
+  // OUTER: NT (0->N) , RO cap (NT[N]->EB[N]) , EB reversed (N->0) , PO cap (EB[0]->NT[0])
+  const NT = nk.O, NB = nk.I, EB = ey.O, ET = ey.I;
+  const outerD = "M " + fmt(NT[0][0]) + " " + fmt(NT[0][1]) + " " + Ls(NT.slice(1))
+    + " " + capC(NT[N], EB[N], trebOutX, sbow)
+    + " " + Ls(EB.slice().reverse().slice(1))
+    + " " + capC(EB[0], NT[0], bassOutX, pbow) + " Z";
+  const innerD = "M " + fmt(NB[0][0]) + " " + fmt(NB[0][1]) + " " + Ls(NB.slice(1))
+    + " " + capC(NB[N], ET[N], trebOutX, sbow*0.6)
+    + " " + Ls(ET.slice().reverse().slice(1))
+    + " " + capC(ET[0], NB[0], bassOutX, pbow*0.6) + " Z";
+  const ref = contentGroup.firstChild;
+  mkFramePath(outerD + " " + innerD, "frame-fill", "evenodd-band", "none", ref);   // CF band (behind)
+  mkFramePath(outerD, "frame-outer", "none", "#9aa0a6", ref);
+  mkFramePath(innerD, "frame-inner", "none", "#9aa0a6", ref);
+  fitLadderRungs();                                 // lace it (uses pillar/shoulder curves if present)
+  const peak = Math.max(...ERAND47_BARH);
+  setStatus(`Ladder frame: outer NT-RO-EB-PO + inner NB-RI-ET-PI, CF spread ${fmt(ERAND47_BARH[0])}-${fmt(peak)} mm (deflection-governed).`);
 }
 
 // ---- per-string annotations: tuning pins + RGB sensor dots ----
