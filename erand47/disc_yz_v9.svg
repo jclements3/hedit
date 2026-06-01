@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="560" viewBox="0 0 940 560" font-family="Georgia,serif">
+<defs>
+<linearGradient id="bar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a8f97"/><stop offset="1" stop-color="#4c5158"/></linearGradient>
+<linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6eaef"/><stop offset=".5" stop-color="#a6abb3"/><stop offset="1" stop-color="#565b63"/></linearGradient>
+<radialGradient id="pin" cx=".35" cy=".35" r=".75"><stop offset="0" stop-color="#e2e6ec"/><stop offset=".6" stop-color="#9aa0a8"/><stop offset="1" stop-color="#5e636b"/></radialGradient>
+<marker id="arr" markerWidth="7" markerHeight="7" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#8aa0c0"/></marker></defs>
+<rect width="940" height="560" fill="#13110d"/>
+<text x="470" y="30" fill="#eef0f4" font-size="16" text-anchor="middle">yz section (depth × string) — D4, to scale · +y left, −y right</text>
+<rect x="413.5" y="86.0" width="27.9" height="334.4" fill="url(#bar)" stroke="#2d3036"/>
+<rect x="498.6" y="86.0" width="27.9" height="334.4" fill="url(#bar)" stroke="#2d3036"/>
+<text x="427.3" y="78.0" fill="#aeb3bd" font-size="11" text-anchor="middle">+y bar (left)</text>
+<text x="512.7" y="78.0" fill="#aeb3bd" font-size="11" text-anchor="middle">−y bar (right)</text>
+<line x1="470.0" y1="86.0" x2="470.0" y2="420.4" stroke="#b8924a" stroke-width="5.6" stroke-linecap="round"/>
+<text x="478.0" y="416.4" fill="#b8924a" font-size="10">string y=0</text>
+<rect x="441.4" y="149.5" width="8.8" height="31.1" rx="3" fill="url(#steel)" stroke="#eef0f4" stroke-width="1"/>
+<rect x="450.2" y="170.1" width="19.8" height="9.2" rx="4.6" fill="url(#pin)" stroke="#eef0f4" stroke-width="0.7"/>
+<rect x="450.2" y="150.8" width="19.8" height="9.2" rx="4.6" fill="url(#pin)" stroke="#eef0f4" stroke-width="0.7"/>
+<line x1="445.8" y1="165.1" x2="399.6" y2="165.1" stroke="#cfd4da" stroke-width="13.2" stroke-linecap="round"/>
+<circle cx="445.8" cy="165.1" r="2.2" fill="#2a2d31"/>
+<line x1="399.6" y1="165.1" x2="399.6" y2="143.1" stroke="#cfd4da" stroke-width="2.4"/>
+<line x1="399.6" y1="143.1" x2="399.6" y2="86.0" stroke="#8aa0c0" stroke-width="2.4"/>
+<text x="531.6" y="168.1" fill="#c0a0ff" font-size="11">natural (z=46)</text>
+<rect x="441.4" y="340.6" width="8.8" height="31.1" rx="3" fill="url(#steel)" stroke="#eef0f4" stroke-width="1"/>
+<rect x="450.2" y="361.2" width="19.8" height="9.2" rx="4.6" fill="url(#pin)" stroke="#eef0f4" stroke-width="0.7"/>
+<rect x="450.2" y="341.9" width="19.8" height="9.2" rx="4.6" fill="url(#pin)" stroke="#eef0f4" stroke-width="0.7"/>
+<line x1="445.8" y1="356.1" x2="399.6" y2="356.1" stroke="#cfd4da" stroke-width="13.2" stroke-linecap="round"/>
+<circle cx="445.8" cy="356.1" r="2.2" fill="#2a2d31"/>
+<line x1="399.6" y1="356.1" x2="399.6" y2="334.1" stroke="#cfd4da" stroke-width="2.4"/>
+<line x1="399.6" y1="334.1" x2="399.6" y2="86.0" stroke="#8aa0c0" stroke-width="2.4"/>
+<text x="531.6" y="359.1" fill="#ff8c5a" font-size="11">sharp (z=89)</text>
+<text x="393.6" y="88.0" fill="#8aa0c0" font-size="10" text-anchor="end">action rods ↑ pedal</text>
+<line x1="441.4" y1="416.0" x2="498.6" y2="416.0" stroke="#8a8f98" stroke-width="0.8"/>
+<text x="470.0" y="412.0" fill="#8a8f98" font-size="10" text-anchor="middle">gap 13</text>
+<text x="470.0" y="442.4" fill="#8a8f98" font-size="11" text-anchor="middle">bar ¼″(6.35) · disc t 2 · axle Ø3 · prong Ø2.1 reach 6.5 · nat→sharp 43 mm apart</text>
+</svg>

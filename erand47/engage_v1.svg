@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="560" viewBox="0 0 940 560" font-family="Georgia,serif">
+<defs><marker id="ccw" markerWidth="9" markerHeight="9" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#e0b86e"/></marker></defs>
+<rect width="940" height="560" fill="#13110d"/>
+<text x="200" y="40" fill="#eef0f4" font-size="14" text-anchor="middle">pedal in flat</text>
+<text x="470" y="40" fill="#eef0f4" font-size="14" text-anchor="middle">pedal in natural</text>
+<text x="740" y="40" fill="#eef0f4" font-size="14" text-anchor="middle">pedal in sharp</text>
+<text x="60" y="180" fill="#c0a0ff" font-size="12" transform="rotate(-90 60 180)" text-anchor="middle">NATURAL disc</text>
+<text x="60" y="430" fill="#ff8c5a" font-size="12" transform="rotate(-90 60 430)" text-anchor="middle">SHARP disc</text>
+<line x1="200" y1="90" x2="200" y2="250" stroke="#b8924a" stroke-width="5"/>
+<circle cx="200" cy="170" r="58" fill="none" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="200" cy="170" r="4" fill="#23262b" stroke="#9aa0a8"/>
+<circle cx="240" cy="170" r="7" fill="none" stroke="#c0a0ff" stroke-width="3"/>
+<circle cx="160" cy="170" r="7" fill="none" stroke="#c0a0ff" stroke-width="3"/>
+<line x1="200" y1="340" x2="200" y2="500" stroke="#b8924a" stroke-width="5"/>
+<circle cx="200" cy="420" r="58" fill="none" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="200" cy="420" r="4" fill="#23262b" stroke="#9aa0a8"/>
+<circle cx="240" cy="420" r="7" fill="none" stroke="#ff8c5a" stroke-width="3"/>
+<circle cx="160" cy="420" r="7" fill="none" stroke="#ff8c5a" stroke-width="3"/>
+<line x1="470" y1="90" x2="470" y2="250" stroke="#b8924a" stroke-width="5"/>
+<circle cx="470" cy="170" r="58" fill="none" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="470" cy="170" r="4" fill="#23262b" stroke="#9aa0a8"/>
+<circle cx="493" cy="137" r="7" fill="none" stroke="#c0a0ff" stroke-width="3"/>
+<circle cx="447" cy="203" r="7" fill="none" stroke="#c0a0ff" stroke-width="3"/>
+<circle cx="470" cy="203" r="3.2" fill="#9ad8b0"/>
+<text x="424" y="219" fill="#9ad8b0" font-size="9" text-anchor="end">pitch pt</text>
+<text x="503" y="131" fill="#cfd4da" font-size="9">grabs above</text>
+<path d="M 406,180 A 66 66 0 0 1 418,148" fill="none" stroke="#e0b86e" stroke-width="1.6" marker-end="url(#ccw)"/>
+<text x="400" y="170" fill="#e0b86e" font-size="9" text-anchor="end">CCW</text>
+<line x1="470" y1="340" x2="470" y2="500" stroke="#b8924a" stroke-width="5"/>
+<circle cx="470" cy="420" r="58" fill="none" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="470" cy="420" r="4" fill="#23262b" stroke="#9aa0a8"/>
+<circle cx="510" cy="420" r="7" fill="none" stroke="#ff8c5a" stroke-width="3"/>
+<circle cx="430" cy="420" r="7" fill="none" stroke="#ff8c5a" stroke-width="3"/>
+<line x1="740" y1="90" x2="740" y2="250" stroke="#b8924a" stroke-width="5"/>
+<circle cx="740" cy="170" r="58" fill="none" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="740" cy="170" r="4" fill="#23262b" stroke="#9aa0a8"/>
+<circle cx="763" cy="137" r="7" fill="none" stroke="#c0a0ff" stroke-width="3"/>
+<circle cx="717" cy="203" r="7" fill="none" stroke="#c0a0ff" stroke-width="3"/>
+<circle cx="740" cy="203" r="3.2" fill="#9ad8b0"/>
+<text x="694" y="219" fill="#9ad8b0" font-size="9" text-anchor="end">pitch pt</text>
+<text x="773" y="131" fill="#cfd4da" font-size="9">grabs above</text>
+<line x1="740" y1="340" x2="740" y2="500" stroke="#b8924a" stroke-width="5"/>
+<circle cx="740" cy="420" r="58" fill="none" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="740" cy="420" r="4" fill="#23262b" stroke="#9aa0a8"/>
+<circle cx="763" cy="387" r="7" fill="none" stroke="#ff8c5a" stroke-width="3"/>
+<circle cx="717" cy="453" r="7" fill="none" stroke="#ff8c5a" stroke-width="3"/>
+<circle cx="740" cy="453" r="3.2" fill="#9ad8b0"/>
+<text x="694" y="469" fill="#9ad8b0" font-size="9" text-anchor="end">pitch pt</text>
+<text x="773" y="381" fill="#cfd4da" font-size="9">grabs above</text>
+<path d="M 676,430 A 66 66 0 0 1 688,398" fill="none" stroke="#e0b86e" stroke-width="1.6" marker-end="url(#ccw)"/>
+<text x="670" y="420" fill="#e0b86e" font-size="9" text-anchor="end">CCW</text>
+<text x="470" y="540" fill="#8a8f98" font-size="11" text-anchor="middle">flat: prongs horizontal, string free · natural: natural disc CCW · sharp: + sharp disc CCW (natural stays)</text>
+</svg>

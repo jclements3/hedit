@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="640" viewBox="0 0 980 640" font-family="Georgia,serif">
+<defs>
+<linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b5a3e"/><stop offset="1" stop-color="#3a3026"/></linearGradient>
+<linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6eaef"/><stop offset="1" stop-color="#6a6f78"/></linearGradient>
+<marker id="rot" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L7,4 L0,8 Z" fill="#e0b86e"/></marker></defs>
+<rect width="980" height="640" fill="#13110d"/>
+<text x="490" y="30" fill="#eef0f4" font-size="16" text-anchor="middle">erand47 pedal mechanism — top (fan) · side (section + bell-crank)</text>
+<text x="250" y="60" fill="#cdd2da" font-size="13" text-anchor="middle">TOP — 7 pedals fan from centre, cross to opposite rods</text>
+<path d="M 45,400 Q 250,110 455,400 Z" fill="url(#wood)" stroke="#2d241a" stroke-width="1.5" opacity="0.85"/>
+<circle cx="250" cy="150" r="10" fill="#23262b" stroke="#9aa0a8" stroke-width="2"/>
+<line x1="289" y1="126" x2="97" y2="245" stroke="#9ec3ff" stroke-width="6" stroke-linecap="round"/>
+<ellipse cx="97" cy="245" rx="13" ry="7" transform="rotate(-58 97 245)" fill="url(#steel)" stroke="#eef0f4" stroke-width="0.6"/>
+<circle cx="289" cy="126" r="3.2" fill="#7fb0ff"/>
+<text x="82" y="259" fill="#9ec3ff" font-size="12" text-anchor="middle">D</text>
+<line x1="279" y1="114" x2="138" y2="291" stroke="#9ec3ff" stroke-width="6" stroke-linecap="round"/>
+<ellipse cx="138" cy="291" rx="13" ry="7" transform="rotate(-39 138 291)" fill="url(#steel)" stroke="#eef0f4" stroke-width="0.6"/>
+<circle cx="279" cy="114" r="3.2" fill="#7fb0ff"/>
+<text x="126" y="309" fill="#9ec3ff" font-size="12" text-anchor="middle">C</text>
+<line x1="265" y1="107" x2="190" y2="320" stroke="#9ec3ff" stroke-width="6" stroke-linecap="round"/>
+<ellipse cx="190" cy="320" rx="13" ry="7" transform="rotate(-19 190 320)" fill="url(#steel)" stroke="#eef0f4" stroke-width="0.6"/>
+<circle cx="265" cy="107" r="3.2" fill="#7fb0ff"/>
+<text x="184" y="341" fill="#9ec3ff" font-size="12" text-anchor="middle">B</text>
+<line x1="250" y1="104" x2="250" y2="330" stroke="#ffc488" stroke-width="6" stroke-linecap="round"/>
+<ellipse cx="250" cy="330" rx="13" ry="7" transform="rotate(0 250 330)" fill="url(#steel)" stroke="#eef0f4" stroke-width="0.6"/>
+<circle cx="250" cy="104" r="3.2" fill="#7fb0ff"/>
+<text x="250" y="352" fill="#ffc488" font-size="12" text-anchor="middle">E</text>
+<line x1="235" y1="107" x2="310" y2="320" stroke="#ffc488" stroke-width="6" stroke-linecap="round"/>
+<ellipse cx="310" cy="320" rx="13" ry="7" transform="rotate(19 310 320)" fill="url(#steel)" stroke="#eef0f4" stroke-width="0.6"/>
+<circle cx="235" cy="107" r="3.2" fill="#7fb0ff"/>
+<text x="316" y="341" fill="#ffc488" font-size="12" text-anchor="middle">F</text>
+<line x1="221" y1="114" x2="362" y2="291" stroke="#ffc488" stroke-width="6" stroke-linecap="round"/>
+<ellipse cx="362" cy="291" rx="13" ry="7" transform="rotate(39 362 291)" fill="url(#steel)" stroke="#eef0f4" stroke-width="0.6"/>
+<circle cx="221" cy="114" r="3.2" fill="#7fb0ff"/>
+<text x="374" y="309" fill="#ffc488" font-size="12" text-anchor="middle">G</text>
+<line x1="211" y1="126" x2="403" y2="245" stroke="#ffc488" stroke-width="6" stroke-linecap="round"/>
+<ellipse cx="403" cy="245" rx="13" ry="7" transform="rotate(58 403 245)" fill="url(#steel)" stroke="#eef0f4" stroke-width="0.6"/>
+<circle cx="211" cy="126" r="3.2" fill="#7fb0ff"/>
+<text x="418" y="259" fill="#ffc488" font-size="12" text-anchor="middle">A</text>
+<text x="250" y="124" fill="#7fb0ff" font-size="10" text-anchor="middle">rods ↑ column</text>
+<text x="100" y="400" fill="#9ec3ff" font-size="11">left foot D C B</text>
+<text x="400" y="400" fill="#ffc488" font-size="11" text-anchor="end">right foot E F G A</text>
+<text x="800" y="60" fill="#cdd2da" font-size="13" text-anchor="middle">SIDE — pedal → notch → rod ↑ column → bell-crank → disc</text>
+<rect x="660" y="540" width="300" height="60" fill="url(#wood)" stroke="#2d241a"/>
+<circle cx="740" cy="558" r="4" fill="#2a2d31" stroke="#cfd4da"/>
+<line x1="610" y1="566" x2="790" y2="552" stroke="url(#steel)" stroke-width="7" stroke-linecap="round"/>
+<text x="608" y="560" fill="#cdd2da" font-size="11" text-anchor="end">pedal</text>
+<line x1="770" y1="548" x2="786" y2="548" stroke="#8a8f98" stroke-width="2"/>
+<text x="792" y="552" fill="#8a8f98" font-size="10">♭</text>
+<line x1="770" y1="564" x2="786" y2="564" stroke="#9ad8b0" stroke-width="2"/>
+<text x="792" y="568" fill="#9ad8b0" font-size="10">♮</text>
+<line x1="770" y1="580" x2="786" y2="580" stroke="#ff8c5a" stroke-width="2"/>
+<text x="792" y="584" fill="#ff8c5a" font-size="10">♯</text>
+<line x1="770" y1="548" x2="770" y2="360" stroke="#7fb0ff" stroke-width="3"/>
+<line x1="764" y1="360" x2="776" y2="350" stroke="#13110d" stroke-width="6"/>
+<line x1="770" y1="340" x2="770" y2="150" stroke="#7fb0ff" stroke-width="3"/>
+<text x="778" y="260" fill="#7fb0ff" font-size="11">control rod ↑ pillar</text>
+<line x1="750" y1="540" x2="750" y2="150" stroke="#54585f" stroke-width="2"/>
+<line x1="794" y1="430" x2="794" y2="150" stroke="#54585f" stroke-width="2"/>
+<circle cx="770" cy="140" r="6" fill="#2a2d31" stroke="#e0b86e" stroke-width="2"/>
+<line x1="770" y1="140" x2="770" y2="150" stroke="#e0b86e" stroke-width="4"/>
+<line x1="770" y1="140" x2="700" y2="134" stroke="#e0b86e" stroke-width="4"/>
+<path d="M 782,128 A 17 17 0 0 1 785,148" fill="none" stroke="#e0b86e" stroke-width="1.5" marker-end="url(#rot)"/>
+<text x="788" y="126" fill="#e0b86e" font-size="12">bell-crank</text>
+<line x1="700" y1="134" x2="620" y2="134" stroke="#9ad8b0" stroke-width="2" stroke-dasharray="5 4"/>
+<rect x="586" y="128" width="28" height="12" rx="6" fill="url(#steel)" stroke="#eef0f4" stroke-width="0.7"/>
+<circle cx="600" cy="134" r="3" fill="#2a2d31"/>
+<path d="M 610,124 A 13 13 0 0 1 613,142" fill="none" stroke="#c0a0ff" stroke-width="1.4" marker-end="url(#rot)"/>
+<text x="600" y="122" fill="#c0a0ff" font-size="11" text-anchor="middle">disc turns</text>
+<text x="730" y="158" fill="#9ad8b0" font-size="10" text-anchor="middle">neck rod</text>
+<text x="490" y="624" fill="#8a8f98" font-size="11" text-anchor="middle">single cross-over at the pedal tips (Fig 1) · double-action adds the ♯ second notch driving the −y/+y sharp discs</text>
+</svg>

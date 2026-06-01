@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="560" viewBox="0 0 560 560" font-family="Georgia,serif">
+<rect width="560" height="560" fill="#13110d"/>
+<text x="280.0" y="30" fill="#eef0f4" font-size="15" text-anchor="middle">b3 natural disc — stick detail (axle offset off node by prong)</text>
+<line x1="190.7" y1="37.4" x2="272.6" y2="704.4" stroke="#b8924a" stroke-width="5"/>
+<text x="279" y="704" fill="#b8924a" font-size="11">string</text>
+<line x1="280.0" y1="280.0" x2="231.7" y2="370.9" stroke="#9ad8b0" stroke-width="4"/>
+<line x1="280.0" y1="280.0" x2="328.3" y2="189.1" stroke="#b8924a" stroke-width="4"/>
+<line x1="280.0" y1="280.0" x2="548.3" y2="77.8" stroke="#e0b86e" stroke-width="3"/>
+<line x1="280.0" y1="280.0" x2="589.3" y2="411.3" stroke="#e0b86e" stroke-width="3"/>
+<circle cx="280.0" cy="280.0" r="4" fill="#c0a0ff"/>
+<text x="287.0" y="274.0" fill="#c0a0ff" font-size="11">…ta axle</text>
+<circle cx="231.7" cy="370.9" r="4" fill="#9ad8b0"/>
+<text x="238.7" y="364.9" fill="#9ad8b0" font-size="11">…nd node = pitch (lower prong)</text>
+<circle cx="328.3" cy="189.1" r="4" fill="#b8924a"/>
+<text x="335.3" y="183.1" fill="#b8924a" font-size="11">…up upper prong</text>
+<circle cx="548.3" cy="77.8" r="4" fill="#cfd4da"/>
+<text x="555.3" y="71.8" fill="#cfd4da" font-size="11">…ti input</text>
+<circle cx="589.3" cy="411.3" r="4" fill="#cfd4da"/>
+<text x="596.3" y="405.3" fill="#cfd4da" font-size="11">…to output</text>
+<polyline points="333.6,235.0 328.8,229.8 323.5,225.2 317.7,221.0 311.6,217.5 305.1,214.7 298.4,212.5 291.5,211.0 284.5,210.1 277.4,210.0 270.4,210.7 263.4,212.0 256.7,214.0 250.1,216.7 243.9,220.0 238.0,224.0 232.6,228.5 227.6,233.5 223.2,239.1 219.4,245.0" fill="none" stroke="#e0b86e" stroke-width="1.5"/>
+<path d="M 214.9,252.8 L 215.0,242.5 L 223.7,247.5 Z" fill="#e0b86e"/>
+<text x="280" y="202" fill="#e0b86e" font-size="11" text-anchor="middle">engage CCW</text>
+<text x="280" y="540" fill="#8a8f98" font-size="10" text-anchor="middle">green prong reaches the node (pitch); tan prong grabs above; gold = back crank arms</text>
+</svg>

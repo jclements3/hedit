@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="620" viewBox="0 0 980 620" font-family="Georgia,serif">
+<defs>
+<linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6eaef"/><stop offset="1" stop-color="#6a6f78"/></linearGradient>
+<radialGradient id="disc" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#dfe3e9"/><stop offset="1" stop-color="#646973"/></radialGradient>
+<marker id="rot" markerWidth="9" markerHeight="9" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#e0b86e"/></marker>
+<marker id="bl" markerWidth="9" markerHeight="9" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#7fb0ff"/></marker></defs>
+<rect width="980" height="620" fill="#13110d"/>
+<text x="490" y="30" fill="#eef0f4" font-size="16" text-anchor="middle">neck action train — rod slides → cranks rotate all the class discs (slider-crank)</text>
+<text x="150" y="155" fill="#c0a0ff" font-size="12">natural rod (1st notch)</text>
+<rect x="250" y="106" width="600" height="8" rx="3" fill="url(#steel)" stroke="#9aa0a8" stroke-width="0.6"/>
+<circle cx="300" cy="150" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="300" cy="150" r="2.4" fill="#23262b"/>
+<line x1="300" y1="150" x2="292" y2="137" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="292" cy="137" r="2.6" fill="#e0b86e"/>
+<line x1="300" y1="110" x2="292" y2="137" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="300" cy="110" r="2.4" fill="#9aa0a8"/>
+<circle cx="470" cy="150" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="470" cy="150" r="2.4" fill="#23262b"/>
+<line x1="470" y1="150" x2="462" y2="137" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="462" cy="137" r="2.6" fill="#e0b86e"/>
+<line x1="470" y1="110" x2="462" y2="137" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="470" cy="110" r="2.4" fill="#9aa0a8"/>
+<circle cx="640" cy="150" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="640" cy="150" r="2.4" fill="#23262b"/>
+<line x1="640" y1="150" x2="632" y2="137" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="632" cy="137" r="2.6" fill="#e0b86e"/>
+<line x1="640" y1="110" x2="632" y2="137" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="640" cy="110" r="2.4" fill="#9aa0a8"/>
+<circle cx="810" cy="150" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="810" cy="150" r="2.4" fill="#23262b"/>
+<line x1="810" y1="150" x2="802" y2="137" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="802" cy="137" r="2.6" fill="#e0b86e"/>
+<line x1="810" y1="110" x2="802" y2="137" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="810" cy="110" r="2.4" fill="#9aa0a8"/>
+<text x="150" y="345" fill="#ff8c5a" font-size="12">sharp rod (2nd notch)</text>
+<rect x="250" y="296" width="600" height="8" rx="3" fill="url(#steel)" stroke="#9aa0a8" stroke-width="0.6"/>
+<circle cx="300" cy="340" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="300" cy="340" r="2.4" fill="#23262b"/>
+<line x1="300" y1="340" x2="292" y2="327" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="292" cy="327" r="2.6" fill="#e0b86e"/>
+<line x1="300" y1="300" x2="292" y2="327" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="300" cy="300" r="2.4" fill="#9aa0a8"/>
+<circle cx="470" cy="340" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="470" cy="340" r="2.4" fill="#23262b"/>
+<line x1="470" y1="340" x2="462" y2="327" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="462" cy="327" r="2.6" fill="#e0b86e"/>
+<line x1="470" y1="300" x2="462" y2="327" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="470" cy="300" r="2.4" fill="#9aa0a8"/>
+<circle cx="640" cy="340" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="640" cy="340" r="2.4" fill="#23262b"/>
+<line x1="640" y1="340" x2="632" y2="327" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="632" cy="327" r="2.6" fill="#e0b86e"/>
+<line x1="640" y1="300" x2="632" y2="327" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="640" cy="300" r="2.4" fill="#9aa0a8"/>
+<circle cx="810" cy="340" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="810" cy="340" r="2.4" fill="#23262b"/>
+<line x1="810" y1="340" x2="802" y2="327" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="802" cy="327" r="2.6" fill="#e0b86e"/>
+<line x1="810" y1="300" x2="802" y2="327" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="810" cy="300" r="2.4" fill="#9aa0a8"/>
+<text x="490" y="500" fill="#cdd2da" font-size="12" text-anchor="middle">one station, engaged: rod slides Δ → link drives crank pin → disc turns ~60°; spring returns on release</text>
+<text x="120" y="110" fill="#e0b86e" font-size="11">bell-crank</text>
+<circle cx="150" cy="150" r="9" fill="#2a2d31" stroke="#e0b86e" stroke-width="2"/>
+<line x1="150" y1="150" x2="250" y2="110" stroke="#e0b86e" stroke-width="3"/>
+<line x1="150" y1="150" x2="150" y2="200" stroke="#7fb0ff" stroke-width="2.6"/>
+<line x1="150" y1="188" x2="150" y2="202" stroke="#7fb0ff" stroke-width="1.4" marker-end="url(#bl)"/>
+<circle cx="150" cy="340" r="9" fill="#2a2d31" stroke="#e0b86e" stroke-width="2"/>
+<line x1="150" y1="340" x2="250" y2="300" stroke="#e0b86e" stroke-width="3"/>
+<line x1="150" y1="340" x2="150" y2="390" stroke="#7fb0ff" stroke-width="2.6"/>
+<line x1="150" y1="378" x2="150" y2="392" stroke="#7fb0ff" stroke-width="1.4" marker-end="url(#bl)"/>
+<line x1="540" y1="96" x2="600" y2="96" stroke="#c0a0ff" stroke-width="1.6" marker-end="url(#rot)"/><text x="560" y="90" fill="#c0a0ff" font-size="10">slide</text>
+<line x1="540" y1="286" x2="600" y2="286" stroke="#ff8c5a" stroke-width="1.6" marker-end="url(#rot)"/><text x="560" y="280" fill="#ff8c5a" font-size="10">slide</text>
+<polyline points="848,110 852,116 859,104 866,116 873,104 880,116 887,104 894,116 898,110" fill="none" stroke="#9ad8b0" stroke-width="1.6"/>
+<text x="892" y="100" fill="#9ad8b0" font-size="10">return</text>
+<polyline points="848,300 852,306 859,294 866,306 873,294 880,306 887,294 894,306 898,300" fill="none" stroke="#9ad8b0" stroke-width="1.6"/>
+<text x="150" y="585" fill="#8a8f98" font-size="12"></text>
+<rect x="250" y="536" width="600" height="8" rx="3" fill="url(#steel)" stroke="#9aa0a8" stroke-width="0.6"/>
+<circle cx="300" cy="580" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="300" cy="580" r="2.4" fill="#23262b"/>
+<line x1="300" y1="580" x2="307" y2="567" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="307" cy="567" r="2.6" fill="#e0b86e"/>
+<line x1="322" y1="540" x2="307" y2="567" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="322" cy="540" r="2.4" fill="#9aa0a8"/>
+<path d="M 288,568 A 17 17 0 0 1 312,567" fill="none" stroke="#e0b86e" stroke-width="1.4" marker-end="url(#rot)"/>
+<circle cx="470" cy="580" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="470" cy="580" r="2.4" fill="#23262b"/>
+<line x1="470" y1="580" x2="477" y2="567" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="477" cy="567" r="2.6" fill="#e0b86e"/>
+<line x1="492" y1="540" x2="477" y2="567" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="492" cy="540" r="2.4" fill="#9aa0a8"/>
+<path d="M 458,568 A 17 17 0 0 1 482,567" fill="none" stroke="#e0b86e" stroke-width="1.4" marker-end="url(#rot)"/>
+<circle cx="640" cy="580" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="640" cy="580" r="2.4" fill="#23262b"/>
+<line x1="640" y1="580" x2="647" y2="567" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="647" cy="567" r="2.6" fill="#e0b86e"/>
+<line x1="662" y1="540" x2="647" y2="567" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="662" cy="540" r="2.4" fill="#9aa0a8"/>
+<path d="M 628,568 A 17 17 0 0 1 652,567" fill="none" stroke="#e0b86e" stroke-width="1.4" marker-end="url(#rot)"/>
+<circle cx="810" cy="580" r="17" fill="url(#disc)" stroke="#eef0f4" stroke-width="0.8"/>
+<circle cx="810" cy="580" r="2.4" fill="#23262b"/>
+<line x1="810" y1="580" x2="817" y2="567" stroke="#2a2d31" stroke-width="3"/>
+<circle cx="817" cy="567" r="2.6" fill="#e0b86e"/>
+<line x1="832" y1="540" x2="817" y2="567" stroke="#cfd4da" stroke-width="2"/>
+<circle cx="832" cy="540" r="2.4" fill="#9aa0a8"/>
+<path d="M 798,568 A 17 17 0 0 1 822,567" fill="none" stroke="#e0b86e" stroke-width="1.4" marker-end="url(#rot)"/>
+<text x="150" y="585" fill="#8a8f98" font-size="11">ENGAGED</text>
+</svg>

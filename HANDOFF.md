@@ -1,84 +1,56 @@
-# HANDOFF — harp part tracing + hedit image/resize upgrade
+# HANDOFF — clements47_cf harp, continue in hedit
 
-Written 2026-05-30 by the work laptop's Claude. Read this first, then test in the
-browser. Everything below is committed and pushed to `origin/main`
-(`ssh://git@ssh.github.com:443/waveform-jc/hedit.git` — note the **port-443 SSH
-endpoint**, set because plain port-22 SSH times out on the VPN; `git pull` just works).
+Written 2026-06-01 (work machine). Pull this on the **home laptop**, then resume in hedit.
+Remote is `origin` = `ssh://git@ssh.github.com:443/jclements3/hedit.git` (port-443 SSH endpoint,
+set because plain port-22 times out on the VPN); `git pull` just works.
 
-## Goal
-Trace the **gold** and **gray** part outlines out of the CAD frames in `images/`,
-then use hedit to lay each part's photo in the **background** and tweak the
-**outline shapes** (select / resize / node-edit) on top, saving clean part SVGs.
+## Current focus
+Continue the **clements47_cf** design = **erand47**, the 47-string (C1–G7) solid-body electric
+**pedal harp**, **carbon-fiber frame** revision. Edit it in **hedit** (the single-file SVG editor).
 
-## What's DONE
-1. **Repo synced** to the home-laptop version (was 4 commits behind; fast-forwarded).
-2. **Tracer** `images/trace_parts.py` — pure Python (Pillow + numpy, no potrace).
-   Color-keys gold or gray, cleans the mask, contour-traces, RDP-simplifies,
-   writes `<stem>.traced.svg` + a debug mask PNG. Tunables: `--only gold|gray`,
-   `--eps`, `--min-area`, `--close`, `--open`, color thresholds.
-   Run: `python3 trace_parts.py harp_0011.png --only gold --min-area 80 --eps 1.2`
-3. **17 part sprites traced** → `images/harp_XXXX.traced.svg`:
-   - GOLD parts (gold-keyed, clean): 0007 0009 0011 0015 0021 0023 0027 0030
-     0032 0043 1219 1373
-   - SILVER/GRAY parts (re-traced with `--only gray`): 0057 0061 0063 0079
-   - `harp_0080` is a *string-layout render*, not a part — its trace is just the
-     brass pin fittings. Ignore/delete it.
-4. **hedit.html upgraded** (+188 lines, all in one block appended after `loadSample`):
-   - **Background reference image**: header **"Image…"** button → loads a photo as
-     a dimmed `<image>` in a new `#bg` layer behind the content, fits the view to
-     it. **opacity slider** + **"Clear img"** button. The `#bg` layer is OUTSIDE
-     `contentGroup`, so **Save never includes it**. Persists across reload via its
-     own localStorage keys (`hedit:bg:url` / `hedit:bg:wh`), never in the part file.
-   - **Select + resize**: the Select tool (V) now draws **8 white resize handles**
-     around the selection bbox. Drag to scale any shape (rect/ellipse/circle/line/
-     path) about the opposite anchor; **Shift = proportional**. Move + node-edit (N)
-     unchanged.
-   - **"Import…"** button: loads an SVG and APPENDS its shapes on top of the current
-     document (doesn't wipe content or bg; skips the tracer's dark backdrop rect and
-     `<metadata>/<defs>`). Use it to drop a `*.traced.svg` outline onto its photo.
-   - Open/Save of standard-shape SVGs already round-trips.
+> Keep two projects straight: **clements47_cf is the pedal harp** (twin curved-ladder CF frame).
+> It is **NOT** the Paraguayan limaçon-body CF harp (harp.py / paraguayan_core / DP-BP-SP-WP rails).
+> hedit's harp-curve JSON panel (DP/BP/SP/WP) was built for the Paraguayan one and does nothing
+> useful on clements47_cf — here you edit the string `<line>`s and frame/disc geometry directly.
 
-### New code (search hedit.html for these)
-`bgGroup` (decl + created in `buildLayers`), `setBgFromDataURL`, `setBgOpacity`,
-`clearBg`, `restoreBg` (called from `buildLayers`), `loadRefImage`,
-`importSVGFile`/`importSVGText`, `selBBoxUser`, `rzHandles`, `drawResizeHandles`
-(called in `renderOverlay`), `startResize` (called in `onDown`), `resizeMove`
-(called in `onMove`), and the `addRefImageUI` IIFE that injects the toolbar
-buttons next to `#btn-dxf`. Resize finalize is the existing `onUp` (drag=null).
+## Resume here
+1. Serve + open hedit (localStorage/disk-save are reliable over http, flaky on file://):
+   `cd ~/projects/hedit && python3 -m http.server 8000` → open `http://localhost:8000/hedit.html`.
+2. **Open…** (use the picker, not drag-drop, so Ctrl+S saves back in place) → `clements47_cf_profile.svg`.
+3. hedit drops the dark `#13110d` full-canvas backdrop on load (by design) — light strokes look
+   low-contrast on hedit's canvas; that's display-only, not data loss.
 
-## What I VERIFIED
-- `node --check` on the extracted script → **SYNTAX_OK**.
-- `./test-hedit.sh` (headless Chrome, real `loadSVGText`) → **TEST_OK**, boots clean.
-- Saved-SVG path builds from `contentGroup` only (bg image cannot leak into a save).
+## What's DONE this session
+1. **Fixed the string lengths (the big one).** The generator had clobbered the real measured
+   C1→G7 scale with `L = np.linspace(1514.93,60.61,47)` — a straight ramp wrong by up to **310 mm**,
+   which rendered the soundboard as a straight-edged triangle. Restored the **real lengths from
+   `strings.svg`** (the canonical harp reference: 47 `data-len` values, irregular taper) in BOTH
+   the `clements47_cf.md` §2 table and the §7 generator, and regenerated `clements47_cf_profile.svg`.
+   Verified per-string accurate to **0.02 mm**; still loads clean in hedit (190 objects, 47 lines).
+   - **Do NOT re-linearize `L`.** If the strings ever look like a straight taper again, this bug is back.
+   - `erand47_design.py` (repo root) is the standalone fixed generator, consistent with §7
+     (`python3 erand47_design.py` → writes the profile SVG + prints the BOM; needs numpy).
+2. **Ported the erand47 stainless session** into `erand47/` (design record `clements47.md`,
+   generators, the pedal/bell-crank/linkage **bone skeleton** `erand47_bones.svg`, parts library).
+3. **Traced the bellcrank reference parts** → `trace_parts.py` + `parts/bellcrank_svg/`
+   (5 gold parts + 4 gray rods as fitted bezier outlines; see that folder's `_overview.svg`).
 
-## What I could NOT verify — DO THIS AT HOME
-The work-laptop environment was unstable (dropped/corrupted tool output), so I did
-**no interactive click-testing**. Please smoke-test the real workflow:
-1. Open `hedit.html` (or `python3 -m http.server` then load it — localStorage is more
-   reliable over http than file://).
-2. **Image…** → pick `images/harp_0011.png`. Confirm it appears dimmed in the
-   background and the view fits it. Try the opacity slider + **Clear img**.
-3. **Import…** → `images/harp_0011.traced.svg`. The outline should drop on top.
-4. **V** (Select) → click a shape → drag the white corner/edge handles to resize
-   (Shift for proportional); drag the body to move. **N** → tweak bezier nodes.
-5. **Ctrl+S** → save. Re-open the saved file and confirm the shapes round-trip and
-   the background image is NOT in it.
-6. Run `./test-hedit.sh` to confirm the headless smoke test still passes.
+## Open / TODO
+- **Tension schedule is still linear** (`TENSION_LBF = linspace(...)`) — looked intentional; only
+  lengths were flagged wrong. Decide if tension should follow a real schedule too.
+- **Mechanism is not yet in the CF design.** The pedal/column/bell-crank/linkage actuation lives
+  in the *stainless* session (`erand47/erand47_bones.svg`, `erand47/parts.py`). Porting it onto the
+  CF frame is the next big step (stainless handoff TODO #2/#3 in `erand47/HANDOFF.md`:
+  re-add `build_class_bones`/`draw_bones` with per-string `PC`, then assemble the real relay).
+- **Pin/axle holes** in the traced bellcrank parts are outer-silhouette only (no inner cutouts).
 
-## Known gaps / next steps (optional)
-- **Pin/axle holes**: tracer emits only the OUTER silhouette; bolt/axle circles are
-  not cut as inner holes. Add an inner-contour pass to `trace_parts.py` if wanted.
-- **DXF export** of corrected outlines: hedit has a DXF button; not verified on these
-  parts.
-- **Only the 17 clean sprites are traced.** The ~1440 full Fusion screenshots in
-  `images/` are cluttered (UI chrome, multiple parts) — not worth tracing without
-  cropping first.
-- Debug masks (`*.gold.png` / `*.gray.png`) are git-ignored (see `.gitignore`); they
-  regenerate on each tracer run.
-
-## File map
-- `hedit.html` — the editor (the upgrade).
-- `images/trace_parts.py` — the tracer.
-- `images/harp_*.traced.svg` — the 17 traced part outlines (the deliverable).
-- `images/harp_*.png` — clean part sprites (good trace/background targets).
-- `images/harp_*.jpg` — full source frames (~1440; reference only).
+## File map (repo root)
+- `hedit.html` — the editor.
+- `clements47_cf.md` — CF design record (§2 string table, §7 runnable generator, §8 geometry).
+- `clements47_cf_profile.svg` — **the working file** (open in hedit). `…_profile.png` — preview.
+- `erand47_design.py` — standalone fixed CF generator.
+- `strings.svg` — canonical harp string reference (the authoritative C1→G7 lengths/diameters).
+- `erand47/` — ported stainless session + mechanism skeleton + `erand47/HANDOFF.md`.
+- `trace_parts.py`, `parts/bellcrank*`, `parts/bellcrank_svg/` — bellcrank part tracing.
+- Take-home tarball also lives at `~/Downloads/clements47_cf_hedit_session.tar.gz` (self-contained
+  copy: hedit.html + the CF files + this kind of handoff), if you prefer that over `git pull`.
