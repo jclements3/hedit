@@ -84,7 +84,7 @@ L = grommet_y − pin_y · tension schedule linear C1→G7 · ΣT = **1496 lbf =
 |43|C7  |61.1  |14.60  |65.0 |0.635 |13.6    |
 |44|D7  |45.5  |13.70  |60.9 |0.635 |13.6    |
 |45|E7  |30.3  |12.79  |56.9 |0.635 |13.6    |
-|46|F7  |15.6  |11.88  |52.9 |0.635 |13.6    |
+|46|F7  |75.0  |11.88  |52.9 |0.635 |13.6    |
 |47|G7  |60.6  |10.98  |48.8 |0.635 |13.6    |
 
 -----
@@ -180,14 +180,15 @@ RHO_BRASS          = 8.5e-3      # wear shoes / eyelets only
 # AUTHORITATIVE length scale (matches erand47_profile_v2.svg). Avoid two earlier regressions:
 # (a) np.linspace(1514.93,60.61,N) -- a straight ramp; (b) strings.svg lengths (1514.9,1489.7,...) --
 # that is the *Paraguayan* harp, a different instrument. The treble tail is non-monotonic
-# (F7=15.59 then G7=60.61); preserved verbatim (15.59 mm looks unphysical -- open data-check item).
+# archive F7 was 15.59 mm (unphysical); corrected to 75.0 per the measured value (user 2026-06-01).
+# Very top still non-monotonic (D7=45.5, E7=30.3 < F7=75 > G7=60.6) -- pending real D7/E7/G7.
 L = np.array([
  1514.93,1448.69,1384.93,1323.57,1264.50,1207.63,1152.87,1100.13,
  1049.33,1000.39,953.23,907.78,863.97,821.73,781.00,741.71,
  703.81,667.24,631.95,597.88,564.99,533.23,502.55,472.91,
  444.27,416.59,389.82,363.94,338.90,314.68,291.24,268.55,
  246.58,225.31,204.70,184.74,165.39,146.64,128.46,110.83,
- 93.74,77.15,61.06,45.45,30.30,15.59,60.61])
+ 93.74,77.15,61.06,45.45,30.30,75.0,60.61])
 assert L.size==N_STRINGS, "L must have N_STRINGS entries"
 TENSION_LBF = np.linspace(52.693,10.976,N_STRINGS)              # linear tension schedule
 DIA = np.array([1.676,1.549,1.448,1.270,1.219,1.219,1.016,1.016,0.914,2.642,2.489,2.337,

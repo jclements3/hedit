@@ -37,11 +37,20 @@ Edit it in **hedit**.
    Note: the zip's §2 *table* still showed the linear ramp while its generator/profile used the
    archive — I synced that table to the archive so the doc is self-consistent.
 
-## OPEN ITEM — needs your call (data check)
-The archive's treble tail is **non-monotonic and likely a typo**: F7 = **15.59 mm**, then G7 = 60.61 mm.
-A 15.6 mm vibrating string is unphysical. I preserved the archive **verbatim** (didn't silently
-"fix" it). The corrected profile therefore comes to a sharp treble point. Tell me the right F7 value
-(it should probably continue the taper, ~75 mm) and I'll patch the archive + regenerate.
+## Also done since
+4. **F7 corrected to 75 mm** (was the unphysical 15.59) per your measured value — in the §2 table,
+   the §7 generator, `erand47_design.py`, and the regenerated profile + the hedit string loader.
+5. **hedit #1 Strings card → "Load erand47 strings" button** (`loadErand47Strings`): lays down the
+   47 archive strings (C1..G7 lengths + diameters, F7=75), vertical and air-gap spaced on the x=0
+   axis, tagged with the harp data-* schema. Replaces existing strings, preserves other content.
+6. **Hi-res bellcrank parts** (`files (8).zip`) traced cleanly → `parts/bellcrank_svg/arm_top_left.svg`,
+   `yoke_mid_left.svg`, `arm_bottom_left.svg` (sources in `parts/bellcrank_hires/`, `trace_bellcrank_hires.py`).
+
+## OPEN ITEM — still needs your call (treble is non-monotonic)
+Setting F7=75 alone leaves the very top non-monotonic: **D7=45.5, E7=30.3 < F7=75 > G7=60.6** — so the
+profile shows a small hook at the treble tip. If the real treble bottoms out near ~60–75 mm (likely),
+then D7/E7/G7 (maybe C7) are also wrong in the archive. Give me the real top lengths and I'll fix the
+whole tail to a clean monotonic taper + regenerate.
 
 ## Other open / TODO
 - **Tension** is still a linear schedule (`TENSION_LBF = linspace(...)`) — looked intentional; confirm.

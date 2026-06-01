@@ -33,15 +33,15 @@ RHO_BRASS          = 8.5e-3      # wear shoes / eyelets only
 # This is the AUTHORITATIVE length scale (confirmed against erand47_profile_v2.svg). Two earlier
 # regressions to avoid: (a) np.linspace(1514.93,60.61,N) -- a straight ramp; (b) substituting
 # strings.svg lengths (1514.9,1489.7,...) -- those are the *Paraguayan* harp, a different instrument.
-# NB: the treble tail is non-monotonic (F7=15.59 then G7=60.61); preserved verbatim from the archive
-# (15.59 mm looks unphysical -- flagged as an open data-check item, not silently "fixed").
+# NB: archive F7 was 15.59 mm (unphysical); corrected to 75.0 per the measured value (user 2026-06-01).
+# The very top is still non-monotonic (D7=45.5, E7=30.3 < F7=75 > G7=60.6) -- pending real D7/E7/G7.
 L = np.array([
  1514.93,1448.69,1384.93,1323.57,1264.50,1207.63,1152.87,1100.13,
  1049.33,1000.39,953.23,907.78,863.97,821.73,781.00,741.71,
  703.81,667.24,631.95,597.88,564.99,533.23,502.55,472.91,
  444.27,416.59,389.82,363.94,338.90,314.68,291.24,268.55,
  246.58,225.31,204.70,184.74,165.39,146.64,128.46,110.83,
- 93.74,77.15,61.06,45.45,30.30,15.59,60.61])
+ 93.74,77.15,61.06,45.45,30.30,75.0,60.61])
 assert L.size==N_STRINGS, "L must have N_STRINGS entries"
 TENSION_LBF = np.linspace(52.693,10.976,N_STRINGS)              # linear tension schedule
 DIA = np.array([1.676,1.549,1.448,1.270,1.219,1.219,1.016,1.016,0.914,2.642,2.489,2.337,
