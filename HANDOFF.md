@@ -17,40 +17,41 @@ Edit it in **hedit**.
 2. **Open…** (picker, not drag-drop, so Ctrl+S saves in place) → `clements47_cf_profile.svg`.
 3. hedit drops the dark backdrop on load (by design) — light strokes look low-contrast; display-only.
 
-## What I did this session (unattended)
-1. **Corrected the string lengths — for real this time.** The authoritative scale is the **erand47
-   archive** array (`L = np.array([1514.93, 1448.69, …])`), confirmed by your `erand47_profile_v2.svg`.
-   - My *previous* "fix" had used `strings.svg` lengths (1514.9, 1489.7, …) — that's the **Paraguayan**
-     harp, a different instrument, off by ~82 mm mean / 279 mm max. **That wrong version was committed
-     and pushed earlier; this commit corrects it.**
-   - Fixed in `clements47_cf.md` §2 table + §7 generator and standalone `erand47_design.py`.
-     Regenerated `clements47_cf_profile.svg` (verified per-string to 0.011 mm vs the archive).
-   - **Do NOT** re-introduce either regression: not `np.linspace(...)` (a straight ramp), not
-     `strings.svg` (the wrong harp).
-2. **Reduced §4 (structural analysis, CF)** to the solver-independent core: material-independent loads
-   (6655 N closing / 811 N shear), the E-ratio deflection re-size (193/135 = 1.43× → bar height ×1.127,
-   ends 18.8 / peak 91.4 mm), trivial stress, ILSS/lacing notes, and an honest caveat that the full
-   frame-FE solver isn't in the repo (§7 hardcodes the SS profile, scaled ×1.127). Dropped the
-   overstated per-item FE table. BOM updated: bare ≈ 2.56 kg, rigged ≈ 5.0 kg.
-3. **Landed your latest zip** (`files (6).zip`) as the stainless reference and fixed its bug:
-   `erand47/clements47.md` (replaced the still-buggy repo copy) + `erand47/erand47_profile_v2.svg`.
-   Note: the zip's §2 *table* still showed the linear ramp while its generator/profile used the
-   archive — I synced that table to the archive so the doc is self-consistent.
+## String lengths — SETTLED (read this; it went back and forth)
+**Authoritative source = the ORIGINAL Érard scale = `strings.svg`.** "erand47" is named after Érard.
+The real 47-string scale is at **harpcanada.com/harpmaking/erard.htm** (lengths in inches; ×25.4 → mm)
+and is **identical to `strings.svg`** (verified to 0.0 mm): monotonic **C1 = 1514.9 … G7 = 60.6 mm**,
+shortest two **F7 = 70.7, G7 = 60.6**.
 
-## Also done since
-4. **F7 corrected to 75 mm** (was the unphysical 15.59) per your measured value — in the §2 table,
-   the §7 generator, `erand47_design.py`, and the regenerated profile + the hedit string loader.
-5. **hedit #1 Strings card → "Load erand47 strings" button** (`loadErand47Strings`): lays down the
-   47 archive strings (C1..G7 lengths + diameters, F7=75), vertical and air-gap spaced on the x=0
-   axis, tagged with the harp data-* schema. Replaces existing strings, preserves other content.
-6. **Hi-res bellcrank parts** (`files (8).zip`) traced cleanly → `parts/bellcrank_svg/arm_top_left.svg`,
-   `yoke_mid_left.svg`, `arm_bottom_left.svg` (sources in `parts/bellcrank_hires/`, `trace_bellcrank_hires.py`).
+**Three corrupt sources — never use for lengths:**
+1. `np.linspace(1514.93, 60.61, 47)` — a straight ramp (the original bug).
+2. the **"erand47 archive"** array `[1514.93, 1448.69, …, 15.59, 60.61]` from `files (6).zip` — its
+   treble is garbage (15–45 mm stub strings; F7/G7 scrambled), off by up to **279 mm**.
+3. `erand47_profile_v2.svg` — generated from that bad archive, so equally wrong (it has a 7.8 mm string).
 
-## OPEN ITEM — still needs your call (treble is non-monotonic)
-Setting F7=75 alone leaves the very top non-monotonic: **D7=45.5, E7=30.3 < F7=75 > G7=60.6** — so the
-profile shows a small hook at the treble tip. If the real treble bottoms out near ~60–75 mm (likely),
-then D7/E7/G7 (maybe C7) are also wrong in the archive. Give me the real top lengths and I'll fix the
-whole tail to a clean monotonic taper + regenerate.
+History (so it isn't repeated): I first fixed it with strings.svg (correct), then wrongly switched to
+the archive when `files (6).zip` was called "latest", briefly set F7=75 — then the Érard page proved
+strings.svg right. **Now fixed back to the Érard/strings.svg scale** in `clements47_cf.md` §2 + §7,
+`erand47_design.py`, and the hedit loader. Profile regenerated (clean monotonic taper, no treble hook).
+
+## Other work this session
+- **hedit #1 Strings card → "Load erand47 strings"** (`loadErand47Strings`): lays down the 47 Érard
+  strings (C1..G7, monotonic), vertical and air-gap spaced on the x=0 axis, tagged with the harp
+  data-* schema. Replaces existing strings, preserves other content. *Pose note:* these are the bare
+  step-1 strings (flat-topped, vertical) — rake (7°) and the neck-curve top come from the later
+  pipeline steps (align / curves / transform), not from this button.
+- **§4 structural analysis (CF) reduced** to the solver-independent core (loads 6655 N / 811 N shear;
+  E-ratio re-size 193/135 → bar height ×1.127, ends 18.8 / peak 91.4 mm; trivial stress; honest
+  "FE solver not in repo" caveat). BOM ≈ 2.5 kg bare / 4.9 kg rigged.
+- **Hi-res bellcrank parts** (`files (8).zip`) traced → `parts/bellcrank_svg/arm_top_left.svg`,
+  `yoke_mid_left.svg`, `arm_bottom_left.svg` (sources in `parts/bellcrank_hires/`).
+
+## OPEN ITEMS
+- **Diameters** differ across sources: the generator `DIA` (C1≈1.676 mm) ≠ `strings.svg` data-dia
+  (C1≈0.508) ≠ the Érard page gauges (c1 = 0.091″ = 2.31 mm). Lengths are now settled; **diameters are
+  not** — tell me which gauge set is real and I'll align them (they affect spacing + stroke width).
+- `erand47/clements47.md` and `erand47/erand47_profile_v2.svg` are still the **corrupt-archive**
+  stainless versions — left as-is (reference only); regenerate from the Érard scale if you want them.
 
 ## Other open / TODO
 - **Tension** is still a linear schedule (`TENSION_LBF = linspace(...)`) — looked intentional; confirm.

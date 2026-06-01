@@ -2539,10 +2539,12 @@ function selectAllStrings(){
   setStatus(`${lines.length} strings selected.`);
 }
 
-// --- original erand47 string set (archive C1..G7 lengths + diameters) -------------
-// L: erand47 archive StringSpec lengths (mm), F7 corrected 15.59 -> 75 (measured value).
+// --- original Erard 47-string set (C1 bass .. G7 treble) --------------------------
+// ERAND47_L: the ORIGINAL Erard string scale in mm (harpcanada.com/harpmaking/erard.htm,
+// inches x 25.4) -- identical to strings.svg, monotonic C1=1514.9 .. G7=60.6 (shortest).
+// NOT the corrupt "archive"/profile_v2 treble (which had 15-45 mm stub strings).
 // DIA: per-string overall diameters (mm). Tension is the linear 52.693 -> 10.976 lbf schedule.
-const ERAND47_L = [1514.93,1448.69,1384.93,1323.57,1264.50,1207.63,1152.87,1100.13,1049.33,1000.39,953.23,907.78,863.97,821.73,781.00,741.71,703.81,667.24,631.95,597.88,564.99,533.23,502.55,472.91,444.27,416.59,389.82,363.94,338.90,314.68,291.24,268.55,246.58,225.31,204.70,184.74,165.39,146.64,128.46,110.83,93.74,77.15,61.06,45.45,30.30,75.0,60.61];
+const ERAND47_L = [1514.9,1489.7,1464.4,1439.2,1408.9,1378.6,1348.3,1318.0,1282.6,1242.2,1222.0,1186.7,1110.9,1055.4,989.8,924.1,863.5,792.8,732.2,666.6,621.1,570.6,525.2,484.8,449.4,414.1,383.8,353.5,328.2,303.0,277.7,262.6,237.3,222.2,207.0,191.9,176.7,161.6,146.4,131.3,121.2,111.1,101.0,90.9,80.8,70.7,60.6];
 const ERAND47_DIA = [1.676,1.549,1.448,1.270,1.219,1.219,1.016,1.016,0.914,2.642,2.489,2.337,2.184,2.057,2.057,1.930,1.676,1.676,1.549,1.549,1.270,1.270,1.270,1.143,1.143,1.143,1.016,1.016,1.016,0.914,0.914,0.914,0.813,0.813,0.813,0.813,0.762,0.762,0.762,0.711,0.711,0.660,0.635,0.635,0.635,0.635,0.635];
 const ERAND47_STRING_COLOR = "#7d7762";
 function erand47NoteName(i){ return "cdefgab"[i % 7] + (1 + Math.floor(i / 7)); }
