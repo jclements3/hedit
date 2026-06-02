@@ -3516,11 +3516,11 @@ function fitLadderFrame(){
 }
 
 // ===== Guitar tuners at the neck top (Thingiverse 6099101, CC-BY-NC) =================
-// Ø15.4 gear-post footprint per string, placed above each string TOP along the string's own
-// (raked) up-direction. The Ø15.4 post can't fit at the ~13 mm string pitch, so the twin-plate
-// neck alternates tuners front/back: ODD strings -> near row (front plate, orange), EVEN -> far
-// row (back plate, blue). Each row then sits at ~2x pitch so the posts clear. <circle data-role
-// ="tuner">, so string ops / air-gap / alignment / the harp model all ignore them.
+// Ø15.4 gear-post footprint per string, mounted ON TOP of the neck rail (the ladder's outer edge),
+// NOT inside the plate gap: offset off the neck centreline along its OUTWARD normal by H/2 (bar
+// half-height) + R. The Ø15.4 post can't fit at the ~13 mm pitch, so the twin-plate neck alternates
+// front/back: ODD -> near row (front plate, orange), EVEN -> far row (back plate, blue), each row at
+// ~2x pitch. <circle data-role="tuner">, so string ops / air-gap / alignment / harp model ignore them.
 const TUNER_OD = 15.4;
 function placeTuners(){
   const strings = stringLines();
@@ -3529,15 +3529,20 @@ function placeTuners(){
   contentGroup.querySelectorAll('[data-role="tuner"]').forEach(e => e.remove());   // idempotent
   const S = strings.map(l => ({ ends: stringEnds(l), num: +l.getAttribute("data-num") || 0 }))
                    .sort((a, b) => a.num - b.num);
-  const R = TUNER_OD / 2;
-  for(const s of S){
-    const top = s.ends.top, bot = s.ends.bot;
-    let ux = top[0]-bot[0], uy = top[1]-bot[1]; const m = Math.hypot(ux, uy) || 1; ux /= m; uy /= m;  // up = away from the soundboard
-    const odd = (s.num % 2) === 1;
-    const dist = R + 2 + (odd ? 0 : TUNER_OD + 2);            // odd = near row, even = far row (two-plate parity offset)
+  const R = TUNER_OD / 2, n = S.length;
+  // field centre (toward the strings) so the neck's OUTWARD normal points up off the bar
+  let cx0 = 0, cy0 = 0; for(const s of S){ cx0 += (s.ends.top[0]+s.ends.bot[0])/2; cy0 += (s.ends.top[1]+s.ends.bot[1])/2; } cx0 /= n; cy0 /= n;
+  for(let i = 0; i < n; i++){
+    const top = S[i].ends.top, ref = (S[i+1] || S[i-1]).ends.top, sgn = S[i+1] ? 1 : -1;
+    let tx = (ref[0]-top[0])*sgn, ty = (ref[1]-top[1])*sgn; const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;  // neck tangent (row of tops)
+    let nx = -ty, ny = tx;                                    // neck normal -> orient OUTWARD (off the bar, away from strings)
+    if((top[0]+nx-cx0)**2+(top[1]+ny-cy0)**2 < (top[0]-nx-cx0)**2+(top[1]-ny-cy0)**2){ nx = -nx; ny = -ny; }
+    const odd = (S[i].num % 2) === 1;
+    const H = barHeightAt(i/(n-1));                           // bar height here -> tuner sits on the neck rail's OUTER edge
+    const dist = H/2 + R + 2 + (odd ? 0 : TUNER_OD + 2);      // ON TOP of the ladder; odd=near/front, even=far/back
     const c = document.createElementNS(SVGNS, "circle");
-    c.setAttribute("data-role", "tuner"); c.setAttribute("data-num", String(s.num));
-    c.setAttribute("cx", fmt(top[0] + ux*dist)); c.setAttribute("cy", fmt(top[1] + uy*dist)); c.setAttribute("r", fmt(R));
+    c.setAttribute("data-role", "tuner"); c.setAttribute("data-num", String(S[i].num));
+    c.setAttribute("cx", fmt(top[0] + nx*dist)); c.setAttribute("cy", fmt(top[1] + ny*dist)); c.setAttribute("r", fmt(R));
     c.setAttribute("fill", odd ? "#e08a3c" : "#3a6fd4"); c.setAttribute("fill-opacity", "0.55");
     c.setAttribute("stroke", odd ? "#a85a16" : "#1d3f82"); c.setAttribute("stroke-width", "0.6");
     contentGroup.appendChild(c);
