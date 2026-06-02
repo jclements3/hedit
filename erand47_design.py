@@ -29,6 +29,16 @@ SB_RUNG_OD         = 8.0         # CF rod; BRASS EYELET drilled to string OD; st
 RHO_CF             = 1.55e-3     # g/mm^3  CF/epoxy (was 8.0e-3 SS)
 RHO_BRASS          = 8.5e-3      # wear shoes / eyelets only
 
+# ----- clements47 revision: wooden eyelet (sb, unchanged) PASSES string through; the
+# string then runs a dead-tail L_TAIL to a CF ANCHOR where it KNOTS. The CF frame carries
+# the full axial tension; the wood carries only the perpendicular break-angle down-bearing.
+BREAK_ANGLE_DEG    = 12.0        # constant break angle at every wooden eyelet (tuning knob)
+L_TAIL_MM          = 30.0        # wooden eyelet -> CF anchor dead-tail length, mm
+CHAMBER_DEPTH_BASS = 95.0        # wooden sound-chamber max depth into +y at the bass, mm
+CHAMBER_DEPTH_TREB = 18.0        # ... tapering to a shallow depth at the treble, mm
+CHAMBER_WIDTH_BASS = 150.0       # chamber half-width (across the string band) at bass, mm
+CHAMBER_WIDTH_TREB = 35.0        # ... tapering narrow at the treble, mm
+
 # ----- string lengths: the ORIGINAL Erard 47-string scale (C1 bass .. G7 treble), mm, data-num 1..47.
 # Source: harpcanada.com/harpmaking/erard.htm (Erard lengths in inches x 25.4) -- IDENTICAL to
 # strings.svg (verified to 0.0 mm). Monotonic C1=1514.9 .. G7=60.6; shortest two F7=70.7, G7=60.6.
@@ -101,6 +111,22 @@ def cap(xe,z0,z3,m0,m3,sg,bow):
         if ex>=bow: break
     return cubic(P0,P0+h*d0,P3+h*d3,P3)
 INNER_BOW = INNER_BOW_GAPS*AIR_GAP_MM
+
+# --- clements47: RELOCATE the lower (soundboard) CF ladder down to the ANCHOR curve.
+# In UNRAKED coords the speaking strings are vertical: s_hat=(0,-1) points from neck to
+# the wooden eyelet (down, away from the neck). The anchor sits L_TAIL*cos(b) further
+# down in z (the in-profile drop) and is kicked L_TAIL*sin(b) into +y depth (depth view
+# only). Dropping the SB/ST edges by that same dz opens room for the wooden chamber and
+# moves the whole lower CF bar onto the anchor curve.
+def break_angle(i):  return BREAK_ANGLE_DEG                       # deg, per-string (taperable)
+_b = radians(BREAK_ANGLE_DEG)
+def anchor_offset(i):                                            # (along s_hat, perp n_hat) mm
+    bi = radians(break_angle(i)); return (L_TAIL_MM*cos(bi), L_TAIL_MM*sin(bi))
+DZ_DROP = L_TAIL_MM*cos(_b)        # in-profile z drop (eyelet -> anchor), mm
+D_KICK  = L_TAIL_MM*sin(_b)        # depth kick into +y (anchor straddle), mm
+SB = SB - DZ_DROP                  # relocate outer soundboard edge onto anchor curve
+ST = ST - DZ_DROP                  # relocate inner soundboard edge onto anchor curve
+
 g7={k:slope(xv,v,'hi') for k,v in dict(NT=NT,NB=NB,ST=ST,SB=SB).items()}
 c1={k:slope(xv,v,'lo') for k,v in dict(NT=NT,NB=NB,ST=ST,SB=SB).items()}
 G7o=cap(xc[-1],NT[-1],SB[-1],g7['NT'],g7['SB'],1,SHOULDER_OUTER_BOW)
@@ -117,27 +143,112 @@ def rake(P): P=np.atleast_2d(P); return np.column_stack([P[:,0]/Cs-P[:,1]*Sn, P[
 Ro=rake(outer); Ri=rake(inner)
 neck=rake(np.column_stack([xc,ztip])); sb=rake(np.column_stack([xc,-ztip]))
 
-# ============================== 7. SVG =========================================
+# ============================== 6b. clements47 CF ANCHORS ======================
+# T per string (Newtons): the CF frame takes the FULL axial tension; the wood takes
+# only the perpendicular break-angle down-bearing F_db = 2*T*sin(b/2).
+T = TENSION_LBF*LB2N
+def down_bearing(i):                                            # Newtons onto the wood at eyelet i
+    return 2.0*T[i]*sin(radians(break_angle(i))/2.0)
+def place_cf_anchors():
+    # Build the CF anchor curve from the (unchanged) wooden eyelet curve `sb`.
+    # In-profile (z-x): drop each eyelet by DZ_DROP along the straight string continuation
+    # (s_hat=(0,-1) in unraked coords -> after rake the strings tilt, so follow neck->sb).
+    # Depth (y): kick by D_KICK into +y. Returns (anchor_profile[47,2], depth_y[47]).
+    s = sb - neck                                               # neck->eyelet (string) vectors
+    shat = s/np.hypot(s[:,0],s[:,1])[:,None]                    # unit straight-through dirs
+    along = anchor_offset(0)[0]                                 # L_TAIL*cos(b), same for all (constant b)
+    anc = sb + shat*along                                       # in-profile anchor (z-x) on CF
+    depth = np.full(N_STRINGS, D_KICK)                          # +y kick, depth-view only
+    return anc, depth
+anchor, anchor_y = place_cf_anchors()
+# CF backing rib: a thin band hugging the wooden eyelet line (spreads point loads into CF).
+RIB_T = 6.0                                                     # rib thickness in z, mm
+rib_dir = (sb-neck); rib_dir = rib_dir/np.hypot(rib_dir[:,0],rib_dir[:,1])[:,None]
+rib_in  = sb - rib_dir*1.0                                      # just behind eyelet (toward anchor)
+rib_out = sb - rib_dir*(1.0+RIB_T)
+
+# ============================== 7. SVG (profile + depth/iso) ===================
 S=0.5; MX=MY=80
-allp=np.vstack([Ro,Ri,neck,sb]); x0,x1=allp[:,0].min(),allp[:,0].max(); z0,z1=allp[:,1].min(),allp[:,1].max()
-WD=int((x1-x0)*S)+2*MX; HT=int((z1-z0)*S)+2*MY
+# --- bounds over the PROFILE (z-x) geometry, now including the dropped anchor/tails.
+allp=np.vstack([Ro,Ri,neck,sb,anchor]); x0,x1=allp[:,0].min(),allp[:,0].max(); z0,z1=allp[:,1].min(),allp[:,1].max()
+PW=int((x1-x0)*S)+2*MX; PH=int((z1-z0)*S)+2*MY
 X=lambda x:(x-x0)*S+MX; Z=lambda z:(z1-z)*S+MY
 dof=lambda p:" ".join("%.2f,%.2f"%(X(q[0]),Z(q[1])) for q in p)
-out=[f'<svg xmlns="http://www.w3.org/2000/svg" width="{WD}" height="{HT}" viewBox="0 0 {WD} {HT}">']
-out.append('<defs><linearGradient id="st" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8ccd3"/><stop offset=".5" stop-color="#9094a0"/><stop offset="1" stop-color="#54585f"/></linearGradient></defs>')
-out.append(f'<rect width="{WD}" height="{HT}" fill="#13110d"/>')
+
+out=[]   # PROFILE panel content (translated into the combined SVG below)
+out.append('<text x="%.1f" y="28" fill="#cdd2da" font-family="sans-serif" font-size="20">clements47 - PROFILE (z-x): wooden eyelets unchanged; lower CF ladder relocated to the anchor curve</text>'%MX)
+# tail strings: from each wooden eyelet to its CF anchor knot (red) -- carries the axial T
+for i in range(N_STRINGS):
+    out.append(f'<line x1="{X(sb[i,0]):.2f}" y1="{Z(sb[i,1]):.2f}" x2="{X(anchor[i,0]):.2f}" y2="{Z(anchor[i,1]):.2f}" stroke="#ff5a4d" stroke-width="1.1"/>')
+# speaking strings: neck -> wooden eyelet (UNCHANGED -> pitch unchanged)
 for i in range(N_STRINGS):
     w=max(DIA[i]*S*4,1.0)
     out.append(f'<line x1="{X(neck[i,0]):.2f}" y1="{Z(neck[i,1]):.2f}" x2="{X(sb[i,0]):.2f}" y2="{Z(sb[i,1]):.2f}" stroke="#7d7762" stroke-width="{w:.2f}" stroke-linecap="round"/>')
+# CF frame (lower ladder now sits on the relocated anchor curve)
 out.append(f'<path d="M {dof(Ro)} Z M {dof(Ri)} Z" fill="url(#st)" fill-rule="evenodd" stroke="#ff9e6b" stroke-width="1.6"/>')
+# CF backing rib under the wooden eyelets (spreads per-eyelet loads into the frame)
+out.append(f'<path d="M {dof(rib_in)} L {dof(rib_out[::-1])} Z" fill="#3a6a8c" fill-opacity="0.55" stroke="#7fb7da" stroke-width="0.8"/>')
+# wooden eyelet curve (the OLD soundboard-tip curve), unchanged, drawn as the wood line
+out.append(f'<polyline points="{dof(sb)}" fill="none" stroke="#caa15a" stroke-width="2.2"/>')
 rN=NECK_RUNG_OD/2
 for i in range(N_STRINGS):
     nk=neck[i]+np.array([(DIA[i]/2+rN)*Cs,(DIA[i]/2+rN)*Sn])      # tangent @9 o'clock
     out.append(f'<circle cx="{X(nk[0]):.2f}" cy="{Z(nk[1]):.2f}" r="{rN*S:.2f}" fill="#6ee0a0"/>')
-    out.append(f'<circle cx="{X(sb[i,0]):.2f}" cy="{Z(sb[i,1]):.2f}" r="{SB_RUNG_OD/2*S:.2f}" fill="#e0b86e"/>')
+    # wooden eyelet (string PASSES THROUGH, no knot): brass-colored ring + bore
+    out.append(f'<circle cx="{X(sb[i,0]):.2f}" cy="{Z(sb[i,1]):.2f}" r="{SB_RUNG_OD/2*S:.2f}" fill="none" stroke="#e0b86e" stroke-width="1.3"/>')
     out.append(f'<circle cx="{X(sb[i,0]):.2f}" cy="{Z(sb[i,1]):.2f}" r="{max(DIA[i]/2*S,.6):.2f}" fill="#13110d"/>')
-out.append('</svg>')
-open("erand47.svg","w").write("\n".join(out))
+    # CF anchor knot (string KNOTS here; CF takes the axial tension)
+    out.append(f'<circle cx="{X(anchor[i,0]):.2f}" cy="{Z(anchor[i,1]):.2f}" r="2.0" fill="#ff5a4d"/>')
+
+# ===== DEPTH / ISO panel (string axis vs depth y): eyelet at y=0, tail kicked d into +y,
+# tapered wooden chamber bulging into +y (deep+wide bass, shallow treble, soundhole back).
+# Use the spacing axis x (station) as horizontal, depth y as vertical (+y = into page, down).
+dep=[]
+DS=0.6; DMX=80; DMY=80
+# along-string profile per string: speaking string is at depth y=0 over its whole length;
+# the tail kicks from y=0 (eyelet) to y=D_KICK (anchor). We render depth(y) vs station x.
+# chamber depth taper across the band (bass station xc[0] deep -> treble xc[-1] shallow):
+def chamber_depth(xstat):
+    f=(xstat-xc[0])/(xc[-1]-xc[0])                              # 0 at bass .. 1 at treble
+    return CHAMBER_DEPTH_BASS + (CHAMBER_DEPTH_TREB-CHAMBER_DEPTH_BASS)*f
+def chamber_halfwidth(xstat):
+    f=(xstat-xc[0])/(xc[-1]-xc[0])
+    return CHAMBER_WIDTH_BASS + (CHAMBER_WIDTH_TREB-CHAMBER_WIDTH_BASS)*f
+xs=xc; depth_prof=np.array([chamber_depth(x) for x in xs])
+dx0,dx1=xs.min(),xs.max(); dy0,dy1=0.0,max(CHAMBER_DEPTH_BASS,float(anchor_y.max()))+10
+DW=int((dx1-dx0)*DS)+2*DMX; DH=int((dy1-dy0)*DS)+2*DMY
+DX=lambda x:(x-dx0)*DS+DMX; DY=lambda y:(y-dy0)*DS+DMY      # +y depth grows DOWNWARD on page
+ddof=lambda px,py:" ".join("%.2f,%.2f"%(DX(a),DY(b)) for a,b in zip(px,py))
+dep.append('<text x="%.1f" y="28" fill="#cdd2da" font-family="sans-serif" font-size="20">DEPTH/ISO (station x vs depth y): wooden chamber bulges +y (deep/wide bass -> shallow treble), tails kick d=%.1f mm</text>'%(DMX,D_KICK))
+# wooden chamber body (filled): front edge at y=0 (the eyelet plane), back edge = depth taper
+chamber_top=[DX(x) for x in xs]; cf=[DY(0.0) for _ in xs]; cb=[DY(d) for d in depth_prof]
+poly=" ".join("%.2f,%.2f"%(DX(x),DY(0.0)) for x in xs)
+poly+=" "+" ".join("%.2f,%.2f"%(DX(x),DY(d)) for x,d in list(zip(xs,depth_prof))[::-1])
+dep.append(f'<polygon points="{poly}" fill="#6b4a23" fill-opacity="0.85" stroke="#caa15a" stroke-width="1.6"/>')
+# soundhole in the BACK (deep) wall, near the bass third
+sh_x=xs[0]+(xs[-1]-xs[0])*0.22; sh_y=chamber_depth(sh_x)*0.62
+dep.append(f'<ellipse cx="{DX(sh_x):.2f}" cy="{DY(sh_y):.2f}" rx="{18*DS:.2f}" ry="{12*DS:.2f}" fill="#13110d" stroke="#caa15a" stroke-width="1.2"/>')
+# eyelet plane line at y=0
+dep.append(f'<line x1="{DX(dx0):.2f}" y1="{DY(0):.2f}" x2="{DX(dx1):.2f}" y2="{DY(0):.2f}" stroke="#caa15a" stroke-width="2.2"/>')
+# per-string straddle: speaking string above the board (y=0), tail kicked to +D_KICK below
+for i in range(N_STRINGS):
+    px=DX(xs[i])
+    dep.append(f'<circle cx="{px:.2f}" cy="{DY(0.0):.2f}" r="1.8" fill="#e0b86e"/>')                 # eyelet @ y=0
+    dep.append(f'<line x1="{px:.2f}" y1="{DY(0.0):.2f}" x2="{px:.2f}" y2="{DY(-abs(anchor_y[i])*0.0):.2f}" stroke="#7d7762" stroke-width="1.0"/>')
+    dep.append(f'<line x1="{px:.2f}" y1="{DY(0.0):.2f}" x2="{px:.2f}" y2="{DY(anchor_y[i]):.2f}" stroke="#ff5a4d" stroke-width="1.0"/>')  # tail kicks +y
+    dep.append(f'<circle cx="{px:.2f}" cy="{DY(anchor_y[i]):.2f}" r="1.6" fill="#ff5a4d"/>')         # CF anchor knot in +y
+# CF anchor curve in the depth view (the kicked plane)
+dep.append(f'<polyline points="{ddof(xs, anchor_y)}" fill="none" stroke="#ff9e6b" stroke-width="2.0"/>')
+
+# ===== combine the two panels stacked vertically into one SVG =====
+WD=max(PW,DW); HT=PH+DH+20
+svg=[f'<svg xmlns="http://www.w3.org/2000/svg" width="{WD}" height="{HT}" viewBox="0 0 {WD} {HT}">']
+svg.append('<defs><linearGradient id="st" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8ccd3"/><stop offset=".5" stop-color="#9094a0"/><stop offset="1" stop-color="#54585f"/></linearGradient></defs>')
+svg.append(f'<rect width="{WD}" height="{HT}" fill="#13110d"/>')
+svg.append(f'<g transform="translate(0,0)">{"".join(out)}</g>')
+svg.append(f'<g transform="translate(0,{PH+20})"><rect width="{DW}" height="{DH}" fill="#0e0c09"/>{"".join(dep)}</g>')
+svg.append('</svg>')
+open("erand47.svg","w").write("\n".join(svg))
 
 # ============================== BOM / report ===================================
 def shoelace(P): x,y=P[:,0],P[:,1]; return .5*abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
@@ -148,3 +259,33 @@ print(f"band area = {band:.0f} mm^2/plate (rake area-preserving, det=1)")
 print(f"2 plates = {2*plate:.2f} kg | {PILLAR_RUNGS+94} rungs = {rung:.2f} kg")
 print(f"bare frame = {2*plate+rung:.2f} kg = {(2*plate+rung)*2.205:.1f} lb")
 print(f"rigged (+tuners 1.2 +pickups 0.7 +strings 0.5) = {2*plate+rung+2.4:.1f} kg = {(2*plate+rung+2.4)*2.205:.0f} lb")
+
+# ============================== clements47 LOAD SUMMARY ========================
+Fdb = np.array([down_bearing(i) for i in range(N_STRINGS)])
+cf_total   = T.sum()                 # full axial tension -> CF frame
+wood_total = Fdb.sum()               # break-angle down-bearing -> wood
+print()
+print("== clements47 load split (break angle b = %.1f deg) =="%BREAK_ANGLE_DEG)
+print(f"Total axial tension -> CF frame : {int(cf_total)} N")
+print(f"Total down-bearing  -> wood     : {int(round(wood_total))} N  (~{100*wood_total/cf_total:.0f}% of tension)")
+# per-octave stations: C1..C7 every 7 strings, then G7 (last).
+oct_idx=[0,7,14,21,28,35,42,N_STRINGS-1]; oct_lbl=["C1","C2","C3","C4","C5","C6","C7","G7"]
+print("Per-eyelet down-bearing F_db (N):  " +
+      "  ".join(f"{l} {Fdb[i]:.1f}" for l,i in zip(oct_lbl,oct_idx)))
+# chamber depth profile (DEPTH view), bass..treble at the octave stations:
+print("Chamber depth profile (mm) @ "+" ".join(oct_lbl)+":  " +
+      " ".join(f"{chamber_depth(xc[i]):.0f}" for i in oct_idx))
+
+# --- verification: pitch unchanged + measured break angle at a mid station ---
+speak_len = np.hypot(sb[:,0]-neck[:,0], sb[:,1]-neck[:,1])
+orig_len  = np.hypot((rake(np.column_stack([xc,ztip]))-rake(np.column_stack([xc,-ztip])))[:,0],
+                     (rake(np.column_stack([xc,ztip]))-rake(np.column_stack([xc,-ztip])))[:,1])
+mid=N_STRINGS//2
+# break angle = angle between the (incoming) speaking string and the (outgoing) tail at the
+# eyelet, measured in the 3-D station/depth/profile space (depth gives the perpendicular kick).
+sp3 = np.array([neck[mid,0]-sb[mid,0], 0.0, neck[mid,1]-sb[mid,1]])              # eyelet->neck (3D: x, y=depth, z)
+tl3 = np.array([anchor[mid,0]-sb[mid,0], anchor_y[mid]-0.0, anchor[mid,1]-sb[mid,1]])  # eyelet->anchor (3D)
+cosang=np.dot(sp3,tl3)/(np.linalg.norm(sp3)*np.linalg.norm(tl3))
+break_meas=180.0-math.degrees(math.acos(max(-1,min(1,cosang))))                 # kink angle off straight
+print(f"pitch unchanged: speaking length neck->eyelet matches original to {np.abs(speak_len-orig_len).max():.4f} mm")
+print(f"measured break angle @ mid station ({oct_lbl[0] if mid==0 else 'idx %d'%mid}) = {break_meas:.2f} deg (target {BREAK_ANGLE_DEG:.1f})")

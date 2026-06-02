@@ -123,6 +123,31 @@ on the contact arc), not bare CF — a tensioned string saws resin/fibers. Shoe 
 the string Ø, with a knot (2× Ø) below. Brass takes the bearing; CF is not loaded transversely across a cut hole.
 - 13 mm string air gap maintained.
 
+### 5b. Lower-ladder split: wooden eyelet (pitch) vs CF anchor (load)
+
+The lower termination is split so the **CF frame carries the full axial string tension** and the
+**wood carries only a small, tunable, perpendicular down-bearing** (so a wooden sound chamber can
+be fitted without taking string load):
+
+- **Wooden eyelet curve** = the old soundboard-tip (`sb`) curve, **unchanged** — it still sets the
+  speaking length, so **pitch and the whole tension schedule are unchanged** (verified: speaking
+  length matches the original to 0.0000 mm). Strings **pass through** these wooden eyelets (no knot).
+- **CF anchor curve** (`place_cf_anchors`): from each eyelet, a dead-tail `L_TAIL = 30 mm` runs along
+  the straight string continuation, then kicks `d = L_TAIL·sin(β) ≈ 6.24 mm` along the soundboard
+  outward normal (the chamber/depth +y). The string **knots on the CF here**; the lower CF ladder
+  relocates to this curve (drops ~`L_TAIL·cos β` = 29.3 mm back), opening room for the wood.
+- The **break-angle kink** `β = BREAK_ANGLE_DEG = 12°` at the eyelet is what drives the wood; the CF
+  anchor takes the axial pull. Helpers `break_angle(i)/down_bearing(i)/anchor_offset(i)` are left
+  per-string so β can be **tapered smaller at the bass** to protect the bass wood.
+- A **CF backing rib** along the eyelet line spreads the per-eyelet point loads into the frame.
+- **Wooden chamber**: bulges into depth off the eyelet curve, tapered (deep+wide bass → shallow
+  treble: ~95 → 18 mm), soundhole in the back. Carries **no** axial tension.
+
+**Load split (β = 12°):** axial tension → CF frame **6655 N**; down-bearing → wood **≈ 1391 N (~21%)**.
+Per-eyelet F_db = 2·T·sin(β/2) (N): C1 49.0 · C2 43.1 · C3 37.2 · C4 31.3 · C5 25.4 · C6 19.5 · C7 13.6 · G7 10.2.
+Tuning knob (total wood load): 10°→1160 N · 12°→1390 N · 15°→1740 N · 20°→2310 N (~115 N per +1°).
+Generator: `erand47_design.py` (PROFILE + DEPTH/ISO panels → `clements47_cf_anchor.svg`).
+
 -----
 
 ## 6. Bill of materials (CF)
