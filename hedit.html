@@ -3470,17 +3470,23 @@ function fitLadderFrame(){
   const PD = Math.max(hEnd0, 24), SD = Math.max(hEnd1, 20);     // pillar / shoulder band depth
   // ---- ONE continuous frame CENTRELINE loop: neck -> shoulder cap -> eyelet -> pillar cap ----
   // (the two user curves are the rail centrelines; the caps bow outward; H = band thickness here)
+  // tip tangents (bass->treble) straight from the curve nodes' end handles -- the caps HONOR these
+  const tN0 = [ns[0].tx,ns[0].ty], tNN = [ns[N].tx,ns[N].ty], tE0 = [es[0].tx,es[0].ty], tEN = [es[N].tx,es[N].ty];
+  const cub = (A,P1,P2,B,t) => { const u=1-t; return [u*u*u*A[0]+3*u*u*t*P1[0]+3*u*t*t*P2[0]+t*t*t*B[0], u*u*u*A[1]+3*u*u*t*P1[1]+3*u*t*t*P2[1]+t*t*t*B[1]]; };
+  // cap handle lengths: enough wrap that the cap stays tangent to the steep tips without pinching
+  const hS = Math.max(sbow*1.5, Math.hypot(ns[N].x-es[N].x, ns[N].y-es[N].y)*0.5);
+  const hP = Math.max(pbow*2,   Math.hypot(es[0].x-ns[0].x, es[0].y-ns[0].y)*0.14);
   let loop = [];
   for(let i = 0; i <= N; i++) loop.push({ x: ns[i].x, y: ns[i].y, h: barHeightAt(i/N) });           // neck bass->treble
-  const sOut = outwardPerp([ns[N].x,ns[N].y], [es[N].x,es[N].y], fld);
-  for(let k = 1, A=[ns[N].x,ns[N].y], B=[es[N].x,es[N].y]; k < 12; k++){ const s = k/12, w = sbow*Math.sin(Math.PI*s);
-    loop.push({ x: A[0]+(B[0]-A[0])*s + sOut[0]*w, y: A[1]+(B[1]-A[1])*s + sOut[1]*w, h: hEnd1 + (SD-hEnd1)*Math.sin(Math.PI*s) }); }
+  // shoulder cap ns[N]->es[N]: leaves the neck tip along +neck-tangent, arrives along the eyelet tip (G1)
+  { const A=[ns[N].x,ns[N].y], B=[es[N].x,es[N].y], P1=[A[0]+tNN[0]*hS,A[1]+tNN[1]*hS], P2=[B[0]+tEN[0]*hS,B[1]+tEN[1]*hS];
+    for(let k=1;k<16;k++){ const s=k/16, p=cub(A,P1,P2,B,s); loop.push({ x:p[0], y:p[1], h: hEnd1+(SD-hEnd1)*Math.sin(Math.PI*s) }); } }
   for(let j = N; j >= 0; j--) loop.push({ x: es[j].x, y: es[j].y, h: barHeightAt(j/N) });             // eyelet treble->bass
-  const pOut = outwardPerp([es[0].x,es[0].y], [ns[0].x,ns[0].y], fld);
-  for(let k = 1, A=[es[0].x,es[0].y], B=[ns[0].x,ns[0].y]; k < 22; k++){ const s = k/22, w = pbow*Math.sin(Math.PI*s);
-    loop.push({ x: A[0]+(B[0]-A[0])*s + pOut[0]*w, y: A[1]+(B[1]-A[1])*s + pOut[1]*w, h: hEnd0 + (PD-hEnd0)*Math.sin(Math.PI*s) }); }
+  // pillar cap es[0]->ns[0]: leaves the eyelet tip along -eyelet-tangent, arrives along the neck tip (G1)
+  { const A=[es[0].x,es[0].y], B=[ns[0].x,ns[0].y], P1=[A[0]-tE0[0]*hP,A[1]-tE0[1]*hP], P2=[B[0]-tN0[0]*hP,B[1]-tN0[1]*hP];
+    for(let k=1;k<28;k++){ const s=k/28, p=cub(A,P1,P2,B,s); loop.push({ x:p[0], y:p[1], h: hEnd0+(PD-hEnd0)*Math.sin(Math.PI*s) }); } }
   loop = resampleLoop(loop, 10);                               // uniform spacing -> clean normals
-  smoothLoop(loop, 10, 2);                                      // round the centreline cap corners
+  smoothLoop(loop, 3, 2);                                       // light: caps are already tangent (G1)
   // ---- offset the centreline +-H/2 along its outward normal -> the two frame paths ----
   const L = loop.length, outer = [], inner = [];
   for(let k = 0; k < L; k++){
