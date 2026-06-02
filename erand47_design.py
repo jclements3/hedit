@@ -123,7 +123,9 @@ _b = radians(BREAK_ANGLE_DEG)
 def anchor_offset(i):                                            # (along s_hat, perp n_hat) mm
     bi = radians(break_angle(i)); return (L_TAIL_MM*cos(bi), L_TAIL_MM*sin(bi))
 DZ_DROP = L_TAIL_MM*cos(_b)        # in-profile z drop (eyelet -> anchor), mm
-D_KICK  = L_TAIL_MM*sin(_b)        # depth kick into +y (anchor straddle), mm
+# depth kick is into -y (the string/playing side), OPPOSITE the +y wooden chamber, so the CF
+# anchor/ladder never enters the chamber cavity. The break-angle still drives the board toward +y.
+D_KICK  = -L_TAIL_MM*sin(_b)       # depth kick into -y, mm (anchor clears the chamber)
 SB = SB - DZ_DROP                  # relocate outer soundboard edge onto anchor curve
 ST = ST - DZ_DROP                  # relocate inner soundboard edge onto anchor curve
 
@@ -215,11 +217,12 @@ def chamber_halfwidth(xstat):
     f=(xstat-xc[0])/(xc[-1]-xc[0])
     return CHAMBER_WIDTH_BASS + (CHAMBER_WIDTH_TREB-CHAMBER_WIDTH_BASS)*f
 xs=xc; depth_prof=np.array([chamber_depth(x) for x in xs])
-dx0,dx1=xs.min(),xs.max(); dy0,dy1=0.0,max(CHAMBER_DEPTH_BASS,float(anchor_y.max()))+10
+# span both sides of the y=0 soundboard plane: chamber on +y, CF anchor/tails on -y (opposite)
+dx0,dx1=xs.min(),xs.max(); dy0,dy1=min(0.0,float(anchor_y.min()))-12, max(CHAMBER_DEPTH_BASS,float(anchor_y.max()))+10
 DW=int((dx1-dx0)*DS)+2*DMX; DH=int((dy1-dy0)*DS)+2*DMY
 DX=lambda x:(x-dx0)*DS+DMX; DY=lambda y:(y-dy0)*DS+DMY      # +y depth grows DOWNWARD on page
 ddof=lambda px,py:" ".join("%.2f,%.2f"%(DX(a),DY(b)) for a,b in zip(px,py))
-dep.append('<text x="%.1f" y="28" fill="#cdd2da" font-family="sans-serif" font-size="20">DEPTH/ISO (station x vs depth y): wooden chamber bulges +y (deep/wide bass -> shallow treble), tails kick d=%.1f mm</text>'%(DMX,D_KICK))
+dep.append('<text x="%.1f" y="28" fill="#cdd2da" font-family="sans-serif" font-size="20">DEPTH/ISO (station x vs depth y): wooden chamber bulges +y; CF anchor/tails kick -y (opposite side, clear of the chamber), |d|=%.1f mm</text>'%(DMX,abs(D_KICK)))
 # wooden chamber body (filled): front edge at y=0 (the eyelet plane), back edge = depth taper
 chamber_top=[DX(x) for x in xs]; cf=[DY(0.0) for _ in xs]; cb=[DY(d) for d in depth_prof]
 poly=" ".join("%.2f,%.2f"%(DX(x),DY(0.0)) for x in xs)

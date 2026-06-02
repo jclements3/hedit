@@ -133,9 +133,11 @@ be fitted without taking string load):
   speaking length, so **pitch and the whole tension schedule are unchanged** (verified: speaking
   length matches the original to 0.0000 mm). Strings **pass through** these wooden eyelets (no knot).
 - **CF anchor curve** (`place_cf_anchors`): from each eyelet, a dead-tail `L_TAIL = 30 mm` runs along
-  the straight string continuation, then kicks `d = L_TAIL·sin(β) ≈ 6.24 mm` along the soundboard
-  outward normal (the chamber/depth +y). The string **knots on the CF here**; the lower CF ladder
-  relocates to this curve (drops ~`L_TAIL·cos β` = 29.3 mm back), opening room for the wood.
+  the straight string continuation, then kicks `|d| = L_TAIL·sin(β) ≈ 6.24 mm` in depth **toward −y
+  — the OPPOSITE side from the wooden chamber (which bulges +y)** — so the **CF anchor/ladder never
+  enters the chamber cavity**. The string **knots on the CF here**; the lower CF ladder relocates to
+  this curve (drops ~`L_TAIL·cos β` = 29.3 mm back), opening room for the wood. The break-angle still
+  drives the soundboard toward +y; only the anchor/tail sit on the string side, clear of the chamber.
 - The **break-angle kink** `β = BREAK_ANGLE_DEG = 12°` at the eyelet is what drives the wood; the CF
   anchor takes the axial pull. Helpers `break_angle(i)/down_bearing(i)/anchor_offset(i)` are left
   per-string so β can be **tapered smaller at the bass** to protect the bass wood.
