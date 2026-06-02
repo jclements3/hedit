@@ -3364,14 +3364,27 @@ function railEdges(samples, field){
   }
   return { O, I };
 }
-const Ls = pts => pts.map(p => "L " + fmt(p[0]) + " " + fmt(p[1])).join(" ");
-function capC(A, B, outx, bow){                   // clean C from A to B bulging `bow` toward x=outx
-  // control points ride 1/3 and 2/3 along the A->B chord, pushed out by ~bow -> a smooth column
-  // arc with no hooks (don't follow the rail tangent, which kinks against the sloped rail ends).
-  const b = Math.max(2, bow) * 1.3;
-  const p1x = A[0] + (B[0]-A[0])/3 + outx*b, p1y = A[1] + (B[1]-A[1])/3;
-  const p2x = A[0] + 2*(B[0]-A[0])/3 + outx*b, p2y = A[1] + 2*(B[1]-A[1])/3;
-  return "C " + fmt(p1x) + " " + fmt(p1y) + " " + fmt(p2x) + " " + fmt(p2y) + " " + fmt(B[0]) + " " + fmt(B[1]);
+// outward unit perpendicular to chord A->B (pointing away from the string-field centre)
+function outwardPerp(A, B, field){
+  const dx = B[0]-A[0], dy = B[1]-A[1], m = Math.hypot(dx, dy) || 1; let nx = -dy/m, ny = dx/m;
+  const mx = (A[0]+B[0])/2, my = (A[1]+B[1])/2;
+  if((mx+nx-field[0])**2 + (my+ny-field[1])**2 < (mx-nx-field[0])**2 + (my-ny-field[1])**2){ nx = -nx; ny = -ny; }
+  return [nx, ny];
+}
+// hook-free bulge points A->B (interior only): a sine bump of height `bow` toward unit `out`
+function bulgeArc(A, B, out, bow, n){
+  const o = [];
+  for(let k = 1; k < n; k++){ const s = k/n, w = bow*Math.sin(Math.PI*s); o.push([A[0]+(B[0]-A[0])*s + out[0]*w, A[1]+(B[1]-A[1])*s + out[1]*w]); }
+  return o;
+}
+// fit ONE smooth cubic-bezier spline through a closed point loop -> "M..C..C.. Z"
+// (fitSmoothSpline = the C2 fitter addLameSide uses; avoids the fitCurve name-collision)
+function closedSplineD(pts, maxNodes){
+  const segs = fitSmoothSpline(pts.concat([pts[0]]), maxNodes);
+  if(!segs || !segs.length) return null;
+  let d = "M " + fmt(segs[0][0][0]) + " " + fmt(segs[0][0][1]);
+  for(const s of segs) d += " C " + fmt(s[1][0])+" "+fmt(s[1][1])+" "+fmt(s[2][0])+" "+fmt(s[2][1])+" "+fmt(s[3][0])+" "+fmt(s[3][1]);
+  return d + " Z";
 }
 function mkFramePath(d, role, fill, stroke, ref){
   const p = document.createElementNS(SVGNS, "path");
@@ -3393,20 +3406,21 @@ function fitLadderFrame(){
   const fx = (ns[0].x + ns[N].x + es[0].x + es[N].x) / 4, fy = (ns[0].y + ns[N].y + es[0].y + es[N].y) / 4;
   const nk = railEdges(ns, [fx, fy]);             // nk.O = NT, nk.I = NB
   const ey = railEdges(es, [fx, fy]);             // ey.O = EB, ey.I = ET
-  // which end is bass (x smaller)? assume index 0 = bass (curves fit bass->treble); set cap directions
-  const bassOutX = (ns[0].x <= ns[N].x) ? -1 : +1, trebOutX = -bassOutX;
   const pbow = Math.max(2, parseFloat((document.getElementById("pillar-bow")||{}).value) || 60);
   const sbow = Math.max(2, parseFloat((document.getElementById("shoulder-bow")||{}).value) || 40);
-  // OUTER: NT (0->N) , RO cap (NT[N]->EB[N]) , EB reversed (N->0) , PO cap (EB[0]->NT[0])
-  const NT = nk.O, NB = nk.I, EB = ey.O, ET = ey.I;
-  const outerD = "M " + fmt(NT[0][0]) + " " + fmt(NT[0][1]) + " " + Ls(NT.slice(1))
-    + " " + capC(NT[N], EB[N], trebOutX, sbow)
-    + " " + Ls(EB.slice().reverse().slice(1))
-    + " " + capC(EB[0], NT[0], bassOutX, pbow) + " Z";
-  const innerD = "M " + fmt(NB[0][0]) + " " + fmt(NB[0][1]) + " " + Ls(NB.slice(1))
-    + " " + capC(NB[N], ET[N], trebOutX, sbow*0.6)
-    + " " + Ls(ET.slice().reverse().slice(1))
-    + " " + capC(ET[0], NB[0], bassOutX, pbow*0.6) + " Z";
+  const NT = nk.O, NB = nk.I, EB = ey.O, ET = ey.I, fld = [fx, fy];
+  // hook-free bulge directions for the end caps (away from the string field)
+  const sOut = outwardPerp(NT[N], EB[N], fld);    // shoulder (treble)
+  const pOut = outwardPerp(EB[0], NT[0], fld);    // pillar (bass)
+  // assemble each boundary as one loop [rail + bulge + rail-reversed + bulge] then fit ONE smooth
+  // spline -> every rail<->cap transition is tangent-continuous (no kinks).
+  // OUTER = NT (bass->treble) . RO . EB (treble->bass) . PO ;  INNER = NB . RI . ET . PI
+  const outerCloud = NT.concat(bulgeArc(NT[N], EB[N], sOut, sbow, 8),
+                               EB.slice().reverse(), bulgeArc(EB[0], NT[0], pOut, pbow, 16));
+  const innerCloud = NB.concat(bulgeArc(NB[N], ET[N], sOut, sbow*0.6, 8),
+                               ET.slice().reverse(), bulgeArc(ET[0], NB[0], pOut, pbow*0.6, 16));
+  const outerD = closedSplineD(outerCloud, 44), innerD = closedSplineD(innerCloud, 44);
+  if(!outerD || !innerD){ setStatus("Could not fit the frame spline."); return; }
   const ref = contentGroup.firstChild;
   mkFramePath(outerD + " " + innerD, "frame-fill", "evenodd-band", "none", ref);   // CF band (behind)
   mkFramePath(outerD, "frame-outer", "none", "#9aa0a6", ref);
