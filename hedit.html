@@ -3395,42 +3395,62 @@ function mkFramePath(d, role, fill, stroke, ref){
   contentGroup.insertBefore(p, ref);              // behind the strings/rungs
   return p;
 }
+// periodic moving-average smoothing of a {x,y,h} loop -> rounds the cap<->rail corners on the
+// CENTRELINE so its parallel offsets come out smooth (no spike), and tapers H across junctions.
+function smoothLoop(loop, iters, w){
+  const L = loop.length;
+  for(let it = 0; it < iters; it++){
+    const out = loop.map((_, k) => {
+      let sx = 0, sy = 0, sh = 0;
+      for(let d = -w; d <= w; d++){ const q = loop[(k+d+L)%L]; sx += q.x; sy += q.y; sh += q.h; }
+      return { x: sx/(2*w+1), y: sy/(2*w+1), h: sh/(2*w+1) };
+    });
+    for(let k = 0; k < L; k++) loop[k] = out[k];
+  }
+}
 function fitLadderFrame(){
   const neck = contentGroup.querySelector('path[data-role="top-curve"]');
   const eye  = contentGroup.querySelector('path[data-role="bottom-curve"]');
   if(!neck || !eye){ setStatus("Need the neck (top) and eyelet (bottom) curves first — fit them in step 5."); return; }
   pushUndo();
   contentGroup.querySelectorAll('[data-role^="frame-"]').forEach(e => e.remove());
-  const N = 120;
+  const N = 90;
   const ns = samplePathTangents(neck, N), es = samplePathTangents(eye, N);
-  // string-field centre, to orient "outer" away from the strings
-  const fx = (ns[0].x + ns[N].x + es[0].x + es[N].x) / 4, fy = (ns[0].y + ns[N].y + es[0].y + es[N].y) / 4;
-  const nk = railEdges(ns, [fx, fy]);             // nk.O = NT, nk.I = NB
-  const ey = railEdges(es, [fx, fy]);             // ey.O = EB, ey.I = ET
+  const fx = (ns[0].x + ns[N].x + es[0].x + es[N].x)/4, fy = (ns[0].y + ns[N].y + es[0].y + es[N].y)/4, fld = [fx, fy];
   const pbow = Math.max(2, parseFloat((document.getElementById("pillar-bow")||{}).value) || 60);
   const sbow = Math.max(2, parseFloat((document.getElementById("shoulder-bow")||{}).value) || 40);
-  const NT = nk.O, NB = nk.I, EB = ey.O, ET = ey.I;
-  const fld = [fx, fy];
-  const sOut = outwardPerp(NT[N], EB[N], fld);   // shoulder (treble) outward
-  const pOut = outwardPerp(EB[0], NT[0], fld);   // pillar (bass) outward
-  // assemble each boundary as one loop [rail + perpendicular bulge cap + rail-reversed + cap] then
-  // fit ONE smooth spline; the spline rounds the rail<->cap corners (C2) -- no overshoot, no kinks.
-  // OUTER = NT (bass->treble) . RO . EB (treble->bass) . PO ;  INNER = NB . RI . ET . PI
-  const outerCloud = NT.concat(bulgeArc(NT[N], EB[N], sOut, sbow, 9),
-                               EB.slice().reverse(), bulgeArc(EB[0], NT[0], pOut, pbow, 13));
-  const innerCloud = NB.concat(bulgeArc(NB[N], ET[N], sOut, sbow*0.7, 9),
-                               ET.slice().reverse(), bulgeArc(ET[0], NB[0], pOut, pbow*0.7, 13));
-  // rotate the loop so the spline SEAM lands mid-neck (a smooth stretch), not at the column corner
-  const rotSeam = a => { const k = Math.floor(N/2); return a.slice(k).concat(a.slice(0, k)); };
-  const outerD = closedSplineD(rotSeam(outerCloud), 48), innerD = closedSplineD(rotSeam(innerCloud), 48);
+  const hEnd0 = barHeightAt(0), hEnd1 = barHeightAt(1);
+  const PD = Math.max(hEnd0, 24), SD = Math.max(hEnd1, 20);     // pillar / shoulder band depth
+  // ---- ONE continuous frame CENTRELINE loop: neck -> shoulder cap -> eyelet -> pillar cap ----
+  // (the two user curves are the rail centrelines; the caps bow outward; H = band thickness here)
+  const loop = [];
+  for(let i = 0; i <= N; i++) loop.push({ x: ns[i].x, y: ns[i].y, h: barHeightAt(i/N) });           // neck bass->treble
+  const sOut = outwardPerp([ns[N].x,ns[N].y], [es[N].x,es[N].y], fld);
+  for(let k = 1, A=[ns[N].x,ns[N].y], B=[es[N].x,es[N].y]; k < 12; k++){ const s = k/12, w = sbow*Math.sin(Math.PI*s);
+    loop.push({ x: A[0]+(B[0]-A[0])*s + sOut[0]*w, y: A[1]+(B[1]-A[1])*s + sOut[1]*w, h: hEnd1 + (SD-hEnd1)*Math.sin(Math.PI*s) }); }
+  for(let j = N; j >= 0; j--) loop.push({ x: es[j].x, y: es[j].y, h: barHeightAt(j/N) });             // eyelet treble->bass
+  const pOut = outwardPerp([es[0].x,es[0].y], [ns[0].x,ns[0].y], fld);
+  for(let k = 1, A=[es[0].x,es[0].y], B=[ns[0].x,ns[0].y]; k < 22; k++){ const s = k/22, w = pbow*Math.sin(Math.PI*s);
+    loop.push({ x: A[0]+(B[0]-A[0])*s + pOut[0]*w, y: A[1]+(B[1]-A[1])*s + pOut[1]*w, h: hEnd0 + (PD-hEnd0)*Math.sin(Math.PI*s) }); }
+  smoothLoop(loop, 6, 2);                                       // round the centreline cap corners
+  // ---- offset the centreline +-H/2 along its outward normal -> the two frame paths ----
+  const L = loop.length, outer = [], inner = [];
+  for(let k = 0; k < L; k++){
+    const p = loop[k], a = loop[(k-1+L)%L], b = loop[(k+1)%L];
+    let tx = b.x-a.x, ty = b.y-a.y; const m = Math.hypot(tx, ty)||1; let nx = -ty/m, ny = tx/m;
+    if((p.x+nx-fx)**2+(p.y+ny-fy)**2 < (p.x-nx-fx)**2+(p.y-ny-fy)**2){ nx = -nx; ny = -ny; }  // outward = away from field
+    const hh = p.h/2;
+    outer.push([p.x+nx*hh, p.y+ny*hh]); inner.push([p.x-nx*hh, p.y-ny*hh]);
+  }
+  const rotSeam = arr => { const k = Math.floor(N/2); return arr.slice(k).concat(arr.slice(0, k)); };
+  const outerD = closedSplineD(rotSeam(outer), 64), innerD = closedSplineD(rotSeam(inner), 64);
   if(!outerD || !innerD){ setStatus("Could not fit the frame spline."); return; }
   const ref = contentGroup.firstChild;
   mkFramePath(outerD + " " + innerD, "frame-fill", "evenodd-band", "none", ref);   // CF band (behind)
   mkFramePath(outerD, "frame-outer", "none", "#9aa0a6", ref);
   mkFramePath(innerD, "frame-inner", "none", "#9aa0a6", ref);
-  fitLadderRungs();                                 // lace it (uses pillar/shoulder curves if present)
-  const peak = Math.max(...ERAND47_BARH);
-  setStatus(`Ladder frame: outer NT-RO-EB-PO + inner NB-RI-ET-PI, CF spread ${fmt(ERAND47_BARH[0])}-${fmt(peak)} mm (deflection-governed).`);
+  fitLadderRungs();
+  setStatus(`Ladder frame (centreline-offset): outer NT-RO-EB-PO + inner NB-RI-ET-PI, CF spread ${fmt(hEnd0)}-${fmt(Math.max(...ERAND47_BARH))} mm.`);
 }
 
 // ---- per-string annotations: tuning pins + RGB sensor dots ----
