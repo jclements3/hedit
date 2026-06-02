@@ -3395,6 +3395,53 @@ function mkFramePath(d, role, fill, stroke, ref){
   contentGroup.insertBefore(p, ref);              // behind the strings/rungs
   return p;
 }
+// resample a closed {x,y,h} loop at uniform arc-length `step` (mm). Uniform spacing is what makes
+// the per-point normals + smoothing well-behaved at the cap<->rail junctions (mixed-density points
+// there were skewing the inner offset into a self-intersecting teardrop).
+function resampleLoop(loop, step){
+  const L = loop.length, seg = []; let total = 0;
+  for(let k = 0; k < L; k++){ const a = loop[k], b = loop[(k+1)%L]; const d = Math.hypot(b.x-a.x, b.y-a.y); seg.push(d); total += d; }
+  const out = []; let target = 0, k = 0, acc = 0;
+  while(target < total && out.length < 20000){
+    while(k < L-1 && acc + seg[k] < target){ acc += seg[k]; k++; }
+    const a = loop[k], b = loop[(k+1)%L], f = seg[k] ? (target-acc)/seg[k] : 0;
+    out.push({ x: a.x+(b.x-a.x)*f, y: a.y+(b.y-a.y)*f, h: a.h+(b.h-a.h)*f });
+    target += step;
+  }
+  return out;
+}
+// segment [p1,p2] x [p3,p4] proper intersection point (or null)
+function segInt(p1, p2, p3, p4){
+  const d1x = p2[0]-p1[0], d1y = p2[1]-p1[1], d2x = p4[0]-p3[0], d2y = p4[1]-p3[1];
+  const den = d1x*d2y - d1y*d2x; if(Math.abs(den) < 1e-9) return null;
+  const t = ((p3[0]-p1[0])*d2y - (p3[1]-p1[1])*d2x) / den;
+  const u = ((p3[0]-p1[0])*d1y - (p3[1]-p1[1])*d1x) / den;
+  if(t > 1e-4 && t < 1-1e-4 && u > 1e-4 && u < 1-1e-4) return [p1[0]+d1x*t, p1[1]+d1y*t];
+  return null;
+}
+// remove self-intersection loops from a closed polyline (heals the offset "teardrop" at tight
+// concave corners -> the band pinches to a point there instead of leaving a hole).
+function deloop(P){
+  let guard = 0;
+  while(guard++ < 200){
+    const n = P.length; let cut = false;
+    for(let i = 0; i < n && !cut; i++){
+      for(let j = i+2; j < n; j++){
+        if(i === 0 && j === n-1) continue;             // shared closing vertex
+        const X = segInt(P[i], P[(i+1)%n], P[j], P[(j+1)%n]);
+        if(X){
+          const innerCount = j - i;                     // points i+1..j
+          P = (innerCount <= n - innerCount)
+            ? P.slice(0, i+1).concat([X], P.slice(j+1)) // drop the short inner loop
+            : [X].concat(P.slice(i+1, j+1));            // keep the short arc
+          cut = true; break;
+        }
+      }
+    }
+    if(!cut) break;
+  }
+  return P;
+}
 // periodic moving-average smoothing of a {x,y,h} loop -> rounds the cap<->rail corners on the
 // CENTRELINE so its parallel offsets come out smooth (no spike), and tapers H across junctions.
 function smoothLoop(loop, iters, w){
@@ -3423,7 +3470,7 @@ function fitLadderFrame(){
   const PD = Math.max(hEnd0, 24), SD = Math.max(hEnd1, 20);     // pillar / shoulder band depth
   // ---- ONE continuous frame CENTRELINE loop: neck -> shoulder cap -> eyelet -> pillar cap ----
   // (the two user curves are the rail centrelines; the caps bow outward; H = band thickness here)
-  const loop = [];
+  let loop = [];
   for(let i = 0; i <= N; i++) loop.push({ x: ns[i].x, y: ns[i].y, h: barHeightAt(i/N) });           // neck bass->treble
   const sOut = outwardPerp([ns[N].x,ns[N].y], [es[N].x,es[N].y], fld);
   for(let k = 1, A=[ns[N].x,ns[N].y], B=[es[N].x,es[N].y]; k < 12; k++){ const s = k/12, w = sbow*Math.sin(Math.PI*s);
@@ -3432,7 +3479,8 @@ function fitLadderFrame(){
   const pOut = outwardPerp([es[0].x,es[0].y], [ns[0].x,ns[0].y], fld);
   for(let k = 1, A=[es[0].x,es[0].y], B=[ns[0].x,ns[0].y]; k < 22; k++){ const s = k/22, w = pbow*Math.sin(Math.PI*s);
     loop.push({ x: A[0]+(B[0]-A[0])*s + pOut[0]*w, y: A[1]+(B[1]-A[1])*s + pOut[1]*w, h: hEnd0 + (PD-hEnd0)*Math.sin(Math.PI*s) }); }
-  smoothLoop(loop, 6, 2);                                       // round the centreline cap corners
+  loop = resampleLoop(loop, 10);                               // uniform spacing -> clean normals
+  smoothLoop(loop, 10, 2);                                      // round the centreline cap corners
   // ---- offset the centreline +-H/2 along its outward normal -> the two frame paths ----
   const L = loop.length, outer = [], inner = [];
   for(let k = 0; k < L; k++){
@@ -3442,8 +3490,8 @@ function fitLadderFrame(){
     const hh = p.h/2;
     outer.push([p.x+nx*hh, p.y+ny*hh]); inner.push([p.x-nx*hh, p.y-ny*hh]);
   }
-  const rotSeam = arr => { const k = Math.floor(N/2); return arr.slice(k).concat(arr.slice(0, k)); };
-  const outerD = closedSplineD(rotSeam(outer), 64), innerD = closedSplineD(rotSeam(inner), 64);
+  const rotSeam = arr => { const k = Math.floor(arr.length*0.2); return arr.slice(k).concat(arr.slice(0, k)); };  // seam mid-neck
+  const outerD = closedSplineD(rotSeam(deloop(outer)), 64), innerD = closedSplineD(rotSeam(deloop(inner)), 64);
   if(!outerD || !innerD){ setStatus("Could not fit the frame spline."); return; }
   const ref = contentGroup.firstChild;
   mkFramePath(outerD + " " + innerD, "frame-fill", "evenodd-band", "none", ref);   // CF band (behind)
