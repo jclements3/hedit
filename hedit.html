@@ -271,6 +271,7 @@
         <label class="checkrow" title="Sharp dot 0.1091·L below the tip"><input type="checkbox" id="dot-sharp"> Sharps</label>
         <label class="checkrow" title="Midi dot 0.125·L below the tip"><input type="checkbox" id="dot-midi"> Midi</label>
         <label class="checkrow" title="Eyelet dot at the string bottom (soundboard attachment)"><input type="checkbox" id="dot-eyelet"> Eyelets</label>
+        <button id="add-tuners-btn" title="Add a Ø15.4 guitar-tuner gear-post above each string top (Thingiverse 6099101). Odd strings = front plate (orange), even = back plate (blue), offset into two rows so the posts clear the 13 mm string pitch.">Add guitar tuners (neck top)</button>
       </div>
     </details>
 
@@ -2262,6 +2263,7 @@ document.getElementById("string-rot-cw").onclick = () => rotateStrings(readRot()
 document.getElementById("s-axis-btn").onclick = setSAxis;
 document.getElementById("string-gap-btn").onclick = () => parallelAirGapStrings(readStringGap());
 document.getElementById("string-rake-btn").onclick = () => { const d = parseFloat(document.getElementById("string-rake").value) || 0; rotateStrings(-d); };  // -d = tops toward the pillar (bass); rigid -> air gap preserved
+document.getElementById("add-tuners-btn").onclick = placeTuners;
 document.getElementById("string-table-btn").onclick = openStringsTable;
 document.getElementById("align-top").onclick = () => alignStrings("top");
 document.getElementById("align-middle").onclick = () => alignStrings("middle");
@@ -3511,6 +3513,37 @@ function fitLadderFrame(){
   mkFramePath(innerD, "frame-inner", "none", "#9aa0a6", ref);
   fitLadderRungs();
   setStatus(`Ladder frame (centreline-offset): outer NT-RO-EB-PO + inner NB-RI-ET-PI, CF spread ${fmt(hEnd0)}-${fmt(Math.max(...ERAND47_BARH))} mm.`);
+}
+
+// ===== Guitar tuners at the neck top (Thingiverse 6099101, CC-BY-NC) =================
+// Ø15.4 gear-post footprint per string, placed above each string TOP along the string's own
+// (raked) up-direction. The Ø15.4 post can't fit at the ~13 mm string pitch, so the twin-plate
+// neck alternates tuners front/back: ODD strings -> near row (front plate, orange), EVEN -> far
+// row (back plate, blue). Each row then sits at ~2x pitch so the posts clear. <circle data-role
+// ="tuner">, so string ops / air-gap / alignment / the harp model all ignore them.
+const TUNER_OD = 15.4;
+function placeTuners(){
+  const strings = stringLines();
+  if(!strings.length){ setStatus("Load strings first (step 1)."); return; }
+  pushUndo();
+  contentGroup.querySelectorAll('[data-role="tuner"]').forEach(e => e.remove());   // idempotent
+  const S = strings.map(l => ({ ends: stringEnds(l), num: +l.getAttribute("data-num") || 0 }))
+                   .sort((a, b) => a.num - b.num);
+  const R = TUNER_OD / 2;
+  for(const s of S){
+    const top = s.ends.top, bot = s.ends.bot;
+    let ux = top[0]-bot[0], uy = top[1]-bot[1]; const m = Math.hypot(ux, uy) || 1; ux /= m; uy /= m;  // up = away from the soundboard
+    const odd = (s.num % 2) === 1;
+    const dist = R + 2 + (odd ? 0 : TUNER_OD + 2);            // odd = near row, even = far row (two-plate parity offset)
+    const c = document.createElementNS(SVGNS, "circle");
+    c.setAttribute("data-role", "tuner"); c.setAttribute("data-num", String(s.num));
+    c.setAttribute("cx", fmt(top[0] + ux*dist)); c.setAttribute("cy", fmt(top[1] + uy*dist)); c.setAttribute("r", fmt(R));
+    c.setAttribute("fill", odd ? "#e08a3c" : "#3a6fd4"); c.setAttribute("fill-opacity", "0.55");
+    c.setAttribute("stroke", odd ? "#a85a16" : "#1d3f82"); c.setAttribute("stroke-width", "0.6");
+    contentGroup.appendChild(c);
+  }
+  pathModel = null; renderOverlay();
+  setStatus(`Added ${S.length} guitar tuners (Ø${TUNER_OD}) above the neck — odd=front plate (orange), even=back plate (blue), two-row parity offset.`);
 }
 
 // ---- per-string annotations: tuning pins + RGB sensor dots ----
