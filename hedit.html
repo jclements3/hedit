@@ -237,6 +237,11 @@
           <input type="number" id="string-gap" step="0.1" value="13">
         </div>
         <button id="string-gap-btn" class="btn-primary" title="Make every string vertical and space them with a constant edge-to-edge air gap (accounts for each string's diameter)">Apply parallel air-gap</button>
+        <div class="row" style="margin-top:8px">
+          <label title="String rake angle, tops tilted toward the pillar (bass). Applied as a RIGID rotation of the whole string group, so the perpendicular edge-to-edge air gap is preserved exactly.">Rake (°→pillar)</label>
+          <input type="number" id="string-rake" step="0.5" value="7">
+        </div>
+        <button id="string-rake-btn" title="Rake the strings by the angle, tops toward the pillar (bass). Rigid rotation of the whole group (+ S axis) -> the air gap is preserved exactly. Run after the air-gap.">Apply rake →pillar</button>
       </div>
     </details>
 
@@ -2256,6 +2261,7 @@ document.getElementById("string-rot-ccw").onclick = () => rotateStrings(-readRot
 document.getElementById("string-rot-cw").onclick = () => rotateStrings(readRot());
 document.getElementById("s-axis-btn").onclick = setSAxis;
 document.getElementById("string-gap-btn").onclick = () => parallelAirGapStrings(readStringGap());
+document.getElementById("string-rake-btn").onclick = () => { const d = parseFloat(document.getElementById("string-rake").value) || 0; rotateStrings(-d); };  // -d = tops toward the pillar (bass); rigid -> air gap preserved
 document.getElementById("string-table-btn").onclick = openStringsTable;
 document.getElementById("align-top").onclick = () => alignStrings("top");
 document.getElementById("align-middle").onclick = () => alignStrings("middle");
@@ -2574,7 +2580,7 @@ function loadErand47Strings(){
   for(let i = 0; i < n; i++){
     if(i > 0) x += ERAND47_DIA[i-1]/2 + gap + ERAND47_DIA[i]/2;   // constant edge-to-edge gap
     const len = ERAND47_L[i], dia = ERAND47_DIA[i];
-    const ten = 52.693 + (10.976 - 52.693) * i / (n - 1);
+    const ten = (52.693 + (10.976 - 52.693) * i / (n - 1)) * 4.4482216;   // Erard lbf schedule -> NEWTONS (metric)
     const ln = document.createElementNS(SVGNS, "line");
     ln.setAttribute("x1", fmt(x)); ln.setAttribute("x2", fmt(x));
     ln.setAttribute("y1", "0");    ln.setAttribute("y2", fmt(len));
@@ -3311,7 +3317,7 @@ function fitLadderRungs(){
   [...contentGroup.querySelectorAll('[data-role^="rung-"]')].forEach(e => e.remove());   // idempotent
   const S = strings.map(l => ({ ends: stringEnds(l), dia: effectiveStrokeWidth(l), num: +l.getAttribute("data-num") || 0 }))
                    .sort((p, q) => (p.num - q.num) || (p.ends.top[0] - q.ends.top[0]));
-  const NECK = 3;
+  const NECK = 4;   // CF rod OD: FoS>=3 even at a ~90 deg string wrap (3 mm was marginal); brass shoe is wear-only
   for(let i = 0; i < S.length; i++){                       // neck rungs: string tangent to the rung's LEFT
     const cur = S[i].ends.top, ref = (S[i+1] || S[i-1]).ends.top, sgn = S[i+1] ? 1 : -1;
     const dx = (ref[0] - cur[0]) * sgn, dy = (ref[1] - cur[1]) * sgn, m = Math.hypot(dx, dy) || 1;
