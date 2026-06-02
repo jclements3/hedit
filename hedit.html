@@ -3365,9 +3365,13 @@ function railEdges(samples, field){
   return { O, I };
 }
 const Ls = pts => pts.map(p => "L " + fmt(p[0]) + " " + fmt(p[1])).join(" ");
-function capC(A, B, outx, bow){                   // cubic A->B bulging by `bow` toward outx (+-1 in x)
-  const k = 1.333 * Math.max(2, bow);
-  return "C " + fmt(A[0]+outx*k) + " " + fmt(A[1]) + " " + fmt(B[0]+outx*k) + " " + fmt(B[1]) + " " + fmt(B[0]) + " " + fmt(B[1]);
+function capC(A, B, outx, bow){                   // clean C from A to B bulging `bow` toward x=outx
+  // control points ride 1/3 and 2/3 along the A->B chord, pushed out by ~bow -> a smooth column
+  // arc with no hooks (don't follow the rail tangent, which kinks against the sloped rail ends).
+  const b = Math.max(2, bow) * 1.3;
+  const p1x = A[0] + (B[0]-A[0])/3 + outx*b, p1y = A[1] + (B[1]-A[1])/3;
+  const p2x = A[0] + 2*(B[0]-A[0])/3 + outx*b, p2y = A[1] + 2*(B[1]-A[1])/3;
+  return "C " + fmt(p1x) + " " + fmt(p1y) + " " + fmt(p2x) + " " + fmt(p2y) + " " + fmt(B[0]) + " " + fmt(B[1]);
 }
 function mkFramePath(d, role, fill, stroke, ref){
   const p = document.createElementNS(SVGNS, "path");
