@@ -2583,10 +2583,12 @@ function loadErand47Strings(){
     if(i > 0) x += ERAND47_DIA[i-1]/2 + gap + ERAND47_DIA[i]/2;   // constant edge-to-edge gap
     const len = ERAND47_L[i], dia = ERAND47_DIA[i];
     const ten = (52.693 + (10.976 - 52.693) * i / (n - 1)) * 4.4482216;   // Erard lbf schedule -> NEWTONS (metric)
+    const note = "cdefgab"[i % 7];                                         // standard harp colors: C red, F blue, else dark gray
+    const col = note === "c" ? "#cc2222" : note === "f" ? "#2255cc" : "#444444";
     const ln = document.createElementNS(SVGNS, "line");
     ln.setAttribute("x1", fmt(x)); ln.setAttribute("x2", fmt(x));
     ln.setAttribute("y1", "0");    ln.setAttribute("y2", fmt(len));
-    ln.setAttribute("stroke", ERAND47_STRING_COLOR);
+    ln.setAttribute("stroke", col);
     ln.setAttribute("stroke-width", fmt(dia));
     ln.setAttribute("stroke-linecap", "round");
     ln.setAttribute("data-num", String(i + 1));
