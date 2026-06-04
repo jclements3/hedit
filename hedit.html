@@ -255,8 +255,7 @@
         <div class="seg">
           <button id="align-top" title="Level all string tops">Top</button>
           <button id="align-middle" title="Level string midpoints">Middle</button>
-          <input type="number" id="align-angle" title="Bottom leveling: tilt the bottom edge this many degrees from horizontal (+ raises the treble end). 0 = flat." value="60" step="1" style="width:3.4em">
-          <button id="align-bottom" title="Level all string bottoms onto a line tilted by the angle at left">Bottom</button>
+          <button id="align-bottom" title="Level all string bottoms">Bottom</button>
         </div>
         <div class="row"><label id="sel-count">No selection</label></div>
       </div>
@@ -2344,10 +2343,7 @@ document.getElementById("add-tuners-btn").onclick = placeTuners;
 document.getElementById("string-table-btn").onclick = openStringsTable;
 document.getElementById("align-top").onclick = () => alignStrings("top");
 document.getElementById("align-middle").onclick = () => alignStrings("middle");
-document.getElementById("align-bottom").onclick = () => {
-  const a = parseFloat(document.getElementById("align-angle").value);
-  alignStrings("bottom", isNaN(a) ? 0 : a);
-};
+document.getElementById("align-bottom").onclick = () => alignStrings("bottom");
 document.getElementById("xz-btn").onclick = orientXZ;
 document.getElementById("harp-canvas-btn").onclick = setHarpCanvas;
 const readFitNodes = () => { const v = parseInt(document.getElementById("fit-nodes").value, 10); return isNaN(v) ? 5 : Math.max(2, v); };
@@ -2898,7 +2894,7 @@ function applyWorkflowStep(n){
 // OWN AXIS so its reference point reaches the target level — this keeps the rake angle and the
 // perpendicular air gap (a line slid along its own direction is unchanged), and for vertical
 // strings it reduces to a plain vertical move. Lengths are never changed.
-function alignStrings(mode, angleDeg){
+function alignStrings(mode){
   const lines = stringLines();
   if(!lines.length){ setStatus("No strings to align."); return; }
   pushUndo();
@@ -2911,30 +2907,8 @@ function alignStrings(mode, angleDeg){
     const topEnd = y1 <= y2 ? [x1,y1] : [x2,y2], botEnd = y1 <= y2 ? [x2,y2] : [x1,y1];   // smaller y = geometric top
     let ux = botEnd[0]-topEnd[0], uy = botEnd[1]-topEnd[1]; const L = Math.hypot(ux,uy) || 1; ux/=L; uy/=L;  // axis top->bottom (uy>=0)
     const refY = m === "top" ? topEnd[1] : m === "bottom" ? botEnd[1] : (y1+y2)/2;
-    return { el, x1,y1,x2,y2, ux, uy, refY, bx: botEnd[0], by: botEnd[1], num: el.getAttribute("data-num") };
+    return { el, x1,y1,x2,y2, ux, uy, refY, num: el.getAttribute("data-num") };
   });
-  // Angled bottom: slide each string along its own axis until its bottom lands on a straight line
-  // tilted `angleDeg` from horizontal (anchored at the lowest current bottom). + raises the treble
-  // (+x) end. Keeps rake/length/air-gap (still an along-axis slide). angle 0 falls through to flat.
-  const ang = (mode === "bottom") ? (+angleDeg || 0) : 0;
-  if(ang){
-    const anchor = G.reduce((a,i)=> i.refY > a.refY ? i : a, G[0]);   // lowest bottom = on the line
-    const Q0 = [anchor.bx, anchor.by];
-    let th = ang * Math.PI/180; if(yIsFlipped()) th = -th;            // visual tilt under the render flip
-    const d = [Math.cos(th), -Math.sin(th)];                          // line dir; +ang raises +x end
-    G.forEach(i => {
-      // slide i along its axis u=(ux,uy) until its bottom meets the line through Q0 with dir d:
-      // P0 + s·u = Q0 + r·d  →  s = (-(Q0x-P0x)·d_y + d_x·(Q0y-P0y)) / (-ux·d_y + d_x·uy)
-      const det = -i.ux*d[1] + d[0]*i.uy;
-      const s = Math.abs(det) < 1e-9 ? 0 : (-(Q0[0]-i.bx)*d[1] + d[0]*(Q0[1]-i.by)) / det;
-      const dx = i.ux*s, dy = i.uy*s;
-      i.el.setAttribute("x1", fmt(i.x1+dx)); i.el.setAttribute("y1", fmt(i.y1+dy));
-      i.el.setAttribute("x2", fmt(i.x2+dx)); i.el.setAttribute("y2", fmt(i.y2+dy));
-    });
-    harpAlignment = mode; refreshDots(); pathModel = null; renderOverlay();
-    setStatus(`Aligned ${lines.length} bottoms to a ${ang}° line. Rake, lengths & air gap preserved.`);
-    return;
-  }
   let target;
   if(m === "top")         target = Math.min(...G.map(i => i.refY));   // flush to the highest top
   else if(m === "bottom") target = Math.max(...G.map(i => i.refY));   // flush to the lowest bottom
@@ -3724,10 +3698,10 @@ function numNoteMap(){
 // [ax,az, c1x,c1z, c2x,c2z, bx,bz]. The plate is bound to the DOTS by a least-squares AFFINE fit
 // (REF_DOTS → the current dots, matched by role+num), so the frozen shape travels with the dot
 // cloud: air-gap (scale), rake (rotation), and align (translation/shear) all carry it faithfully.
-const PLATE_SEED=[[-201.32,12.95,-148.84,116.76,-58.96,-116.2,-58.26,-116.9],[-58.26,-116.9,-57.55,-117.61,138.16,-384.83,143.14,-385.26],[143.14,-385.26,148.13,-385.69,437.91,-646.48,512.08,-651.5],[512.08,-651.5,586.24,-656.51,591.79,-746,518.53,-730.14],[518.53,-730.14,442.81,-713.74,335.72,-671.46,164.85,-537.97],[164.85,-537.97,-6.02,-404.47,-30.55,-326.81,-98.93,-302.25],[-98.93,-302.25,-167.31,-277.68,-253.79,-90.87,-201.32,12.95]];
+const PLATE_SEED=[[-199.8,5.59,-190.69,84.61,-89.38,-63.12,-71.84,-80.66],[-71.84,-80.66,-54.3,-98.19,32.95,-262.08,111.73,-351.39],[111.73,-351.39,190.53,-440.7,392.53,-605.8,517.12,-651.93],[517.12,-651.93,570.34,-671.64,560.39,-637,559.78,-693.75],[559.78,-693.75,558.74,-790.49,311.26,-641.79,301.02,-633.78],[301.02,-633.78,290.77,-625.78,105.95,-509.69,62,-448.94],[62,-448.94,18.05,-388.2,8.35,-391.83,-98.44,-325.19],[-98.44,-325.19,-205.24,-258.55,-208.91,-73.42,-199.8,5.59]];
 const REF_PLATE_BBOX=[-188.32,-712.6,550.31,11.79];   // minX, minZ, maxX, maxZ (z-up) of the ref dots
 // reference dot positions (z-up) keyed "p"+num (pin) / "s"+num (sharp) — the frame the seed lives in
-const REF_DOTS={"p1":[-188.3,11.8],"p2":[-169.4,-22.5],"p3":[-150.7,-56],"p4":[-134.3,-71.3],"p5":[-116.7,-96.9],"p6":[-99.2,-122.4],"p7":[-86.2,-111.8],"p8":[-71.3,-116.6],"p9":[-53,-149.6],"p10":[-34.8,-182.4],"p11":[-18.8,-197.3],"p12":[-1.7,-222.3],"p13":[15.7,-244.6],"p14":[33.5,-266.7],"p15":[51.6,-291.2],"p16":[69.4,-313.2],"p17":[86.9,-335],"p18":[104.4,-356.8],"p19":[121.8,-378.4],"p20":[138.8,-397.5],"p21":[155,-411.5],"p22":[171.8,-430.5],"p23":[188.2,-446.8],"p24":[204.5,-463.2],"p25":[220.7,-478.8],"p26":[236.6,-492],"p27":[252.4,-505.1],"p28":[267.8,-515.8],"p29":[284.4,-536.5],"p30":[300.1,-549.7],"p31":[315.7,-562.9],"p32":[331,-573.6],"p33":[346,-581.8],"p34":[361.2,-592.5],"p35":[376.3,-603.3],"p36":[391.8,-616.5],"p37":[407,-627.2],"p38":[421.8,-635.5],"p39":[436.5,-642.2],"p40":[450.9,-647],"p41":[465.2,-651.8],"p42":[479.3,-655.1],"p43":[493.4,-659.4],"p44":[507.6,-663.7],"p45":[521.7,-668.5],"p46":[535.9,-673.4],"p47":[550.3,-680.7],"s1":[-176.8,-188.5],"s2":[-158.9,-214.9],"s3":[-141.1,-240.7],"s4":[-125.2,-252.3],"s5":[-108.3,-272],"s6":[-91.5,-291.5],"s7":[-78.3,-282.8],"s8":[-63.6,-286.2],"s9":[-46.2,-311.6],"s10":[-28.9,-336.9],"s11":[-13.4,-348.2],"s12":[3,-367.3],"s13":[19.7,-384.4],"s14":[37,-401.3],"s15":[54.3,-420],"s16":[71.4,-436.8],"s17":[88.4,-453.5],"s18":[105.2,-470.1],"s19":[121.9,-486.6],"s20":[138.4,-501.2],"s21":[154.2,-511.8],"s22":[170.5,-526.2],"s23":[186.4,-538.6],"s24":[202.2,-551],"s25":[218,-562.8],"s26":[233.4,-572.8],"s27":[248.8,-582.7],"s28":[263.9,-590.7],"s29":[279.9,-606.4],"s30":[295.2,-616.4],"s31":[310.4,-626.3],"s32":[325.4,-634.3],"s33":[340.1,-640.4],"s34":[354.9,-648.4],"s35":[369.8,-656.4],"s36":[384.8,-666.4],"s37":[399.7,-674.4],"s38":[414.3,-680.5],"s39":[428.7,-685.4],"s40":[442.9,-688.8],"s41":[457.1,-692.2],"s42":[471,-694.4],"s43":[485,-697.4],"s44":[499,-700.4],"s45":[513,-703.8],"s46":[526.9,-707.3],"s47":[541.1,-712.6]};
+const REF_DOTS={"p1":[-188.3,11.8],"p2":[-167.9,-34.7],"p3":[-147.8,-79.9],"p4":[-132.2,-88.8],"p5":[-114.1,-118.3],"p6":[-96.1,-147.7],"p7":[-87,-105.1],"p8":[-74.1,-93.5],"p9":[-54.4,-138.3],"p10":[-34.7,-183.1],"p11":[-19.5,-192],"p12":[-1.8,-221.4],"p13":[15.7,-244.6],"p14":[33.6,-266.9],"p15":[52,-294.3],"p16":[69.8,-316.8],"p17":[87.5,-339.5],"p18":[105.1,-362.6],"p19":[122.7,-385.8],"p20":[139.6,-404.4],"p21":[155.2,-413.4],"p22":[172.1,-432.8],"p23":[188.3,-447.7],"p24":[204.5,-463.2],"p25":[220.6,-477.9],"p26":[236.2,-488.4],"p27":[251.7,-499.5],"p28":[266.7,-506.4],"p29":[284.1,-533.9],"p30":[299.8,-547.1],"p31":[315.5,-561],"p32":[330.7,-570.7],"p33":[345.3,-576.1],"p34":[360.5,-587.2],"p35":[375.8,-599],"p36":[391.8,-616.5],"p37":[407.3,-629.7],"p38":[422.2,-638.6],"p39":[436.8,-645.2],"p40":[451,-648.3],"p41":[465.2,-651.9],"p42":[479,-653.1],"p43":[493.1,-656.6],"p44":[507.1,-660.3],"p45":[521.3,-665.3],"p46":[535.5,-670.5],"p47":[550.3,-680.7],"s1":[-176.8,-188.5],"s2":[-157.4,-227.1],"s3":[-138.2,-264.6],"s4":[-123,-269.8],"s5":[-105.7,-293.3],"s6":[-88.4,-316.8],"s7":[-79.1,-276.1],"s8":[-66.4,-263.1],"s9":[-47.6,-300.4],"s10":[-28.8,-337.6],"s11":[-14.1,-342.9],"s12":[2.9,-366.4],"s13":[19.7,-384.4],"s14":[37,-401.5],"s15":[54.7,-423.1],"s16":[71.9,-440.4],"s17":[88.9,-458],"s18":[105.9,-475.9],"s19":[122.8,-494],"s20":[139.2,-508.1],"s21":[154.4,-513.6],"s22":[170.7,-528.5],"s23":[186.5,-539.5],"s24":[202.2,-551],"s25":[217.9,-562],"s26":[233,-569.1],"s27":[248.1,-577],"s28":[262.8,-581.2],"s29":[279.6,-603.8],"s30":[294.9,-613.8],"s31":[310.2,-624.5],"s32":[325,-631.5],"s33":[339.4,-634.7],"s34":[354.3,-643.1],"s35":[369.2,-652.2],"s36":[384.8,-666.4],"s37":[400,-676.9],"s38":[414.6,-683.7],"s39":[429,-688.4],"s40":[443.1,-690.1],"s41":[457.1,-692.3],"s42":[470.8,-692.4],"s43":[484.6,-694.6],"s44":[498.5,-697],"s45":[512.6,-700.6],"s46":[526.6,-704.4],"s47":[541.1,-712.6]};
 // Vertical/un-raked harp reference — the 5-node plate-top.svg + its dot frame (border-top, z-up).
 // Picked automatically when the loaded harp is the vertical (fan) layout rather than the centered one.
 const PLATE_TOP_SEED=[[52.14,-222.64,-38.98,-260.09,-36.53,-32.56,-8.05,33.91],[-8.05,33.91,20.43,100.37,258.93,88.97,314.74,74.06],[314.74,74.06,370.56,59.14,649.85,80.19,676.66,24.05],[676.66,24.05,703.47,-32.09,643.71,-16.18,356.93,-87.03],[356.93,-87.03,70.14,-157.89,143.26,-185.19,52.14,-222.64]];
