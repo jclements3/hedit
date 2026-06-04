@@ -3702,6 +3702,10 @@ const PLATE_SEED=[[-199.8,5.59,-190.69,84.61,-89.38,-63.12,-71.84,-80.66],[-71.8
 const REF_PLATE_BBOX=[-188.32,-712.6,550.31,11.79];   // minX, minZ, maxX, maxZ (z-up) of the ref dots
 // reference dot positions (z-up) keyed "p"+num (pin) / "s"+num (sharp) — the frame the seed lives in
 const REF_DOTS={"p1":[-188.3,11.8],"p2":[-167.9,-34.7],"p3":[-147.8,-79.9],"p4":[-132.2,-88.8],"p5":[-114.1,-118.3],"p6":[-96.1,-147.7],"p7":[-87,-105.1],"p8":[-74.1,-93.5],"p9":[-54.4,-138.3],"p10":[-34.7,-183.1],"p11":[-19.5,-192],"p12":[-1.8,-221.4],"p13":[15.7,-244.6],"p14":[33.6,-266.9],"p15":[52,-294.3],"p16":[69.8,-316.8],"p17":[87.5,-339.5],"p18":[105.1,-362.6],"p19":[122.7,-385.8],"p20":[139.6,-404.4],"p21":[155.2,-413.4],"p22":[172.1,-432.8],"p23":[188.3,-447.7],"p24":[204.5,-463.2],"p25":[220.6,-477.9],"p26":[236.2,-488.4],"p27":[251.7,-499.5],"p28":[266.7,-506.4],"p29":[284.1,-533.9],"p30":[299.8,-547.1],"p31":[315.5,-561],"p32":[330.7,-570.7],"p33":[345.3,-576.1],"p34":[360.5,-587.2],"p35":[375.8,-599],"p36":[391.8,-616.5],"p37":[407.3,-629.7],"p38":[422.2,-638.6],"p39":[436.8,-645.2],"p40":[451,-648.3],"p41":[465.2,-651.9],"p42":[479,-653.1],"p43":[493.1,-656.6],"p44":[507.1,-660.3],"p45":[521.3,-665.3],"p46":[535.5,-670.5],"p47":[550.3,-680.7],"s1":[-176.8,-188.5],"s2":[-157.4,-227.1],"s3":[-138.2,-264.6],"s4":[-123,-269.8],"s5":[-105.7,-293.3],"s6":[-88.4,-316.8],"s7":[-79.1,-276.1],"s8":[-66.4,-263.1],"s9":[-47.6,-300.4],"s10":[-28.8,-337.6],"s11":[-14.1,-342.9],"s12":[2.9,-366.4],"s13":[19.7,-384.4],"s14":[37,-401.5],"s15":[54.7,-423.1],"s16":[71.9,-440.4],"s17":[88.9,-458],"s18":[105.9,-475.9],"s19":[122.8,-494],"s20":[139.2,-508.1],"s21":[154.4,-513.6],"s22":[170.7,-528.5],"s23":[186.5,-539.5],"s24":[202.2,-551],"s25":[217.9,-562],"s26":[233,-569.1],"s27":[248.1,-577],"s28":[262.8,-581.2],"s29":[279.6,-603.8],"s30":[294.9,-613.8],"s31":[310.2,-624.5],"s32":[325,-631.5],"s33":[339.4,-634.7],"s34":[354.3,-643.1],"s35":[369.2,-652.2],"s36":[384.8,-666.4],"s37":[400,-676.9],"s38":[414.6,-683.7],"s39":[429,-688.4],"s40":[443.1,-690.1],"s41":[457.1,-692.3],"s42":[470.8,-692.4],"s43":[484.6,-694.6],"s44":[498.5,-697],"s45":[512.6,-700.6],"s46":[526.6,-704.4],"s47":[541.1,-712.6]};
+// Vertical/un-raked harp reference — the 5-node plate-top.svg + its dot frame (border-top, z-up).
+// Picked automatically when the loaded harp is the vertical (fan) layout rather than the centered one.
+const PLATE_TOP_SEED=[[52.14,-222.64,-38.98,-260.09,-36.53,-32.56,-8.05,33.91],[-8.05,33.91,20.43,100.37,258.93,88.97,314.74,74.06],[314.74,74.06,370.56,59.14,649.85,80.19,676.66,24.05],[676.66,24.05,703.47,-32.09,643.71,-16.18,356.93,-87.03],[356.93,-87.03,70.14,-157.89,143.26,-185.19,52.14,-222.64]];
+const REF_DOTS_TOP={"p1":[13,22.5],"p2":[27.6,-2.1],"p3":[42.1,-25.7],"p4":[56.5,-12.6],"p5":[70.8,-20.6],"p6":[85.1,-28.6],"p7":[99.3,35.9],"p8":[113.5,69],"p9":[127.6,45.1],"p10":[141.7,21.1],"p11":[155.7,33.1],"p12":[169.7,24.3],"p13":[184.2,22.5],"p14":[199.3,22.2],"p15":[214.2,16.5],"p16":[229.1,15.4],"p17":[243.9,13.6],"p18":[258.6,11],"p19":[273.2,7.9],"p20":[287.7,8.8],"p21":[302.2,18.9],"p22":[316.5,17.9],"p23":[330.8,20.8],"p24":[345.1,22.5],"p25":[359.2,24.3],"p26":[373.4,29.8],"p27":[387.4,33.9],"p28":[401.5,41.6],"p29":[415.4,27.9],"p30":[429.4,27.9],"p31":[443.3,26.4],"p32":[457.1,28.6],"p33":[471,34.3],"p34":[484.7,33.5],"p35":[498.5,31.2],"p36":[512.2,22.5],"p37":[526,17.4],"p38":[539.7,15.9],"p39":[553.4,16.2],"p40":[567.1,19.4],"p41":[580.8,21.7],"p42":[594.3,26.1],"p43":[607.9,27.7],"p44":[621.4,28.9],"p45":[634.8,28.7],"p46":[648.3,28.2],"p47":[661.7,22.5],"s1":[0,-177.7],"s2":[14.6,-194.4],"s3":[29.1,-210.2],"s4":[43.5,-193.4],"s5":[57.8,-195.4],"s6":[72.1,-197.4],"s7":[86.3,-134.9],"s8":[100.5,-100.3],"s9":[114.6,-116.6],"s10":[128.7,-133],"s11":[142.7,-117.4],"s12":[156.7,-120.2],"s13":[171.2,-116.7],"s14":[186.3,-111.8],"s15":[201.2,-111.7],"s16":[216.1,-107.5],"s17":[230.9,-104.1],"s18":[245.6,-101.6],"s19":[260.2,-99.5],"s20":[274.7,-94],"s21":[289.2,-80.5],"s22":[303.5,-77],"s23":[317.8,-70],"s24":[332.1,-64.4],"s25":[346.2,-58.8],"s26":[360.4,-50],"s27":[374.4,-42.6],"s28":[388.5,-32.1],"s29":[402.4,-40.9],"s30":[416.4,-37.7],"s31":[430.3,-35.9],"s32":[444.1,-31.1],"s33":[458,-23.2],"s34":[471.7,-21.2],"s35":[485.5,-20.8],"s36":[499.2,-26.2],"s37":[513,-28.6],"s38":[526.7,-27.9],"s39":[540.4,-25.7],"s40":[554.1,-21.1],"s41":[567.8,-17.4],"s42":[581.3,-12],"s43":[594.9,-9],"s44":[608.4,-6.5],"s45":[621.8,-5.3],"s46":[635.3,-4.4],"s47":[648.7,-8.1]};
 function _solve3(M,v){   // Gaussian elimination on a 3×3 system; null if singular
   const A=M.map((r,i)=>r.concat(v[i]));
   for(let i=0;i<3;i++){ let piv=i; for(let r=i+1;r<3;r++) if(Math.abs(A[r][i])>Math.abs(A[piv][i])) piv=r;
@@ -3719,18 +3723,44 @@ function _affineFrom(pairs){   // least-squares 2×3 affine mapping ref→cur; r
   if(!a||!b) return null;
   return p=>[a[0]*p[0]+a[1]*p[1]+a[2], b[0]*p[0]+b[1]*p[1]+b[2]];
 }
-// Map PLATE_SEED onto the current harp. curMap: {"p"+num|"s"+num: [x,z]} of the live dots (z-up).
-// Primary: least-squares affine REF_DOTS→curMap (handles air-gap/rake/align). Fallback (too few
-// matches): axis-aligned bbox rescale.
-function fittedPlateSeed(curMap, allp){
-  const pairs=[]; for(const k in REF_DOTS){ if(curMap[k]) pairs.push([REF_DOTS[k], curMap[k]]); }
+// Warp one reference plate (`seed` segments, in its `refDots` frame) onto the live harp. curMap:
+// {"p"+num|"s"+num: [x,z]} of the live dots (z-up). Primary: least-squares affine refDots→curMap +
+// an inverse-distance-weighted residual warp (handles air-gap/rake/align, even nonlinear). Fallback
+// (too few matches): axis-aligned bbox rescale.
+function warpSeed(seed, refDots, curMap, allp){
+  const pairs=[]; for(const k in refDots){ if(curMap[k]) pairs.push([refDots[k], curMap[k]]); }
   const T = pairs.length>=6 ? _affineFrom(pairs) : null;
-  if(T) return PLATE_SEED.map(s=>[T([s[0],s[1]]),T([s[2],s[3]]),T([s[4],s[5]]),T([s[6],s[7]])]);
+  if(T){
+    const src = pairs.map(p=>p[0]);
+    const res = pairs.map(p=>{ const t=T(p[0]); return [p[1][0]-t[0], p[1][1]-t[1]]; });
+    const warp = P => {
+      const t=T(P); let ws=0,rx=0,ry=0;
+      for(let i=0;i<src.length;i++){
+        const dx=P[0]-src[i][0], dy=P[1]-src[i][1], w=1/(dx*dx+dy*dy+1e-6);
+        ws+=w; rx+=w*res[i][0]; ry+=w*res[i][1];
+      }
+      return [t[0]+rx/ws, t[1]+ry/ws];
+    };
+    return seed.map(s=>[warp([s[0],s[1]]),warp([s[2],s[3]]),warp([s[4],s[5]]),warp([s[6],s[7]])]);
+  }
   let minx=Infinity,minz=Infinity,maxx=-Infinity,maxz=-Infinity;
   for(const p of allp){ if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<minz)minz=p[1]; if(p[1]>maxz)maxz=p[1]; }
-  const [rx0,rz0,rx1,rz1]=REF_PLATE_BBOX, rw=(rx1-rx0)||1, rh=(rz1-rz0)||1, cw=maxx-minx, ch=maxz-minz;
+  let rx0=Infinity,rz0=Infinity,rx1=-Infinity,rz1=-Infinity;
+  for(const k in refDots){ const p=refDots[k]; if(p[0]<rx0)rx0=p[0]; if(p[0]>rx1)rx1=p[0]; if(p[1]<rz0)rz0=p[1]; if(p[1]>rz1)rz1=p[1]; }
+  const rw=(rx1-rx0)||1, rh=(rz1-rz0)||1, cw=maxx-minx, ch=maxz-minz;
   const mx=x=>minx+(x-rx0)/rw*cw, mz=z=>minz+(z-rz0)/rh*ch;
-  return PLATE_SEED.map(s=>[[mx(s[0]),mz(s[1])],[mx(s[2]),mz(s[3])],[mx(s[4]),mz(s[5])],[mx(s[6]),mz(s[7])]]);
+  return seed.map(s=>[[mx(s[0]),mz(s[1])],[mx(s[2]),mz(s[3])],[mx(s[4]),mz(s[5])],[mx(s[6]),mz(s[7])]]);
+}
+// Auto-pick the reference (centered banana vs vertical fan) that fits the loaded harp best, and warp
+// it. Whichever warps to the higher min-clearance is the matching layout.
+function fittedPlateSeed(curMap, allp){
+  let best=null, bm=-Infinity;
+  for(const [seed,ref] of [[PLATE_SEED,REF_DOTS],[PLATE_TOP_SEED,REF_DOTS_TOP]]){
+    const cv=warpSeed(seed,ref,curMap,allp);
+    const m=PlateFit.exactMinClear(cv,allp,800);
+    if(m>bm){ bm=m; best=cv; }
+  }
+  return best;
 }
 // Async: wrap the pins + sharps in the min-area plate and draw it as a green closed path.
 async function fitPlate(){
