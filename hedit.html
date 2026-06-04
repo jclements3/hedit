@@ -93,6 +93,9 @@
   .ov-pen-preview{fill:none; stroke:var(--accent2); stroke-width:1.5; vector-effect:non-scaling-stroke}
   .ov-shape-preview{fill:rgba(110,168,254,.15); stroke:var(--accent); stroke-width:1; vector-effect:non-scaling-stroke}
   .ov-marquee{fill:rgba(110,168,254,.12); stroke:var(--accent); stroke-width:1; vector-effect:non-scaling-stroke; stroke-dasharray:3 3}
+  .ov-plate-ctrl{fill:var(--handle); stroke:#10131a; stroke-width:1; vector-effect:non-scaling-stroke}
+  .ov-plate-node{fill:#10131a; stroke:#f4e3b0; stroke-width:1.5; vector-effect:non-scaling-stroke}
+  .ov-nodenum{fill:#f4e3b0; font-family:inherit; font-weight:700; paint-order:stroke; stroke:#10131a; stroke-width:2; vector-effect:non-scaling-stroke}
   /* strings spec-table modal */
   .modal{position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:50}
   .modal[hidden]{display:none}
@@ -197,18 +200,23 @@
   </div>
 
   <div class="props props-left">
-    <details class="sec" id="files-sec" open>
-      <summary><span class="step">📁</span> Files (folder browse)</summary>
+    <details class="sec harp" id="files-sec" open>
+      <summary><span class="step">📁</span> Files &amp; harp JSON</summary>
       <div class="sec-body">
+        <div class="row">
+          <label title="Edge-to-edge air gap between adjacent strings (mm). Used by string loading, Apply parallel air-gap, the shift default, and curve clearances.">Air gap</label>
+          <input type="number" id="string-gap" step="0.1" value="13">
+          <label title="Max on-curve nodes for fitted curves (smooth C2 spline; endpoints pinned)">Max nodes</label>
+          <input type="number" id="fit-nodes" min="2" step="1" value="5">
+        </div>
+        <div class="row">
+          <label title="String rake angle (°), tops tilted toward the pillar (bass). Used by Apply rake →pillar.">Rake (°→pillar)</label>
+          <input type="number" id="string-rake" step="0.5" value="7">
+        </div>
         <button id="files-pick" title="Choose a folder; hedit lists its SVG parts and images below to Open / Import / load as reference — no OS file dialog per file">Browse folder…</button>
         <input id="files-filter" type="text" placeholder="filter by name…" style="display:none">
         <div id="files-list" class="files-list"></div>
-      </div>
-    </details>
-
-    <details class="sec harp" open>
-      <summary><span class="step">JSON</span> Harp file (DP/BP/SP/WP)</summary>
-      <div class="sec-body">
+        <div class="row" style="margin-top:8px"><label>Harp JSON (DP/BP/SP/WP)</label></div>
         <div class="seg">
           <button id="harp-import-btn" title="Import a Paraguayan-format harp JSON (DP/BP/SP rails + WP)">Import</button>
           <button id="harp-export-btn" title="Export DP/BP/SP/WP as paraguayan_overrides.json (drop-in)">Export</button>
@@ -216,68 +224,63 @@
         <button id="vim-source-btn" title="Edit the harp JSON directly in an embedded vim editor; Apply parses it back into the curves">Edit JSON (vim)</button>
         <button id="js-source-btn" title="Open a vim JavaScript console that runs in hedit's scope: call stringLines(), addPins(), fitEndsCurve(), contentGroup, exportHarpJSON()... Run to eval, Undo (Ctrl+Z) to revert">JS console (vim)</button>
         <button id="wp-edit-btn" title="Edit the WP waterfall profile (f -> r cross-section width scale) by dragging nodes">Edit WP curve…</button>
+        <div class="row" style="margin-top:8px">
+          <label title="Build stage — auto-applies the workflow up to this step: 1 load (air gap) + rake · 2 center on the rake-perpendicular middle · 3 fit the NT/NB neck frame. Drag to rebuild to that stage.">Build</label>
+          <input type="range" id="workflow-slider" min="0" max="9" step="1" value="0" style="flex:1">
+          <span id="workflow-val" style="min-width:1.2em; text-align:right">0</span>
+        </div>
       </div>
     </details>
 
     <details class="sec harp" open>
-      <summary><span class="step">1</span> Strings</summary>
+      <summary><span class="step">1</span> Strings (load · space · rake · level)</summary>
       <div class="sec-body">
-        <button id="string-load-erand47" class="btn-primary" title="Load the original 47 erand47 strings (archive C1..G7 lengths + diameters), air-gap spaced on the x=0 axis. Replaces existing strings.">Load erand47 strings</button>
-        <button id="string-table-btn" title="Open the string specification table (note, length, diameter, tension, core/wrap)">Edit specs…</button>
-        <button id="string-selectall" title="Select every string (line) as a group">Select all strings</button>
+        <button id="string-load-clements47" class="btn-primary" title="Load the 47 clements47_cf strings from the full spec (C1..G7: material, L_nat length, OD, tension in N, etc.), vertical and spaced by the air gap above. Replaces existing strings.">Load clements47 strings</button>
+        <button id="string-load-erand47" title="Load the 47 strings at the original Erard scale (C1..G7 lengths + diameters), vertical and spaced by the air gap above. Replaces existing strings.">Load erand47 strings</button>
+        <div class="seg">
+          <button id="string-table-btn" title="Open the string specification table (note, length, diameter, tension, core/wrap)">Edit specs…</button>
+          <button id="string-selectall" title="Select every string (line) as a group">Select all</button>
+        </div>
+        <button id="string-gap-btn" class="btn-primary" title="Make every string vertical and re-space them with a constant edge-to-edge air gap (the value above; accounts for each string's diameter)">Apply parallel air-gap</button>
+        <div class="row" style="margin-top:8px">
+          <label title="Horizontal shift amount (mm) for the whole string group + S axis (defaults to the air gap)">Shift (mm)</label>
+          <input type="number" id="string-shift" step="1" value="13">
+        </div>
+        <div class="seg">
+          <button id="string-shift-left" title="Shift all strings (and the S axis) LEFT by the amount. Pure translation — the air gap / spacing is preserved.">◀ Left</button>
+          <button id="string-shift-right" title="Shift all strings (and the S axis) RIGHT by the amount. Pure translation — the air gap / spacing is preserved.">Right ▶</button>
+        </div>
+        <button id="string-rake-btn" title="Rake the strings by the angle set in the Files section (tops toward the pillar/bass). Rigid rotation of the whole group (+ S axis) -> the air gap is preserved exactly. Run after the air-gap.">Apply rake →pillar</button>
+        <div class="row" style="margin-top:8px"><label title="Slide each string along its own axis to level the chosen end — rake &amp; air gap preserved">Level (rake &amp; gap kept)</label></div>
+        <div class="seg">
+          <button id="align-top" title="Level all string tops">Top</button>
+          <button id="align-middle" title="Level string midpoints">Middle</button>
+          <button id="align-bottom" title="Level all string bottoms">Bottom</button>
+        </div>
         <div class="row"><label id="sel-count">No selection</label></div>
       </div>
     </details>
 
     <details class="sec harp" open>
-      <summary><span class="step">2</span> Spacing</summary>
+      <summary><span class="step">2</span> Dots</summary>
       <div class="sec-body">
-        <div class="row">
-          <label title="Edge-to-edge air gap between adjacent strings, in SVG units (mm)">Air gap</label>
-          <input type="number" id="string-gap" step="0.1" value="13">
-        </div>
-        <button id="string-gap-btn" class="btn-primary" title="Make every string vertical and space them with a constant edge-to-edge air gap (accounts for each string's diameter)">Apply parallel air-gap</button>
-        <div class="row" style="margin-top:8px">
-          <label title="String rake angle, tops tilted toward the pillar (bass). Applied as a RIGID rotation of the whole string group, so the perpendicular edge-to-edge air gap is preserved exactly.">Rake (°→pillar)</label>
-          <input type="number" id="string-rake" step="0.5" value="7">
-        </div>
-        <button id="string-rake-btn" title="Rake the strings by the angle, tops toward the pillar (bass). Rigid rotation of the whole group (+ S axis) -> the air gap is preserved exactly. Run after the air-gap.">Apply rake →pillar</button>
-      </div>
-    </details>
-
-    <details class="sec harp" open>
-      <summary><span class="step">3</span> Align string ends</summary>
-      <div class="sec-body">
-        <div class="row"><label>Level (lengths &amp; gap kept)</label></div>
-        <div class="seg">
-          <button id="align-top" title="Align all string tops">Top</button>
-          <button id="align-middle" title="Center strings vertically">Middle</button>
-          <button id="align-bottom" title="Align all string bottoms">Bottom</button>
-        </div>
-        <div class="row"><label>Onto the selected curve</label></div>
-        <div class="seg">
-          <button id="align-curve-top" title="Align string TOP ends to a selected path/curve">Tops</button>
-          <button id="align-curve-bottom" title="Align string BOTTOM ends to a selected path/curve">Bottoms</button>
-        </div>
-      </div>
-    </details>
-
-    <details class="sec harp" open>
-      <summary><span class="step">4</span> Dots</summary>
-      <div class="sec-body">
-        <label class="checkrow" title="Pin dot per string — 3 air-gaps up-and-to-the-right of the top"><input type="checkbox" id="dot-pin"> Pins</label>
-        <label class="checkrow" title="Flat dot at the string tip (the open/flat note)"><input type="checkbox" id="dot-flat"> Flats</label>
-        <label class="checkrow" title="Natural dot 0.0561·L below the tip"><input type="checkbox" id="dot-natural"> Naturals</label>
-        <label class="checkrow" title="Sharp dot 0.1091·L below the tip"><input type="checkbox" id="dot-sharp"> Sharps</label>
+        <label class="checkrow" title="Pin dot per string — 2 air-gaps up-and-to-the-right of the top"><input type="checkbox" id="dot-pin" checked> Pins</label>
+        <label class="checkrow" title="Flat dot at the string tip (the open/flat note)"><input type="checkbox" id="dot-flat" checked> Flats</label>
+        <label class="checkrow" title="Natural dot 0.0561·L below the tip"><input type="checkbox" id="dot-natural" checked> Naturals</label>
+        <label class="checkrow" title="Sharp dot 0.1091·L below the tip"><input type="checkbox" id="dot-sharp" checked> Sharps</label>
         <label class="checkrow" title="Midi dot 0.125·L below the tip"><input type="checkbox" id="dot-midi"> Midi</label>
         <label class="checkrow" title="Eyelet dot at the string bottom (soundboard attachment)"><input type="checkbox" id="dot-eyelet"> Eyelets</label>
+        <label class="checkrow" title="Show the plate's Bézier control handles (anchor→control lines + squares)"><input type="checkbox" id="plate-handles"> Plate handles</label>
+        <label class="checkrow" title="Number the plate's nodes 0–7"><input type="checkbox" id="plate-numbers"> Plate node #s</label>
         <button id="add-tuners-btn" title="Add a Ø15.4 guitar-tuner gear-post above each string top (Thingiverse 6099101). Odd strings = front plate (orange), even = back plate (blue), offset into two rows so the posts clear the 13 mm string pitch.">Add guitar tuners (neck top)</button>
       </div>
     </details>
 
     <details class="sec harp" open>
-      <summary><span class="step">5</span> Curves</summary>
+      <summary><span class="step">3</span> Curves</summary>
       <div class="sec-body">
+        <button id="fit-step5-btn" class="btn-primary" title="Fit a green soundboard curve through the string BOTTOMS and rest the strings on it (keeps each string's length + the air gap). Uses Max nodes + Air gap (Files section).">Fit bottom</button>
+        <button id="fix-plate-btn" class="btn-primary" title="Wrap the pins + sharps in one closed min-area Bézier 'plate' that clears every dot by the air gap (the plate-fit algorithm + constraints: nodes homed on dot circles, node1 @ −45°, node5 angled down, the G7 cap free). Runs the optimizer in the background (~15–40 s).">Fix plate</button>
         <div class="row">
           <label title="Which point-set to fit a smooth C2 curve through">Fit</label>
           <select id="fit-source">
@@ -291,11 +294,7 @@
             <option value="eyelet">Eyelets</option>
           </select>
         </div>
-        <div class="row">
-          <label title="Max on-curve nodes (smooth C2 spline; endpoints pinned)">Max nodes</label>
-          <input type="number" id="fit-nodes" min="2" step="1" value="9">
-        </div>
-        <button id="fit-btn" class="btn-primary" title="Fit a smooth C2 curve through the chosen point-set">Fit curve</button>
+        <button id="fit-btn" title="Fit a smooth C2 curve through the chosen point-set (manual, single source)">Fit curve</button>
         <div class="row"><label title="Rest the string ends on a fitted bottom/top curve (keeps each string's length &amp; the air gap)">Rest string ends on curve</label></div>
         <div class="seg">
           <button id="place-bottoms-btn" title="Drop the string BOTTOM ends onto the fitted bottom curve">Bottoms ↓ curve</button>
@@ -304,9 +303,9 @@
         <button id="clear-curve-btn" class="danger" title="Delete all fitted curves">Clear fitted curves</button>
         <div class="row" style="margin-top:8px">
           <label title="Shift the selected/active curve vertically, in mm">Shift</label>
-          <input type="number" id="shift-amt" step="1" value="25">
-          <label title="Use the string air gap as the shift step instead of the amount">×gap</label>
-          <input type="checkbox" id="shift-gap">
+          <input type="number" id="shift-amt" step="1" value="13">
+          <label title="Use the string air gap as the shift step instead of the amount (default on)">×gap</label>
+          <input type="checkbox" id="shift-gap" checked>
         </div>
         <div class="seg">
           <button id="shift-up-btn" title="Shift up">Shift ↑</button>
@@ -316,7 +315,7 @@
     </details>
 
     <details class="sec harp" open>
-      <summary><span class="step">5b</span> Sides (Lamé)</summary>
+      <summary><span class="step">3b</span> Sides (Lamé)</summary>
       <div class="sec-body">
         <div class="row">
           <label title="How far the pillar curve bows toward −x from c1, in mm">Pillar bow</label>
@@ -332,54 +331,6 @@
           <input type="number" id="shoulder-n" step="0.1" min="1.05" value="2.5">
         </div>
         <button id="add-shoulder-btn" class="btn-primary" title="Lamé right-side curve from the SB (bottom) curve to the neck/top curve at the last string's x, bowing +x by 'Shoulder bow' mm.">Add shoulder</button>
-      </div>
-    </details>
-
-    <details class="sec harp" open>
-      <summary><span class="step">5c</span> Ladder (frame + rungs)</summary>
-      <div class="sec-body">
-        <div class="row">
-          <label title="Dedicated support rungs spaced along the pillar (bass) side curve — CF buckling needs ~8">Pillar rungs</label>
-          <input type="number" id="ladder-pillar-rungs" min="0" step="1" value="8">
-          <label title="Dedicated support rungs along the shoulder (treble) side curve">Shoulder</label>
-          <input type="number" id="ladder-shoulder-rungs" min="0" step="1" value="3">
-        </div>
-        <button id="fit-ladder-btn" class="btn-primary" title="Build the CF ladder frame from the step-5 neck (top) + eyelet (bottom) curves: outer path NT-RO-EB-PO and inner path NB-RI-ET-PI, spread = the deflection-governed CF bar height (18.8-91.4 mm). Then laces it with rungs (neck tangent-left, eyelet centered+drilled; pillar/shoulder supports if those side curves exist).">Fit ladder frame</button>
-      </div>
-    </details>
-
-    <details class="sec harp">
-      <summary><span class="step">6</span> Transform</summary>
-      <div class="sec-body">
-        <div class="row">
-          <label title="Rotate all strings (and the S axis) rigidly about their center; air gap preserved">Rotate (°)</label>
-          <input type="number" id="string-rot" step="1" value="15">
-        </div>
-        <div class="seg">
-          <button id="string-rot-ccw" title="Rotate counter-clockwise">⟲ CCW</button>
-          <button id="string-rot-cw" title="Rotate clockwise">CW ⟳</button>
-        </div>
-        <button id="s-axis-btn" title="Draw the S axis: a faint reference line through the string centers along the spacing direction; it rotates with the strings">Set S axis</button>
-        <button id="xz-btn" title="Put the harp in a right-handed +X/+Z frame: +X right, +Z up, Y into the page; origin at the bbox bottom-left, all coords positive; renders upright">Orient +X/+Z (RH)</button>
-      </div>
-    </details>
-
-    <details class="sec harp" open>
-      <summary><span class="step">+</span> Harp canvas (envelope)</summary>
-      <div class="sec-body">
-        <div class="row">
-          <label title="−X space left of c1 (the origin): pillar / left shoulder">L</label>
-          <input type="number" id="canvas-ml" step="10" value="120">
-          <label title="+X space right of the highest string: rear / right shoulder">R</label>
-          <input type="number" id="canvas-mr" step="10" value="60">
-        </div>
-        <div class="row">
-          <label title="+Z space above the string tops: the neck + tuning-pin material">T</label>
-          <input type="number" id="canvas-mt" step="10" value="220">
-          <label title="−Z space below c1's bottom eyelet (the origin): the harp base">B</label>
-          <input type="number" id="canvas-mb" step="10" value="130">
-        </div>
-        <button id="harp-canvas-btn" class="btn-primary" title="Set the document canvas (viewBox) to the whole harp envelope — the content plus the L/R/T/B margins (pillar, shoulders, pin material, base). Keeps alignment on-canvas and reserves room for the body.">Set harp canvas</button>
       </div>
     </details>
 
@@ -450,7 +401,10 @@
         <div class="seg">
           <button id="zoom-out" title="Zoom out">−</button>
           <button id="zoom-in" title="Zoom in">+</button>
+        </div>
+        <div class="row">
           <button id="zoom-fit" title="Fit &amp; center everything (F)">Fit</button>
+          <label class="checkrow" title="Auto-fit: after every adjustment, re-fit & re-center the content in the canvas (fires once the edit settles; never mid-drag)"><input type="checkbox" id="auto-fit" checked> Auto-fit</label>
         </div>
         <button id="view3d-btn" title="Toggle a 3D orthographic view: left-drag rotate, right-drag pan, wheel zoom, Shift+left roll, double-click recenter">3D view</button>
         <div class="seg" style="margin-top:4px">
@@ -477,6 +431,54 @@
     <details class="sec">
       <summary>Help</summary>
       <div class="sec-body"><div class="hint" id="hint"></div></div>
+    </details>
+
+    <details class="sec harp">
+      <summary>Transform</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="Rotate all strings (and the S axis) rigidly about their center; air gap preserved">Rotate (°)</label>
+          <input type="number" id="string-rot" step="1" value="15">
+        </div>
+        <div class="seg">
+          <button id="string-rot-ccw" title="Rotate counter-clockwise">⟲ CCW</button>
+          <button id="string-rot-cw" title="Rotate clockwise">CW ⟳</button>
+        </div>
+        <button id="s-axis-btn" title="Draw the S axis: a faint reference line through the string centers along the spacing direction; it rotates with the strings">Set S axis</button>
+        <button id="xz-btn" title="Put the harp in a right-handed +X/+Z frame: +X right, +Z up, Y into the page; origin at the bbox bottom-left, all coords positive; renders upright">Orient +X/+Z (RH)</button>
+      </div>
+    </details>
+
+    <details class="sec harp">
+      <summary>Harp canvas (envelope)</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="−X space left of c1 (the origin): pillar / left shoulder">L</label>
+          <input type="number" id="canvas-ml" step="10" value="120">
+          <label title="+X space right of the highest string: rear / right shoulder">R</label>
+          <input type="number" id="canvas-mr" step="10" value="60">
+        </div>
+        <div class="row">
+          <label title="+Z space above the string tops: the neck + tuning-pin material">T</label>
+          <input type="number" id="canvas-mt" step="10" value="220">
+          <label title="−Z space below c1's bottom eyelet (the origin): the harp base">B</label>
+          <input type="number" id="canvas-mb" step="10" value="130">
+        </div>
+        <button id="harp-canvas-btn" class="btn-primary" title="Set the document canvas (viewBox) to the whole harp envelope — the content plus the L/R/T/B margins (pillar, shoulders, pin material, base). Keeps alignment on-canvas and reserves room for the body.">Set harp canvas</button>
+      </div>
+    </details>
+
+    <details class="sec harp">
+      <summary>Ladder (frame + rungs)</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="Dedicated support rungs spaced along the pillar (bass) side curve — CF buckling needs ~8">Pillar rungs</label>
+          <input type="number" id="ladder-pillar-rungs" min="0" step="1" value="8">
+          <label title="Dedicated support rungs along the shoulder (treble) side curve">Shoulder</label>
+          <input type="number" id="ladder-shoulder-rungs" min="0" step="1" value="3">
+        </div>
+        <button id="fit-ladder-btn" class="btn-primary" title="Build the CF ladder frame from the neck (top) + eyelet (bottom) curves: outer path NT-RO-EB-PO and inner path NB-RI-ET-PI, spread = the deflection-governed CF bar height (18.8-91.4 mm). Then laces it with rungs (neck tangent-left, eyelet centered+drilled; pillar/shoulder supports if those side curves exist).">Fit ladder frame</button>
+      </div>
     </details>
   </div>
 </main>
@@ -591,7 +593,7 @@ function buildLayers(){
   // (re)attach the autosave observer to the fresh content layer
   if(window.MutationObserver){
     if(contentObserver) contentObserver.disconnect();
-    contentObserver = new MutationObserver(() => { if(typeof schedulePersist === "function") schedulePersist(); });
+    contentObserver = new MutationObserver(() => { if(typeof schedulePersist === "function") schedulePersist(); if(typeof scheduleAutoFit === "function") scheduleAutoFit(); });
     contentObserver.observe(contentGroup, { childList:true, subtree:true, attributes:true });
   }
 }
@@ -999,7 +1001,48 @@ function renderOverlay(){
   if(tool === "node" && pathModel){
     drawNodeEditor(aR, cR);
   }
+  drawPlateOverlay(scale);
   if(typeof syncDotCheckboxes === "function") syncDotCheckboxes();
+}
+
+// Plate visualization chrome (overlay-only, never saved): Bézier control handles and/or node
+// numbers for the closed plate path, toggled by the Dots-section checkboxes. Constant pixel size.
+function drawPlateOverlay(scale){
+  const showH = document.getElementById("plate-handles") && document.getElementById("plate-handles").checked;
+  const showN = document.getElementById("plate-numbers") && document.getElementById("plate-numbers").checked;
+  if(!showH && !showN) return;
+  const el = contentGroup.querySelector('path[data-role="plate"]');
+  if(!el) return;
+  const nums = (el.getAttribute("d") || "").match(/-?\d+\.?\d*/g);
+  if(!nums || nums.length < 8) return;
+  const v = nums.map(Number);
+  let cur = [v[0], v[1]], rest = v.slice(2), segs = [], i = 0;     // parse M + C… (cubic) segments
+  while(i + 6 <= rest.length){ segs.push([cur, [rest[i],rest[i+1]], [rest[i+2],rest[i+3]], [rest[i+4],rest[i+5]]]); cur = [rest[i+4],rest[i+5]]; i += 6; }
+  const n = segs.length; if(!n) return;
+  const toU = p => toUserFromLocal(el, { x:p[0], y:p[1] });        // content/local -> stage-user coords (flip-aware)
+  const sq = CTRL_PX / scale;
+  if(showH){
+    for(let k = 0; k < n; k++){
+      const A = toU(segs[k][0]), c1 = toU(segs[k][1]), c2 = toU(segs[k][2]), B = toU(segs[k][3]);
+      overlayGroup.appendChild(ovEl("line", { x1:A.x, y1:A.y, x2:c1.x, y2:c1.y }, "ov-handle-line"));
+      overlayGroup.appendChild(ovEl("line", { x1:B.x, y1:B.y, x2:c2.x, y2:c2.y }, "ov-handle-line"));
+      overlayGroup.appendChild(ovEl("rect", { x:c1.x-sq, y:c1.y-sq, width:sq*2, height:sq*2 }, "ov-plate-ctrl"));
+      overlayGroup.appendChild(ovEl("rect", { x:c2.x-sq, y:c2.y-sq, width:sq*2, height:sq*2 }, "ov-plate-ctrl"));
+    }
+  }
+  if(showH || showN){                                             // anchor markers so nodes are visible
+    for(let k = 0; k < n; k++){ const A = toU(segs[k][0]); overlayGroup.appendChild(ovEl("circle", { cx:A.x, cy:A.y, r:(HANDLE_PX*0.9)/scale }, "ov-plate-node")); }
+  }
+  if(showN){
+    let cx = 0, cy = 0; for(const s of segs){ const a = toU(s[0]); cx += a.x; cy += a.y; } cx /= n; cy /= n;
+    const off = 16 / scale;
+    for(let k = 0; k < n; k++){
+      const A = toU(segs[k][0]); let dx = A.x-cx, dy = A.y-cy; const L = Math.hypot(dx,dy) || 1; dx /= L; dy /= L;
+      const t = ovEl("text", { x:A.x+dx*off, y:A.y+dy*off+(4.5/scale), "font-size":(14/scale), "text-anchor":"middle" }, "ov-nodenum");
+      t.textContent = String(k);
+      overlayGroup.appendChild(t);
+    }
+  }
 }
 
 function drawBBox(el){
@@ -1160,7 +1203,7 @@ window.addEventListener("mousemove", onMove);
 window.addEventListener("mouseup", onUp);
 stage.addEventListener("dblclick", onDblClick);
 stage.addEventListener("wheel", onWheel, { passive:false });
-stage.addEventListener("contextmenu", e => { if(tool==="pen" && penState){ e.preventDefault(); finishPen(true); } });
+stage.addEventListener("contextmenu", e => { e.preventDefault(); if(tool==="pen" && penState) finishPen(true); });   // right-drag pans; no browser menu on the canvas
 
 // Nearest content <path> whose outline passes within tolPx (screen px) of the click.
 // Lets you select / node-edit a curve by clicking NEAR it, not exactly on its thin stroke.
@@ -1181,9 +1224,14 @@ function nearestPathAt(clientX, clientY, tolPx){
   return (best && best.d <= tolPx) ? best.el : null;
 }
 function onDown(e){
-  if(e.button === 1 || (e.button === 0 && spaceDown)){ // pan
-    drag = { type:"pan", sx:e.clientX, sy:e.clientY, ox:view.x, oy:view.y };
-    stage.classList.add("panning");
+  // OpenSCAD-style nav: right OR middle button (or space+left) pans; + Shift = zoom-drag
+  if(e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown)){
+    if(e.shiftKey){
+      drag = { type:"zoomdrag", sy:e.clientY, ow:view.w, oh:view.h, ox:view.x, oy:view.y, anchor:evtUser(e) };
+    } else {
+      drag = { type:"pan", sx:e.clientX, sy:e.clientY, ox:view.x, oy:view.y };
+      stage.classList.add("panning");
+    }
     e.preventDefault(); return;
   }
   if(e.button !== 0) return;
@@ -1243,6 +1291,13 @@ function onMove(e){
     const k = view.w / stage.clientWidth;
     view.x = drag.ox - (e.clientX - drag.sx) * k;
     view.y = drag.oy - (e.clientY - drag.sy) * k;
+    applyView(); renderOverlay(); return;
+  }
+  if(drag.type === "zoomdrag"){            // Shift+drag: up = zoom in, down = zoom out, about the grab point
+    const factor = Math.exp((e.clientY - drag.sy) * 0.005);
+    view.w = drag.ow * factor; view.h = drag.oh * factor;
+    view.x = drag.anchor.x - (drag.anchor.x - drag.ox) * factor;
+    view.y = drag.anchor.y - (drag.anchor.y - drag.oy) * factor;
     applyView(); renderOverlay(); return;
   }
   const u = evtUser(e);
@@ -1305,11 +1360,14 @@ function onMove(e){
 
 function onUp(e){
   if(!drag) return;
+  const t = drag.type;
   stage.classList.remove("panning");
   if(drag.type === "move" && !drag.moved){ undoStack.pop(); } // no movement: discard snapshot
   if(drag.type === "shape"){ finishShape(); }
   if(drag.type === "marquee"){ finishMarquee(); }
   drag = null;
+  // re-fit after a content-changing drag settles (not pan/marquee — those mustn't fight a manual pan)
+  if(t === "move" || t === "node" || t === "shape" || t === "pen") scheduleAutoFit();
 }
 
 function finishMarquee(){
@@ -2152,6 +2210,19 @@ function fitView(){
   }
   applyView(); renderOverlay();
 }
+// --- Auto-fit: keep content fitted & centered after every adjustment ---------------
+// `autoFitView()` reports the View-section "Auto-fit" checkbox. `scheduleAutoFit()` is
+// debounced and skipped during an active pointer drag (re-fitting mid-drag would move the
+// viewBox out from under the cursor). It's driven by the contentGroup MutationObserver, so
+// any edit (load/space/shift/rake/align/fit/node-drag) re-centers once it settles. fitView
+// only writes the stage viewBox (never contentGroup), so it can't re-trigger the observer.
+let autoFitTimer = null;
+function autoFitView(){ const cb = document.getElementById("auto-fit"); return !!(cb && cb.checked); }
+function scheduleAutoFit(){
+  if(!autoFitView() || drag) return;          // not enabled, or a drag is in progress
+  clearTimeout(autoFitTimer);
+  autoFitTimer = setTimeout(() => { if(!drag) fitView(); }, 250);
+}
 function harpCanvasMargins(){
   const num = id => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : Math.max(0, v); };
   return { l:num("canvas-ml"), r:num("canvas-mr"), t:num("canvas-mt"), b:num("canvas-mb") };
@@ -2237,6 +2308,7 @@ document.getElementById("btn-delete").onclick = deleteSelection;
 document.getElementById("zoom-in").onclick = () => zoomBy(0.8);
 document.getElementById("zoom-out").onclick = () => zoomBy(1.25);
 document.getElementById("zoom-fit").onclick = fitView;
+document.getElementById("auto-fit").onchange = () => { if(autoFitView()) fitView(); };
 document.getElementById("view3d-btn").onclick = toggle3d;
 document.getElementById("v3d-side").onclick = () => set3dPreset("side");
 document.getElementById("v3d-front").onclick = () => set3dPreset("front");
@@ -2255,6 +2327,7 @@ function readGap(){ const v = parseFloat(document.getElementById("distribute-gap
 function readIncludeStroke(){ return document.getElementById("distribute-stroke").checked; }
 document.getElementById("dist-h").onclick = () => distribute("h", readGap(), readIncludeStroke());
 document.getElementById("dist-v").onclick = () => distribute("v", readGap(), readIncludeStroke());
+document.getElementById("string-load-clements47").onclick = loadClements47Strings;
 document.getElementById("string-load-erand47").onclick = loadErand47Strings;
 document.getElementById("string-selectall").onclick = selectAllStrings;
 const readRot = () => { const v = parseFloat(document.getElementById("string-rot").value); return isNaN(v) ? 0 : v; };
@@ -2262,18 +2335,23 @@ document.getElementById("string-rot-ccw").onclick = () => rotateStrings(-readRot
 document.getElementById("string-rot-cw").onclick = () => rotateStrings(readRot());
 document.getElementById("s-axis-btn").onclick = setSAxis;
 document.getElementById("string-gap-btn").onclick = () => parallelAirGapStrings(readStringGap());
+const readStringShift = () => { const v = parseFloat(document.getElementById("string-shift").value); return isNaN(v) ? 0 : Math.abs(v); };
+document.getElementById("string-shift-left").onclick = () => shiftStrings(-readStringShift());
+document.getElementById("string-shift-right").onclick = () => shiftStrings(readStringShift());
 document.getElementById("string-rake-btn").onclick = () => { const d = parseFloat(document.getElementById("string-rake").value) || 0; rotateStrings(-d); };  // -d = tops toward the pillar (bass); rigid -> air gap preserved
 document.getElementById("add-tuners-btn").onclick = placeTuners;
 document.getElementById("string-table-btn").onclick = openStringsTable;
 document.getElementById("align-top").onclick = () => alignStrings("top");
 document.getElementById("align-middle").onclick = () => alignStrings("middle");
 document.getElementById("align-bottom").onclick = () => alignStrings("bottom");
-document.getElementById("align-curve-top").onclick = () => alignStringsToCurve("top");
-document.getElementById("align-curve-bottom").onclick = () => alignStringsToCurve("bottom");
 document.getElementById("xz-btn").onclick = orientXZ;
 document.getElementById("harp-canvas-btn").onclick = setHarpCanvas;
 const readFitNodes = () => { const v = parseInt(document.getElementById("fit-nodes").value, 10); return isNaN(v) ? 5 : Math.max(2, v); };
 document.getElementById("fit-btn").onclick = () => fitCurve(document.getElementById("fit-source").value, readFitNodes());
+document.getElementById("fit-step5-btn").onclick = buildStep5Curves;
+document.getElementById("fix-plate-btn").onclick = fixPlate;
+{ const wf = document.getElementById("workflow-slider"), wv = document.getElementById("workflow-val");
+  if(wf) wf.oninput = () => { wv.textContent = wf.value; applyWorkflowStep(parseInt(wf.value, 10)); }; }
 document.getElementById("place-bottoms-btn").onclick = () => placeStringsOnFittedCurve("bottom");
 document.getElementById("place-tops-btn").onclick = () => placeStringsOnFittedCurve("top");
 document.getElementById("clear-curve-btn").onclick = clearFitCurves;
@@ -2282,6 +2360,10 @@ document.getElementById("shift-down-btn").onclick = () => shiftCurves(false);
 ["pin","flat","natural","sharp","midi","eyelet"].forEach(role => {
   const cb = document.getElementById("dot-" + role);
   if(cb) cb.onchange = () => toggleDotLayer(role, cb.checked);
+});
+["plate-handles","plate-numbers"].forEach(id => {            // plate handle/number overlays (view-only)
+  const cb = document.getElementById(id);
+  if(cb) cb.onchange = renderOverlay;
 });
 // ---- editor canvas background (view-only; persisted, not saved in the SVG) ----
 const CANVAS_BG_KEY = "hedit:canvasbg";
@@ -2494,35 +2576,17 @@ function bakeLineTransform(el){
 }
 function readStringGap(){ const v = parseFloat(document.getElementById("string-gap").value); return isNaN(v)?0:v; }
 
-// Reset the whole design process back to the bare strings: drop the +X/+Z frame,
-// remove everything that isn't a string (S axis, fitted curves, DP/BP/SP rails,
-// pins, sensor dots), and rebuild each string vertical on the x=0 axis at its spec
-// length (no air gap, no alignment). Strings are re-appended in data-num order so a
-// later parallel air-gap (which sorts by x) re-spreads them correctly. Undoable.
+// Reset = wipe EVERYTHING (strings, curves, dots, S-axis, +X/+Z frame, Paraguayan rails) and
+// hard-reload to a clean, empty editor. The emptied doc is saved to the autosave first, so the
+// reload comes up empty (not the default sample). No confirm (New has that) — Reset just clears.
+// Re-load strings from step 1 to start a new design.
 function resetDesign(){
-  const strings = stringLines();
-  if(!strings.length){ setStatus("No strings to reset."); return; }
-  pushUndo();
-  const activeDots = ALL_DOT_ROLES.filter(r => contentGroup.querySelector('circle[data-role="' + r + '"]'));   // dots are part of the strings — re-derive them after reset
-  if(frameXZ){ frameXZ = false; contentGroup.removeAttribute("transform"); syncFrameButton(); }
-  strings.forEach(bakeLineTransform);
-  const keep = new Set(strings);
-  [...contentGroup.children].forEach(el => { if(!keep.has(el)) el.remove(); });   // drop curves, S-axis, old dots
-  strings.sort((a,b) => (parseFloat(a.getAttribute("data-num"))||0) - (parseFloat(b.getAttribute("data-num"))||0));
-  const lenOf = el => parseFloat(el.getAttribute("data-len")) ||
-                Math.abs((parseFloat(el.getAttribute("y2"))||0) - (parseFloat(el.getAttribute("y1"))||0));
-  const Lmax = Math.max(...strings.map(lenOf));   // longest string (c1) anchors the bottom eyelet at the origin
-  strings.forEach(el => {
-    const len = lenOf(el);
-    // x=0 axis (no air gap); upright: tops level, hanging up to the c1 bottom eyelet at (0,0)
-    el.setAttribute("x1", "0"); el.setAttribute("x2", "0");
-    el.setAttribute("y1", fmt(-Lmax)); el.setAttribute("y2", fmt(len - Lmax));
-    contentGroup.appendChild(el);   // re-stack in string-number order
-  });
-  activeDots.forEach(placeDotRole);   // dots come back with the strings (their curves do not)
-  harpAlignment = null;
-  clearSelection(); pathModel = null; renderOverlay();
-  setStatus(`Reset to ${strings.length} bare strings on the x=0 axis (air gap, alignment, S-axis & fitted curves removed; dots kept). Undo to restore.`);
+  if(frameXZ){ frameXZ = false; contentGroup.removeAttribute("transform"); }
+  while(contentGroup.firstChild) contentGroup.removeChild(contentGroup.firstChild);   // drop strings + every other element
+  harpWP = null; harpExtra = {};
+  selected = []; selection = null; pathModel = null; harpAlignment = null;
+  try { persist(); } catch(e){}        // save the now-empty doc so the reload restores an empty canvas
+  location.reload();
 }
 
 // make every string vertical and space them so the visible edge-to-edge gap
@@ -2561,50 +2625,157 @@ function selectAllStrings(){
   setStatus(`${lines.length} strings selected.`);
 }
 
-// --- original Erard 47-string set (C1 bass .. G7 treble) --------------------------
+// --- clements47 47-string spec (C1 bass .. G7 treble) -----------------------------
+// The clements47_cf design spec. Full per-string spec: material, the three lever
+// lengths/frequencies (flat / nat / sharp), OD, linear mass mu, tension (N + lb),
+// tension-as-%-of-break, center spacing, and the authored foot/top/nail/tuner coordinates.
+// loadClements47Strings lays the strings VERTICAL on the x=0 axis (no spacing — step 2
+// spaces them), using L_nat as the speaking length, OD as the diameter and T_N as the
+// tension; the coordinate columns are parsed for reference (kept on the spec rows) but are
+// NOT used for the vertical placement.
+const CLEMENTS47_SPEC_CSV = `sn,note,material,L_flat_mm,L_nat_mm,L_sharp_mm,f_flat_Hz,f_nat_Hz,f_sharp_Hz,OD_mm,mu_g_per_m,T_N,T_lb,TS_pct,center_spacing_mm,foot_x_mm,foot_y_mm,top_x_mm,top_y_mm,nail_x_mm,nail_y_mm,tuner_x_mm,tuner_y_mm
+1,C1,wound_bass_steel_bronze,1725.4,1628.6,1537.1,30.87,32.70,34.65,1.63,18.147,205.9,46.3,50.0,14.45,25.948,1782.709,-184.325,70.170,-182.027,69.888,-174.263,40.910
+2,D1,wound_bass_steel_bronze,1648.5,1556.0,1468.7,34.65,36.71,38.89,1.52,15.867,207.1,46.6,50.0,14.36,38.221,1763.069,-162.680,126.856,-160.437,126.581,-152.673,97.603
+3,E1,wound_bass_steel_bronze,1573.1,1484.8,1401.5,38.89,41.20,43.65,1.44,14.137,211.6,47.6,50.0,14.29,50.414,1743.557,-141.299,182.182,-139.095,181.912,-131.330,152.934
+4,F1,wound_bass_steel_bronze,1536.7,1450.4,1369.0,41.20,43.65,46.25,1.39,13.126,210.5,47.3,50.0,14.23,62.552,1724.132,-124.724,198.886,-122.546,198.619,-114.781,169.641
+5,G1,wound_bass_steel_bronze,1478.3,1395.3,1317.0,46.25,49.00,51.91,1.30,11.533,215.7,48.5,50.0,14.17,74.632,1704.802,-105.528,237.521,-103.394,237.259,-95.629,208.281
+6,A1,wound_bass_steel_bronze,1420.2,1340.5,1265.2,51.91,55.00,58.27,1.25,10.614,230.8,51.9,50.0,14.12,86.652,1685.566,-86.427,275.952,-84.318,275.693,-76.553,246.715
+7,B1,wound_bass_steel_bronze,1439.2,1358.4,1282.2,58.27,61.74,65.41,1.20,9.681,272.4,61.2,50.0,14.07,98.630,1666.397,-76.764,237.925,-74.680,237.669,-66.915,208.691
+8,C2,wound_bass_steel_bronze,1425.2,1345.2,1269.7,61.74,65.41,69.30,1.16,9.000,278.7,62.7,50.0,14.03,110.571,1647.289,-63.118,232.712,-61.053,232.459,-53.289,203.481
+9,D2,wound_bass_steel_bronze,1351.1,1275.3,1203.7,69.30,73.42,77.78,1.10,8.164,286.3,64.4,50.0,13.97,122.469,1628.249,-42.189,287.219,-40.154,286.970,-32.390,257.992
+10,E2,wound_bass_steel_bronze,1277.3,1205.6,1137.9,77.78,82.41,87.31,1.05,7.379,291.3,65.5,50.0,13.93,134.321,1609.282,-21.343,341.503,-19.333,341.256,-11.569,312.278
+11,F2,wound_bass_steel_bronze,1241.9,1172.2,1106.4,82.41,87.31,92.50,1.01,6.776,283.9,63.8,50.0,13.88,146.135,1590.376,-5.215,357.733,-3.225,357.489,4.540,328.511
+12,G2,wound_bass_steel_bronze,1184.9,1118.4,1055.6,92.50,98.00,103.83,0.96,6.054,290.9,65.4,50.0,14.36,157.911,1571.531,13.508,395.463,15.473,395.222,23.238,366.244
+13,A2,gut,1133.6,1070.0,1009.9,103.83,110.00,116.54,2.08,4.471,247.8,55.7,16.3,14.80,170.137,1551.965,31.986,426.815,34.507,426.505,42.272,397.527
+14,B2,gut,1082.5,1021.7,964.4,116.54,123.47,130.81,1.97,4.012,255.4,57.4,18.7,14.75,182.789,1531.718,50.866,457.287,53.332,456.984,61.097,428.007
+15,C3,gut,1026.2,968.6,914.2,123.47,130.81,138.59,1.97,4.031,258.9,58.2,18.8,14.70,195.395,1511.546,70.333,492.995,72.799,492.692,80.564,463.714
+16,D3,gut,975.5,920.7,869.1,138.59,146.83,155.56,1.86,3.599,263.1,59.1,21.4,14.56,207.954,1491.448,89.071,523.219,91.482,522.923,99.247,493.945
+17,E3,gut,925.0,873.1,824.1,155.56,164.81,174.61,1.66,2.872,237.9,53.5,24.3,14.47,220.383,1471.558,107.654,553.453,109.966,553.169,117.731,524.191
+18,F3,gut,874.8,825.6,779.3,164.81,174.61,185.00,1.67,2.882,239.6,53.9,24.4,14.43,232.732,1451.797,126.120,583.517,128.438,583.233,136.202,554.255
+19,G3,gut,824.7,778.4,734.7,185.00,196.00,207.65,1.59,2.623,244.2,54.9,27.3,14.36,245.051,1432.082,144.545,613.529,146.823,613.250,154.588,584.272
+20,A3,gut,780.1,736.3,695.0,207.65,220.00,233.08,1.50,2.344,246.0,55.3,30.8,14.26,257.298,1412.482,162.228,638.197,164.461,637.923,172.226,608.945
+21,B3,gut,746.4,704.6,665.0,233.08,246.94,261.63,1.36,1.911,231.4,52.0,35.6,14.19,269.449,1393.038,178.486,652.201,180.650,651.935,188.414,622.958
+22,C4,gut,702.2,662.9,625.7,246.94,261.63,277.18,1.36,1.924,231.4,52.0,35.3,14.14,281.541,1373.687,195.965,676.721,198.128,676.456,205.893,647.478
+23,D4,gut,663.6,626.4,591.2,277.18,293.66,311.13,1.25,1.618,219.0,49.2,39.7,14.05,293.587,1354.411,212.714,695.757,214.823,695.498,222.588,666.520
+24,E4,gut,625.1,590.0,556.9,311.13,329.63,349.23,1.17,1.425,215.6,48.5,44.4,14.02,305.552,1335.262,229.372,714.822,231.441,714.568,239.206,685.590
+25,F4,gut,588.0,555.0,523.9,329.63,349.23,369.99,1.17,1.422,213.7,48.0,44.1,13.99,317.484,1316.168,245.825,732.551,247.895,732.297,255.659,703.319
+26,G4,gut,556.2,525.0,495.5,369.99,392.00,415.30,1.12,1.290,218.5,49.1,49.7,13.94,329.395,1297.107,261.611,745.053,263.656,744.802,271.421,715.824
+27,A4,gut,524.4,495.0,467.2,415.30,440.00,466.16,1.04,1.133,214.9,48.3,55.7,13.88,341.251,1278.134,277.343,757.643,279.348,757.397,287.112,728.419
+28,B4,gut,497.9,470.0,443.6,466.16,493.88,523.25,0.99,1.014,218.5,49.1,63.2,13.83,353.053,1259.248,292.374,765.060,294.354,764.816,302.119,735.839
+29,C5,gut,450.3,425.0,401.1,493.88,523.25,554.37,0.93,0.896,177.3,39.9,58.0,13.81,364.808,1240.437,309.930,793.493,311.880,793.254,319.645,764.276
+30,D5,gut,418.5,395.0,372.8,554.37,587.33,622.25,0.93,0.898,193.2,43.4,63.2,13.79,376.538,1221.666,325.535,806.285,327.486,806.046,335.250,777.068
+31,E5,gut,386.7,365.0,344.5,622.25,659.26,698.46,0.87,0.791,183.2,41.2,67.9,13.76,388.242,1202.935,341.115,819.118,343.036,818.882,350.800,789.904
+32,F5,gut,360.2,340.0,320.9,659.26,698.46,739.99,0.87,0.791,178.5,40.1,66.2,13.74,399.921,1184.245,356.024,826.730,357.945,826.494,365.709,797.516
+33,G5,fluorocarbon,339.0,320.0,302.0,739.99,783.99,830.61,0.81,0.925,233.0,52.4,82.4,13.68,411.575,1165.595,370.262,829.122,372.153,828.890,379.917,799.912
+34,A5,fluorocarbon,312.5,295.0,278.4,830.61,880.00,932.33,0.74,0.777,209.3,47.1,88.2,13.65,423.175,1147.033,385.091,836.862,386.947,836.634,394.711,807.657
+35,B5,fluorocarbon,286.1,270.0,254.8,932.33,987.77,1046.50,0.74,0.776,220.9,49.7,93.1,13.68,434.745,1128.518,399.878,844.550,401.734,844.323,409.498,815.345
+36,C6,nylon,254.3,240.0,226.5,987.77,1046.50,1108.73,0.79,0.560,141.2,31.8,57.5,13.68,446.335,1109.969,415.344,857.565,417.225,857.334,424.989,828.356
+37,D6,nylon,227.8,215.0,202.9,1108.73,1174.66,1244.51,0.72,0.469,119.7,26.9,58.2,13.65,457.918,1091.434,430.156,865.332,432.002,865.105,439.767,836.127
+38,E6,nylon,206.6,195.0,184.1,1244.51,1318.51,1396.91,0.72,0.469,124.1,27.9,60.3,13.65,469.471,1072.946,444.293,867.886,446.139,867.659,453.903,838.681
+39,F6,nylon,188.6,178.0,168.0,1318.51,1396.91,1479.98,0.72,0.468,115.8,26.0,56.4,13.62,481.024,1054.458,458.039,867.264,459.885,867.037,467.650,838.059
+40,G6,nylon,174.8,165.0,155.7,1479.98,1567.98,1661.22,0.67,0.400,107.0,24.1,61.0,13.58,492.556,1036.003,471.253,862.506,473.074,862.283,480.839,833.305
+41,A6,nylon,161.0,152.0,143.5,1661.22,1760.00,1864.66,0.61,0.335,96.0,21.6,65.3,13.53,504.041,1017.623,484.420,857.823,486.212,857.603,493.977,828.625
+42,B6,nylon,150.4,142.0,134.0,1864.66,1975.53,2093.00,0.53,0.256,80.5,18.1,71.8,13.50,515.468,999.337,497.139,850.058,498.891,849.843,506.655,820.865
+43,C7,nylon,137.7,130.0,122.7,2093.00,2093.00,2217.46,0.50,0.227,75.5,17.0,67.5,13.46,526.848,981.125,510.067,844.452,511.804,844.238,519.569,815.261
+44,D7,nylon,125.0,118.0,111.4,2217.46,2349.32,2489.02,0.50,0.224,68.9,15.5,70.1,13.44,538.216,962.934,522.982,838.865,524.719,838.652,532.484,809.674
+45,E7,nylon,111.2,105.0,99.1,2489.02,2637.02,2793.83,0.47,0.196,60.1,13.5,69.9,13.42,549.571,944.762,536.019,834.391,537.741,834.180,545.506,805.202
+46,F7,nylon,97.5,92.0,86.8,2793.83,2959.96,3135.96,0.44,0.175,51.8,11.7,60.3,13.42,560.901,926.631,549.019,829.858,550.726,829.648,558.491,800.671
+47,G7,nylon,78.4,74.0,69.8,3135.96,3322.44,3520.00,0.44,0.173,41.9,9.4,49.1,,572.218,908.520,562.664,830.705,564.371,830.495,572.135,801.517`;
+const CLEMENTS47_SPEC = CLEMENTS47_SPEC_CSV.trim().split("\n").slice(1).map(r => {
+  const c = r.split(",");
+  const optNum = v => v === "" ? null : +v;
+  return { num:+c[0], note:c[1], material:c[2],
+    lFlat:+c[3], lNat:+c[4], lSharp:+c[5], fFlat:+c[6], fNat:+c[7], fSharp:+c[8],
+    od:+c[9], mu:+c[10], tN:+c[11], tLb:+c[12], ts:+c[13], spacing:optNum(c[14]),
+    footX:+c[15], footY:+c[16], topX:+c[17], topY:+c[18],
+    nailX:+c[19], nailY:+c[20], tunerX:+c[21], tunerY:+c[22] };
+});
+// standard harp coloring by note letter: C red, F blue, else dark gray (shared by both loaders)
+function noteStrokeColor(note){ const l = (note || "").charAt(0).toLowerCase(); return l === "c" ? "#cc2222" : l === "f" ? "#2255cc" : "#444444"; }
+// Build the 47 clements47 strings: vertical, tops on y=0, spaced by the step-1 air gap,
+// each tagged with the full data-* spec. Replaces any existing strings; leaves other content
+// untouched. This is the step-1 "lay down the strings" action.
+function loadClements47Strings(){
+  pushUndo();
+  stringLines().forEach(l => l.remove());      // clear existing strings only
+  const spec = CLEMENTS47_SPEC, n = spec.length;
+  const gap = readStringGap();
+  let x = 0, maxLen = 0, maxX = 0;
+  for(let i = 0; i < n; i++){
+    const s = spec[i];
+    if(i > 0) x += spec[i-1].od/2 + gap + s.od/2;   // constant edge-to-edge air gap, by OD
+    const len = s.lNat, dia = s.od;                 // L_nat = natural speaking length; OD = diameter
+    const ln = document.createElementNS(SVGNS, "line");
+    ln.setAttribute("x1", fmt(x)); ln.setAttribute("x2", fmt(x));
+    ln.setAttribute("y1", "0"); ln.setAttribute("y2", fmt(len));
+    ln.setAttribute("stroke", noteStrokeColor(s.note));   // C red, F blue, else dark gray
+    ln.setAttribute("stroke-width", fmt(dia));
+    ln.setAttribute("stroke-linecap", "round");
+    ln.setAttribute("data-num", String(s.num));
+    ln.setAttribute("data-note", s.note);
+    ln.setAttribute("data-material", s.material);
+    ln.setAttribute("data-len", fmt(len));            // = natural (L_nat) speaking length
+    ln.setAttribute("data-lflat", fmt(s.lFlat));
+    ln.setAttribute("data-lsharp", fmt(s.lSharp));
+    ln.setAttribute("data-fflat", fmt(s.fFlat));
+    ln.setAttribute("data-fnat", fmt(s.fNat));
+    ln.setAttribute("data-fsharp", fmt(s.fSharp));
+    ln.setAttribute("data-dia", fmt(dia));
+    ln.setAttribute("data-mu", fmt(s.mu));
+    ln.setAttribute("data-ten", fmt(s.tN));           // tension in Newtons
+    ln.setAttribute("data-tlb", fmt(s.tLb));
+    ln.setAttribute("data-ts", fmt(s.ts));
+    contentGroup.appendChild(ln);
+    maxLen = Math.max(maxLen, len); maxX = x;
+  }
+  // set a tight document viewBox so Save frames the band (fitView sets only the live view)
+  const pad = 20, x0 = -spec[0].od/2 - pad, x1 = maxX + spec[n-1].od/2 + pad;
+  doc.viewBox = `${fmt(x0)} ${fmt(-pad)} ${fmt(x1 - x0)} ${fmt(maxLen + 2*pad)}`;
+  doc.width = fmt(x1 - x0); doc.height = fmt(maxLen + 2*pad);
+  pathModel = null; clearSelection(); loadDefaultDots(); fitView(); renderOverlay();
+  setStatus(`Loaded ${n} clements47 strings (C1..G7, L_nat lengths, ${fmt(gap)} mm air gap).`);
+}
+
+// --- original Erard 47-string scale (C1 bass .. G7 treble) ------------------------
 // ERAND47_L: the ORIGINAL Erard string scale in mm (harpcanada.com/harpmaking/erard.htm,
 // inches x 25.4) -- identical to strings.svg, monotonic C1=1514.9 .. G7=60.6 (shortest).
-// NOT the corrupt "archive"/profile_v2 treble (which had 15-45 mm stub strings).
-// DIA: per-string overall diameters (mm). Tension is the linear 52.693 -> 10.976 lbf schedule.
+// NOT the corrupt "archive"/profile_v2 treble. DIA: per-string overall diameters (mm).
+// Tension is the linear 52.693 -> 10.976 lbf schedule (converted to Newtons).
 const ERAND47_L = [1514.9,1489.7,1464.4,1439.2,1408.9,1378.6,1348.3,1318.0,1282.6,1242.2,1222.0,1186.7,1110.9,1055.4,989.8,924.1,863.5,792.8,732.2,666.6,621.1,570.6,525.2,484.8,449.4,414.1,383.8,353.5,328.2,303.0,277.7,262.6,237.3,222.2,207.0,191.9,176.7,161.6,146.4,131.3,121.2,111.1,101.0,90.9,80.8,70.7,60.6];
 const ERAND47_DIA = [1.676,1.549,1.448,1.270,1.219,1.219,1.016,1.016,0.914,2.642,2.489,2.337,2.184,2.057,2.057,1.930,1.676,1.676,1.549,1.549,1.270,1.270,1.270,1.143,1.143,1.143,1.016,1.016,1.016,0.914,0.914,0.914,0.813,0.813,0.813,0.813,0.762,0.762,0.762,0.711,0.711,0.660,0.635,0.635,0.635,0.635,0.635];
-const ERAND47_STRING_COLOR = "#7d7762";
 function erand47NoteName(i){ return "cdefgab"[i % 7] + (1 + Math.floor(i / 7)); }
-// Build the 47 bare strings: vertical, tops on y=0, air-gap spaced on the x=0 axis,
-// each tagged with the harp data-* schema (num/note/len/dia/ten). Replaces any existing
-// strings; leaves other content untouched. This is the step-1 "lay down the strings" action.
+// Build the 47 original-Erard strings: vertical, tops on y=0, spaced by the step-1 air gap,
+// tagged num/note/len/dia/ten. Replaces existing strings.
 function loadErand47Strings(){
-  const gap = readStringGap();                 // step-2 air gap (default 13)
   pushUndo();
   stringLines().forEach(l => l.remove());      // clear existing strings only
   const n = ERAND47_L.length;
+  const gap = readStringGap();
   let x = 0, maxLen = 0, maxX = 0;
   for(let i = 0; i < n; i++){
-    if(i > 0) x += ERAND47_DIA[i-1]/2 + gap + ERAND47_DIA[i]/2;   // constant edge-to-edge gap
     const len = ERAND47_L[i], dia = ERAND47_DIA[i];
-    const ten = (52.693 + (10.976 - 52.693) * i / (n - 1)) * 4.4482216;   // Erard lbf schedule -> NEWTONS (metric)
-    const note = "cdefgab"[i % 7];                                         // standard harp colors: C red, F blue, else dark gray
-    const col = note === "c" ? "#cc2222" : note === "f" ? "#2255cc" : "#444444";
+    if(i > 0) x += ERAND47_DIA[i-1]/2 + gap + dia/2;   // constant edge-to-edge air gap, by OD
+    const ten = (52.693 + (10.976 - 52.693) * i / (n - 1)) * 4.4482216;   // Erard lbf schedule -> Newtons
+    const note = erand47NoteName(i);
     const ln = document.createElementNS(SVGNS, "line");
     ln.setAttribute("x1", fmt(x)); ln.setAttribute("x2", fmt(x));
-    ln.setAttribute("y1", "0");    ln.setAttribute("y2", fmt(len));
-    ln.setAttribute("stroke", col);
+    ln.setAttribute("y1", "0"); ln.setAttribute("y2", fmt(len));
+    ln.setAttribute("stroke", noteStrokeColor(note));   // C red, F blue, else dark gray
     ln.setAttribute("stroke-width", fmt(dia));
     ln.setAttribute("stroke-linecap", "round");
     ln.setAttribute("data-num", String(i + 1));
-    ln.setAttribute("data-note", erand47NoteName(i));
+    ln.setAttribute("data-note", note);
     ln.setAttribute("data-len", fmt(len));
     ln.setAttribute("data-dia", fmt(dia));
     ln.setAttribute("data-ten", fmt(ten));
     contentGroup.appendChild(ln);
     maxLen = Math.max(maxLen, len); maxX = x;
   }
-  // set a tight document viewBox so Save frames the band (fitView sets only the live view)
   const pad = 20, x0 = -ERAND47_DIA[0]/2 - pad, x1 = maxX + ERAND47_DIA[n-1]/2 + pad;
   doc.viewBox = `${fmt(x0)} ${fmt(-pad)} ${fmt(x1 - x0)} ${fmt(maxLen + 2*pad)}`;
   doc.width = fmt(x1 - x0); doc.height = fmt(maxLen + 2*pad);
-  pathModel = null; clearSelection(); refreshDots(); fitView(); renderOverlay();
-  setStatus(`Loaded ${n} erand47 strings (C1..G7, ${fmt(gap)} mm air-gap) on the x=0 axis.`);
+  pathModel = null; clearSelection(); loadDefaultDots(); fitView(); renderOverlay();
+  setStatus(`Loaded ${n} erand47 strings (original Erard scale, ${fmt(gap)} mm air gap).`);
 }
 
 // Rotate all strings together as one rigid body about their common center.
@@ -2640,52 +2811,123 @@ function rotateStrings(deg){
     el.setAttribute("x1", fmt(p1.x)); el.setAttribute("y1", fmt(p1.y));
     el.setAttribute("x2", fmt(p2.x)); el.setAttribute("y2", fmt(p2.y));
   });
+  // rotate the fitted/side curves + ladder (frame paths + rungs) about the SAME pivot, so a
+  // rake keeps the curve fit aligned with the string ends (curves don't auto-follow the strings)
+  const rotPaths = [...contentGroup.querySelectorAll('path[data-role$="-curve"], path[data-role^="frame-"]')];
+  rotPaths.forEach(p => {
+    const subs = segsToSubpaths(parsePathD(p.getAttribute("d") || ""));
+    subs.forEach(sub => sub.nodes.forEach(nd => {
+      const P = rot(nd.x, nd.y); nd.x = P.x; nd.y = P.y;
+      if(nd.hasIn){ const I = rot(nd.inX, nd.inY); nd.inX = I.x; nd.inY = I.y; }
+      if(nd.hasOut){ const O = rot(nd.outX, nd.outY); nd.outX = O.x; nd.outY = O.y; }
+    }));
+    p.setAttribute("d", subsToD(subs));
+  });
+  const rotRungs = [...contentGroup.querySelectorAll('circle[data-role^="rung"]')];
+  rotRungs.forEach(c => {
+    const P = rot(parseFloat(c.getAttribute("cx")) || 0, parseFloat(c.getAttribute("cy")) || 0);
+    c.setAttribute("cx", fmt(P.x)); c.setAttribute("cy", fmt(P.y));
+  });
   refreshDots(); pathModel = null; renderOverlay();
-  setStatus(`Rotated ${lines.length} strings${axis.length ? " + S axis" : ""} by ${fmt(deg)}° about the c1 bottom eyelet. Parallel air gap preserved.`);
+  const extra = rotPaths.length + rotRungs.length;
+  setStatus(`Rotated ${lines.length} strings${axis.length ? " + S axis" : ""}${extra ? " + " + extra + " curve/ladder element(s)" : ""} by ${fmt(deg)}° about the c1 bottom eyelet. Parallel air gap preserved.`);
+}
+
+// Shift the whole string group (+ S axis) horizontally by dx mm (+ = right, − = left).
+// A pure translation, so the edge-to-edge air gap / spacing is preserved exactly.
+function shiftStrings(dx){
+  const lines = stringLines();
+  if(!lines.length){ setStatus("No strings to shift."); return; }
+  if(!dx){ setStatus("Shift amount is 0."); return; }
+  pushUndo();
+  const axis = sAxisLines();
+  const all = lines.concat(axis);
+  all.forEach(bakeLineTransform);
+  all.forEach(el => {
+    el.setAttribute("x1", fmt((parseFloat(el.getAttribute("x1")) || 0) + dx));
+    el.setAttribute("x2", fmt((parseFloat(el.getAttribute("x2")) || 0) + dx));
+  });
+  refreshDots(); pathModel = null; renderOverlay();
+  setStatus(`Shifted ${lines.length} strings${axis.length ? " + S axis" : ""} ${fmt(Math.abs(dx))} mm ${dx < 0 ? "left" : "right"}. Spacing preserved.`);
+}
+
+// Align the strings to the V line — the rake-perpendicular line through the MIDDLE of C1 (the
+// longest, lowest string), which is the UV origin: U = along C1, V = perpendicular through C1's
+// middle. Each string slides ALONG the rake axis until its midpoint sits on that V line (same
+// along-U position as C1's middle). C1 is the anchor and doesn't move. Air gap & rake preserved.
+function alignMiddlePerpToRake(){
+  const lines = stringLines(); if(!lines.length) return;
+  lines.forEach(bakeLineTransform);
+  const c1 = lines.find(el => el.getAttribute("data-num") === "1") || lines[0];   // C1 defines U + origin
+  let ax = (+c1.getAttribute("x2")) - (+c1.getAttribute("x1")), ay = (+c1.getAttribute("y2")) - (+c1.getAttribute("y1"));
+  const m = Math.hypot(ax, ay) || 1; ax /= m; ay /= m;
+  const proj = el => { const x1=+el.getAttribute("x1"), y1=+el.getAttribute("y1"), x2=+el.getAttribute("x2"), y2=+el.getAttribute("y2"); return ((x1+x2)/2)*ax + ((y1+y2)/2)*ay; };
+  const target = proj(c1);                                   // C1's midpoint along U = the V line
+  lines.forEach(el => {
+    const s = target - proj(el);                             // slide along U onto the V line
+    const x1=+el.getAttribute("x1"), y1=+el.getAttribute("y1"), x2=+el.getAttribute("x2"), y2=+el.getAttribute("y2");
+    el.setAttribute("x1", fmt(x1+ax*s)); el.setAttribute("y1", fmt(y1+ay*s));
+    el.setAttribute("x2", fmt(x2+ax*s)); el.setAttribute("y2", fmt(y2+ay*s));
+  });
+  refreshDots(); pathModel = null; renderOverlay();
+}
+// Workflow slider: rebuild the design to stage `n` (each stage re-runs from the start, so the
+// result is deterministic). 1 = load (air gap) + rake · 2 = center on the rake-perpendicular
+// middle · 3 = fit the NT/NB neck frame (one air gap perpendicular off the pins/sharps).
+function applyWorkflowStep(n){
+  if(n < 1){ setStatus("Build stage 0 — move the slider to 1+ to load the strings."); return; }
+  const gap = readStringGap();
+  const rake = parseFloat((document.getElementById("string-rake") || {}).value) || 0;
+  loadClements47Strings();                          // 1) load with the air gap
+  if(rake) rotateStrings(-rake);                    //    + rake (tops toward the pillar)
+  if(n >= 2) alignMiddlePerpToRake();               // 2) center on the rake-perpendicular middle
+  if(n >= 3) buildStep5Curves();                    // 3) fit ST + rest strings on it, THEN fit NT + NB
+  pathModel = null; clearSelection(); renderOverlay();
+  if(autoFitView()) fitView();
+  setStatus(`Build stage ${n}: loaded + raked${n >= 2 ? ", centered" : ""}${n >= 3 ? ", ST rested + NT/NB fitted" : ""}.`);
 }
 
 // --- vertical alignment ---------------------------------------------
 // Alignment moves each string only vertically: x1/x2 are never touched (so the
 // parallel separation / air gap is preserved) and each string keeps its length.
-function stringGeom(el){
-  bakeLineTransform(el);
-  const y1 = parseFloat(el.getAttribute("y1")) || 0, y2 = parseFloat(el.getAttribute("y2")) || 0;
-  const top = Math.min(y1, y2), bot = Math.max(y1, y2);
-  const len = parseFloat(el.getAttribute("data-len")) || (bot - top);
-  return { el, top, bot, len, x: parseFloat(el.getAttribute("x1")) || 0 };
-}
-function placeString(el, top, len){
-  el.setAttribute("y1", fmt(top));
-  el.setAttribute("y2", fmt(top + len));
-}
+// Level the string tops / midpoints / bottoms to a common y. Each string is SLID ALONG ITS
+// OWN AXIS so its reference point reaches the target level — this keeps the rake angle and the
+// perpendicular air gap (a line slid along its own direction is unchanged), and for vertical
+// strings it reduces to a plain vertical move. Lengths are never changed.
 function alignStrings(mode){
   const lines = stringLines();
   if(!lines.length){ setStatus("No strings to align."); return; }
   pushUndo();
-  const g = lines.map(stringGeom);
-  // when content is displayed flipped (+X/+Z frame), visual top/bottom swap relative to stored y
   let m = mode;
-  if(yIsFlipped() && (mode === "top" || mode === "bottom")) m = mode === "top" ? "bottom" : "top";
+  if(yIsFlipped() && (mode === "top" || mode === "bottom")) m = mode === "top" ? "bottom" : "top";  // visual<->stored y
+  const G = lines.map(el => {
+    bakeLineTransform(el);
+    const x1 = +el.getAttribute("x1") || 0, y1 = +el.getAttribute("y1") || 0;
+    const x2 = +el.getAttribute("x2") || 0, y2 = +el.getAttribute("y2") || 0;
+    const topEnd = y1 <= y2 ? [x1,y1] : [x2,y2], botEnd = y1 <= y2 ? [x2,y2] : [x1,y1];   // smaller y = geometric top
+    let ux = botEnd[0]-topEnd[0], uy = botEnd[1]-topEnd[1]; const L = Math.hypot(ux,uy) || 1; ux/=L; uy/=L;  // axis top->bottom (uy>=0)
+    const refY = m === "top" ? topEnd[1] : m === "bottom" ? botEnd[1] : (y1+y2)/2;
+    return { el, x1,y1,x2,y2, ux, uy, refY, num: el.getAttribute("data-num") };
+  });
   let target;
-  if(m === "top")    target = Math.min(...g.map(i => i.top));
-  else if(m === "bottom") target = Math.max(...g.map(i => i.bot));
-  else { // middle: anchor to c1's midpoint so c1's bottom eyelet stays on the origin (no up-drift)
-    const c1g = g.find(i => i.el.getAttribute("data-num") === "1");
-    target = c1g ? (c1g.top + c1g.bot) / 2 : g.reduce((s,i) => s + (i.top + i.bot)/2, 0) / g.length;
-  }
-  g.forEach(i => {
-    if(m === "top")         placeString(i.el, target, i.len);
-    else if(m === "bottom") placeString(i.el, target - i.len, i.len);
-    else                    placeString(i.el, target - i.len/2, i.len);
+  if(m === "top")         target = Math.min(...G.map(i => i.refY));   // flush to the highest top
+  else if(m === "bottom") target = Math.max(...G.map(i => i.refY));   // flush to the lowest bottom
+  else { const c1 = G.find(i => i.num === "1"); target = c1 ? c1.refY : G.reduce((s,i)=>s+i.refY,0)/G.length; }  // c1 midpoint
+  G.forEach(i => {
+    let dx, dy;
+    if(Math.abs(i.uy) < 1e-6){ dx = 0; dy = target - i.refY; }              // (near-)horizontal: vertical fallback
+    else { const s = (target - i.refY) / i.uy; dx = i.ux*s; dy = i.uy*s; }  // slide along the axis
+    i.el.setAttribute("x1", fmt(i.x1+dx)); i.el.setAttribute("y1", fmt(i.y1+dy));
+    i.el.setAttribute("x2", fmt(i.x2+dx)); i.el.setAttribute("y2", fmt(i.y2+dy));
   });
   harpAlignment = mode;
   refreshDots(); pathModel = null; renderOverlay();
-  setStatus(`Aligned ${lines.length} strings (${mode}). Air gap & lengths preserved.`);
+  setStatus(`Aligned ${lines.length} strings (${mode}). Rake, lengths & air gap preserved.`);
 }
 
 // Align one end of every string onto a selected <path> curve (the other end
 // follows so each string keeps its length). `end` is "top" or "bottom".
-function alignStringsToCurve(end, curveEl){
+function alignStringsToCurve(end, curveEl, skipUndo){
   const lines = stringLines();
   if(!lines.length){ setStatus("No strings to align."); return; }
   const curve = curveEl || (selection && selection.tagName.toLowerCase() === "path" ? selection : null);
@@ -2700,19 +2942,44 @@ function alignStringsToCurve(end, curveEl){
     for(const s of samples){ const d = Math.abs(s.x - x); if(!best || d < best.d) best = { d, y:s.y }; }
     return best ? best.y : null;
   };
-  // when content is displayed flipped (+X/+Z), visual top/bottom swap vs stored y
-  const e = (yIsFlipped() && (end === "top" || end === "bottom")) ? (end === "top" ? "bottom" : "top") : end;
-  pushUndo();
+  const flip = yIsFlipped();
+  // Where the string's infinite line (through point `p`, unit axis `u`) crosses the curve,
+  // nearest to `p`. Sliding the string ALONG `u` to there lands the end on the curve while
+  // leaving the line fixed -> rake is kept and the perpendicular air gap is preserved (a line
+  // translated along its own direction is unchanged, so parallel neighbours stay equidistant).
+  const footOnLine = (p, u) => {
+    let prev = null, prevC = null, best = null;
+    for(const q of samples){
+      const c = (q.x - p[0]) * u[1] - (q.y - p[1]) * u[0];   // signed perpendicular offset of q from the line
+      if(prev && ((prevC <= 0) !== (c <= 0))){
+        const t = prevC / (prevC - c);
+        const ix = prev.x + (q.x - prev.x) * t, iy = prev.y + (q.y - prev.y) * t;
+        const s = (ix - p[0]) * u[0] + (iy - p[1]) * u[1];   // signed distance along the axis
+        if(!best || Math.abs(s) < Math.abs(best.s)) best = { x:ix, y:iy, s };
+      }
+      prev = q; prevC = c;
+    }
+    return best;
+  };
+  if(!skipUndo) pushUndo();
   lines.forEach(el => {
-    const i = stringGeom(el);
-    const cy = yAtX(i.x);
-    if(cy == null) return;
-    if(e === "bottom") placeString(el, cy - i.len, i.len);
-    else               placeString(el, cy, i.len);
+    bakeLineTransform(el);
+    const x1 = parseFloat(el.getAttribute("x1")) || 0, y1 = parseFloat(el.getAttribute("y1")) || 0;
+    const x2 = parseFloat(el.getAttribute("x2")) || 0, y2 = parseFloat(el.getAttribute("y2")) || 0;
+    const aLower = (!flip ? (y1 >= y2) : (y1 <= y2));         // is end-A the visually-lower (bottom) end?
+    const bottom = aLower ? [x1,y1] : [x2,y2], topPt = aLower ? [x2,y2] : [x1,y1];
+    const target = (end === "bottom") ? bottom : topPt;
+    let ax = bottom[0]-topPt[0], ay = bottom[1]-topPt[1]; const L = Math.hypot(ax,ay) || 1; ax/=L; ay/=L;  // unit axis (top->bottom)
+    const foot = footOnLine(target, [ax, ay]);
+    let dx = 0, dy;
+    if(foot){ dx = foot.x - target[0]; dy = foot.y - target[1]; }      // slide along the axis onto the curve
+    else { const cy = yAtX(target[0]); if(cy == null) return; dy = cy - target[1]; }   // fallback: vertical
+    el.setAttribute("x1", fmt(x1 + dx)); el.setAttribute("y1", fmt(y1 + dy));
+    el.setAttribute("x2", fmt(x2 + dx)); el.setAttribute("y2", fmt(y2 + dy));
   });
   harpAlignment = "curve-" + end;
   refreshDots(); pathModel = null; renderOverlay();
-  setStatus(`Aligned ${lines.length} string ${end} ends to the curve. Air gap & lengths preserved.`);
+  setStatus(`Aligned ${lines.length} string ${end} ends to the curve. Rake, lengths & air gap preserved.`);
 }
 // Place the string ends onto the curve just fitted for that end (no selection needed).
 function placeStringsOnFittedCurve(end){
@@ -2891,7 +3158,7 @@ function writeHarpMetadata(out){
 function applyHarpModel(model){
   if(!model || model.hedit !== "harp") return false;
   if(model.layout){
-    if(model.layout.airGap != null) document.getElementById("string-gap").value = model.layout.airGap;
+    if(model.layout.airGap != null && model.layout.airGap > 0) document.getElementById("string-gap").value = model.layout.airGap;   // ignore a non-positive (unspaced/overlapping) measured gap so the 13 mm default stands
     harpAlignment = model.layout.alignment != null ? model.layout.alignment : null;
   }
   if(model.wp && model.wp.nodes) harpWP = model.wp;   // restore WP waterfall profile
@@ -3212,21 +3479,347 @@ function fitCurve(source, maxNodes, skipUndo){
 function fitEndsCurve(which, maxNodes){ return fitCurve(which, maxNodes); }   // back-compat
 function fitBottomsCurve(maxNodes){ return fitCurve("bottoms", maxNodes); }    // back-compat
 
+const CURVE_GREEN = "#1a9e3a";
+// translate one path by (dx,dy) — nodes + handles
+function shiftPathBy(el, dx, dy){
+  const subs = segsToSubpaths(parsePathD(el.getAttribute("d") || ""));
+  subs.forEach(sub => sub.nodes.forEach(nd => { nd.x += dx; nd.y += dy; if(nd.hasIn){ nd.inX += dx; nd.inY += dy; } if(nd.hasOut){ nd.outX += dx; nd.outY += dy; } }));
+  el.setAttribute("d", subsToD(subs));
+}
+// unit flat→pin direction (the ~23°-from-vertical tuning-post axis), averaged over the strings
+function pinAxisDir(){
+  const F = {}, P = {};
+  contentGroup.querySelectorAll('circle[data-role="flat"]').forEach(c => F[c.getAttribute("data-num")] = [+c.getAttribute("cx"), +c.getAttribute("cy")]);
+  contentGroup.querySelectorAll('circle[data-role="pin"]').forEach(c => P[c.getAttribute("data-num")] = [+c.getAttribute("cx"), +c.getAttribute("cy")]);
+  let dx = 0, dy = 0, n = 0;
+  Object.keys(P).forEach(k => { if(F[k]){ dx += P[k][0]-F[k][0]; dy += P[k][1]-F[k][1]; n++; } });
+  if(n){ const m = Math.hypot(dx, dy) || 1; return [dx/m, dy/m]; }
+  const ls = stringLines(); if(!ls.length) return [0, -1];                 // fallback: string axis rotated ±30°
+  const { top, bot } = stringEnds(ls[0]); let ux = top[0]-bot[0], uy = top[1]-bot[1]; const L = Math.hypot(ux, uy) || 1; ux /= L; uy /= L;
+  const a = (yIsFlipped() ? -30 : 30) * Math.PI/180, ca = Math.cos(a), sa = Math.sin(a);
+  return [ux*ca - uy*sa, ux*sa + uy*ca];
+}
+// remove self-intersection loops from an OPEN polyline (a concave offset fold collapses to a cusp)
+function deloopOpen(P){
+  let guard = 0;
+  while(guard++ < 600){
+    let cut = false;
+    for(let i = 0; i < P.length - 1 && !cut; i++)
+      for(let j = i + 2; j < P.length - 1; j++){
+        const X = segInt(P[i], P[i+1], P[j], P[j+1]);
+        if(X){ P = P.slice(0, i+1).concat([X], P.slice(j+1)); cut = true; break; }
+      }
+    if(!cut) break;
+  }
+  return P;
+}
+// Build NT/NB: fit the pin/sharp curve, then shift it (up for NT, down for NB) until every dot
+// keeps ≥ `margin` PERPENDICULAR clearance — vertical clearance first, then a top-up loop to the
+// true perpendicular minimum. Robust/convergent (≥1 air gap guaranteed everywhere); the binding
+// point is the steepest region (the bass here), and flatter regions clear by more.
+function fitNeckEdge(dotRole, curveRole, margin, visualUp){
+  if(!contentGroup.querySelector('circle[data-role="' + dotRole + '"]')) placeDotRole(dotRole);
+  const pts = fitSourcePoints(dotRole);
+  [...contentGroup.querySelectorAll('path[data-role="' + curveRole + '"]')].forEach(p => p.remove());
+  if(pts.length < 2) return null;
+  const segs = fitSmoothSpline(pts, readFitNodes());
+  let d = "M " + fmt(segs[0][0][0]) + " " + fmt(segs[0][0][1]);
+  for(const c of segs) d += " C " + fmt(c[1][0])+" "+fmt(c[1][1])+" "+fmt(c[2][0])+" "+fmt(c[2][1])+" "+fmt(c[3][0])+" "+fmt(c[3][1]);
+  const p = document.createElementNS(SVGNS, "path");
+  p.setAttribute("data-role", curveRole); p.setAttribute("d", d); p.setAttribute("fill", "none");
+  p.setAttribute("stroke", CURVE_GREEN); p.setAttribute("stroke-width", "1.5");
+  contentGroup.appendChild(p);
+  const flip = yIsFlipped(), U = y => flip ? y : -y;
+  const tot0 = p.getTotalLength();
+  const yAtX = x => { let b = null; for(let i = 0; i <= 600; i++){ const q = p.getPointAtLength(tot0*i/600); const dd = Math.abs(q.x - x); if(!b || dd < b.d) b = { d:dd, y:q.y }; } return b ? b.y : null; };
+  let extra = 0;
+  pts.forEach(([dx, dy]) => { const cy = yAtX(dx); if(cy != null) extra = Math.max(extra, visualUp ? (U(dy) - U(cy)) : (U(cy) - U(dy))); });
+  shiftCurveBy(p, Math.max(0, extra) + margin, visualUp);
+  const minPerp = () => { const t = p.getTotalLength(); let mn = Infinity;
+    for(const [dx, dy] of pts){ let bb = Infinity; for(let i = 0; i <= 800; i++){ const q = p.getPointAtLength(t*i/800); bb = Math.min(bb, Math.hypot(q.x-dx, q.y-dy)); } mn = Math.min(mn, bb); } return mn; };
+  for(let it = 0; it < 10; it++){ const mp = minPerp(); if(mp >= margin - 0.05) break; shiftCurveBy(p, (margin - mp) + 0.1, visualUp); }
+  return p;
+}
+// Step 3 "Fit bottom": GREEN soundboard curve through the string BOTTOMS, then rest the strings
+// on it (keeping each string's length + the air gap). The neck boundary is no longer two NT/NB
+// curves — it is a single closed "plate" wrap (see fitPlate / the Fix plate button).
+function buildStep5Curves(){
+  if(stringLines().length < 2){ setStatus("Load strings first (step 1)."); return; }
+  pushUndo();
+  // soundboard (bottom) curve through the bottoms (green), then rest the strings on it
+  fitCurve("bottoms", readFitNodes(), true);
+  const bot = contentGroup.querySelector('path[data-role="bottom-curve"]');
+  if(!bot){ setStatus("Could not fit the soundboard curve — need 2+ string bottoms."); return; }
+  bot.setAttribute("stroke", CURVE_GREEN);
+  alignStringsToCurve("bottom", bot, true);
+  refreshDots();                                              // pins/sharps follow the rested strings
+  pathModel = null; clearSelection(); renderOverlay();
+  if(autoFitView()) fitView();
+  setStatus(`Soundboard curve fitted; strings rested on it (length + air gap preserved).`);
+}
+
+// ===========================================================================
+// PLATE FIT — JS port of minarea_bezier.py. One closed cubic-Bézier "plate" of minimum enclosed
+// area wrapping the pins + sharps with >= air-gap clearance from every dot. Ribbon-ordered seed
+// (so node numbering walks the pin edge then the sharp edge) + greedy area-min polish, with the
+// approved constraints (see fitPlate). Namespaced so its short helper names can't clash.
+// ===========================================================================
+const PlateFit = (function(){
+  "use strict";
+  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1]], add=(a,b)=>[a[0]+b[0],a[1]+b[1]],
+        mul=(a,s)=>[a[0]*s,a[1]*s], vlen=a=>Math.hypot(a[0],a[1]),
+        nrm=a=>{const l=vlen(a)||1;return [a[0]/l,a[1]/l];};
+  function bez(c,u){const t=1-u;return [
+    t*t*t*c[0][0]+3*t*t*u*c[1][0]+3*t*u*u*c[2][0]+u*u*u*c[3][0],
+    t*t*t*c[0][1]+3*t*t*u*c[1][1]+3*t*u*u*c[2][1]+u*u*u*c[3][1]];}
+  function curvePolygon(cv,per){const out=[];for(const c of cv)for(let i=0;i<per;i++)out.push(bez(c,i/per));return out;}
+  function polyArea(p){let a=0;for(let i=0;i<p.length;i++){const b=p[(i+1)%p.length];a+=p[i][0]*b[1]-b[0]*p[i][1];}return Math.abs(a)/2;}
+  function pointInPoly(pt,p){let c=false;for(let i=0,j=p.length-1;i<p.length;j=i++){
+    const xi=p[i][0],yi=p[i][1],xj=p[j][0],yj=p[j][1];
+    if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))c=!c;}return c;}
+  function distSeg(pt,a,b){const ab=sub(b,a),ap=sub(pt,a);const d=ab[0]*ab[0]+ab[1]*ab[1]||1;
+    let t=(ap[0]*ab[0]+ap[1]*ab[1])/d;t=t<0?0:t>1?1:t;
+    return vlen(sub(pt,[a[0]+ab[0]*t,a[1]+ab[1]*t]));}
+  function distPoly(pt,p){let m=Infinity;for(let i=0;i<p.length;i++){const d=distSeg(pt,p[i],p[(i+1)%p.length]);if(d<m)m=d;}return m;}
+  // uniform-grid accelerator: edges bucketed into square cells (nearest-segment distance) and into
+  // y-rows (ray-cast inside test) — turns the O(dots*edges) scan into O(dots) lookups, same answers.
+  function makeAccel(poly,cell){const n=poly.length;
+    let minx=Infinity,miny=Infinity;for(const p of poly){if(p[0]<minx)minx=p[0];if(p[1]<miny)miny=p[1];}
+    const gx=i=>Math.floor((i-minx)/cell),gy=i=>Math.floor((i-miny)/cell);
+    const cells=new Map(),rows=new Map();
+    const addC=(x,y,e)=>{const k=x+","+y;let a=cells.get(k);if(!a)cells.set(k,a=[]);a.push(e);};
+    const addR=(y,e)=>{let a=rows.get(y);if(!a)rows.set(y,a=[]);a.push(e);};
+    for(let i=0;i<n;i++){const a=poly[i],b=poly[(i+1)%n];
+      const x0=Math.min(gx(a[0]),gx(b[0])),x1=Math.max(gx(a[0]),gx(b[0]));
+      const y0=Math.min(gy(a[1]),gy(b[1])),y1=Math.max(gy(a[1]),gy(b[1]));
+      for(let X=x0;X<=x1;X++)for(let Y=y0;Y<=y1;Y++)addC(X,Y,i);
+      for(let Y=y0;Y<=y1;Y++)addR(Y,i);}
+    function nearest(pt){const cx=gx(pt[0]),cy=gy(pt[1]);let best=Infinity;
+      for(let r=0;r<64;r++){const seen=new Set();
+        for(let X=cx-r;X<=cx+r;X++)for(let Y=cy-r;Y<=cy+r;Y++){
+          if(r>0&&X>cx-r&&X<cx+r&&Y>cy-r&&Y<cy+r)continue;
+          const a=cells.get(X+","+Y);if(!a)continue;
+          for(const e of a){if(seen.has(e))continue;seen.add(e);const d=distSeg(pt,poly[e],poly[(e+1)%n]);if(d<best)best=d;}}
+        if(best<=r*cell)break;}
+      return best;}
+    function inside(pt){const a=rows.get(gy(pt[1]));if(!a)return false;let c=false;
+      for(const i of a){const A=poly[i],B=poly[(i+1)%n];const yi=A[1],yj=B[1],xi=A[0],xj=B[0];
+        if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))c=!c;}
+      return c;}
+    return {nearest,inside};}
+  function evaluate(cv,pts,margin,per){const poly=curvePolygon(cv,per);const area=polyArea(poly);
+    const acc=makeAccel(poly,Math.max(8,margin));
+    let mn=Infinity,allIn=true;for(const q of pts){const d=acc.nearest(q);const inside=acc.inside(q);
+      if(!inside)allIn=false;const s=inside?d:-d;if(s<mn)mn=s;}
+    return {area,mn,valid:allIn&&mn>=margin-1e-3};}
+  function exactMinClear(cv,pts,per){const s=curvePolygon(cv,per);let mn=Infinity;
+    for(const q of pts){let b=Infinity;for(const p of s){const d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<b)b=d;}if(b<mn)mn=b;}return mn;}
+  function resampleClosed(P,m){const seg=[];let total=0;
+    for(let i=0;i<P.length;i++){const d=vlen(sub(P[(i+1)%P.length],P[i]));seg.push(d);total+=d;}
+    const out=[];let k=0,acc=0;for(let j=0;j<m;j++){const target=total*j/m;
+      while(k<P.length&&acc+seg[k]<target){acc+=seg[k];k++;}
+      const a=P[k%P.length],b=P[(k+1)%P.length],f=seg[k%P.length]?(target-acc)/seg[k%P.length]:0;
+      out.push([a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]);}return out;}
+  function closedSeed(K){const n=K.length,segs=[];for(let i=0;i<n;i++){const p0=K[(i-1+n)%n],p1=K[i],p2=K[(i+1)%n],p3=K[(i+2)%n];
+    segs.push([p1,[p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6],[p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6],p2]);}return segs;}
+  function offsetClosed(pts,d){const n=pts.length;
+    const off=s=>{const r=[];for(let i=0;i<n;i++){const a=pts[(i-1+n)%n],b=pts[i],c=pts[(i+1)%n];
+      const e1=nrm(sub(b,a)),e2=nrm(sub(c,b));const v=nrm(add([e1[1],-e1[0]],[e2[1],-e2[0]]));r.push(add(b,mul(v,s*d)));}return r;};
+    const a=off(1);return polyArea(a)>=polyArea(pts)?a:off(-1);}
+  function toParams(cv){const n=cv.length,A=[],phi=[],lin=[],lout=[];
+    for(let k=0;k<n;k++){const od=sub(cv[k][1],cv[k][0]),id=sub(cv[k][0],cv[(k-1+n)%n][2]);
+      const t=add(nrm(od),nrm(id));A.push(cv[k][0].slice());phi.push(Math.atan2(t[1],t[0]));lout.push(vlen(od));lin.push(vlen(id));}
+    return {A,phi,lin,lout};}
+  function build(A,phi,L){const n=A.length,u=phi.map(p=>[Math.cos(p),Math.sin(p)]),cv=[],hc=0.95;
+    for(let k=0;k<n;k++){const kn=(k+1)%n,chord=vlen(sub(A[kn],A[k]));
+      const lo=Math.min(L[k],hc*chord),li=Math.min(L[kn],hc*chord);
+      cv.push([A[k].slice(),add(A[k],mul(u[k],lo)),sub(A[kn],mul(u[kn],li)),A[kn].slice()]);}return cv;}
+  // greedy area-min polish; async so it yields to the UI between iterations
+  async function polish(cv,pts,cen,margin,opts){
+    opts=opts||{};const fixed=new Set(opts.fixed||[]),circle=opts.circle||{},fa=opts.fixedAngles||{};
+    const per=opts.per||96,maxIters=opts.maxIters||80,yield_=opts.yield;
+    const n=cv.length;let {A,phi,lin,lout}=toParams(cv);let L=A.map((_,k)=>0.5*(lin[k]+lout[k]));
+    for(const k in fa)phi[+k]=fa[+k];
+    const th={};for(const k in circle){const[cx,cy]=circle[k];th[k]=Math.atan2(A[k][1]-cy,A[k][0]-cx);}
+    const place=()=>{for(const k in circle){const[cx,cy,R]=circle[k];A[+k]=[cx+R*Math.cos(th[k]),cy+R*Math.sin(th[k])];}};
+    const mk=()=>{place();return build(A,phi,L);};
+    const score=()=>{const e=evaluate(mk(),pts,margin,per);return [Math.min(e.mn,margin),-e.area];};
+    const better=(a,b)=>a[0]>b[0]||(a[0]===b[0]&&a[1]>b[1]);
+    let best=score();const steps=[[6,.10,8],[3,.05,4],[1.5,.025,2],[.6,.01,1]];
+    for(let it=0;it<maxIters;it++){let improved=false;
+      for(const[ds,as,ls] of steps){
+        for(let k=0;k<n;k++){if(fixed.has(k))continue;
+          if(k in circle){const dth=ds/circle[k][2];for(const s of[dth,-dth]){const o=th[k];th[k]+=s;const sc=score();if(better(sc,best)){best=sc;improved=true;}else th[k]=o;}continue;}
+          const d=nrm(sub(cen,A[k]));let o=A[k].slice();A[k]=add(A[k],mul(d,ds));let sc=score();if(better(sc,best)){best=sc;improved=true;}else A[k]=o;
+          for(let ax=0;ax<2;ax++)for(const s of[ds,-ds]){o=A[k].slice();A[k][ax]+=s;sc=score();if(better(sc,best)){best=sc;improved=true;}else A[k]=o;}}
+        for(let k=0;k<n;k++){if(k in fa)continue;for(const s of[as,-as]){const o=phi[k];phi[k]+=s;const sc=score();if(better(sc,best)){best=sc;improved=true;}else phi[k]=o;}}
+        for(let k=0;k<n;k++){const cap=1.2*Math.max(vlen(sub(A[(k+1)%n],A[k])),vlen(sub(A[k],A[(k-1+n)%n])));
+          for(const s of[ls,-ls]){const o=L[k];L[k]=Math.min(cap,Math.max(1,L[k]+s));const sc=score();if(better(sc,best)){best=sc;improved=true;}else L[k]=o;}}}
+      if(yield_)await yield_(it,maxIters);
+      if(!improved)break;}
+    return mk();}
+  async function solveAsync(allp,pins,sharps,opts){
+    const margin=opts.margin,eff=margin+(opts.safety||0.05),N=opts.nodes||8;
+    const per=opts.per||96,maxIters=opts.maxIters||80,yield_=opts.yield;
+    const ribbon=pins.concat(sharps.slice().reverse());
+    const dense=resampleClosed(ribbon,Math.max(160,N*20));
+    let knots=resampleClosed(offsetClosed(dense,opts.seedOff||eff),N);
+    let cv=opts.seedCurves || closedSeed(knots);   // embedded approved-plate seed if supplied
+    if(opts.start){const s=opts.start;let bi=0,bd=Infinity;cv.forEach((c,i)=>{const d=vlen(sub(c[0],s));if(d<bd){bd=d;bi=i;}});cv=cv.slice(bi).concat(cv.slice(0,bi));}
+    const cen=(()=>{const p=curvePolygon(cv,200);let x=0,y=0;for(const q of p){x+=q[0];y+=q[1];}return [x/p.length,y/p.length];})();
+    const fa={};for(const k in (opts.angles||{}))fa[k]=opts.angles[k]*Math.PI/180;
+    cv=await polish(cv,allp,cen,eff,{fixedAngles:fa,per,maxIters,yield:yield_});
+    const free=new Set(opts.free||[]),fc=opts.oncircle||{};
+    let {A,phi,lin,lout}=toParams(cv);let L=A.map((_,k)=>0.5*(lin[k]+lout[k]));const circle={};
+    for(let i=0;i<N;i++){if(free.has(i))continue;let c;
+      if(i in fc)c=fc[i];
+      else if(opts.perimeter){let bj=0,bd=Infinity;allp.forEach((p,j)=>{const d=vlen(sub(p,A[i]));if(d<bd){bd=d;bj=j;}});c=allp[bj];}
+      else continue;
+      const v=nrm(sub(A[i],c));A[i]=add(c,mul(v,eff));circle[i]=[c[0],c[1],eff];}
+    cv=build(A,phi,L);
+    cv=await polish(cv,allp,cen,eff,{circle,fixedAngles:fa,per,maxIters,yield:yield_});
+    return cv;}
+  return {solveAsync,curvePolygon,polyArea,pointInPoly,exactMinClear};
+})();
+
+// Build a closed plate `d`-string from solver curves (z-up) back into content coords (y = -z).
+function plateCurvesToD(cv){
+  const f=(p)=>`${fmt(p[0])} ${fmt(-p[1])}`;
+  let d=`M ${f(cv[0][0])}`;
+  for(const c of cv) d+=` C ${f(c[1])} ${f(c[2])} ${f(c[3])}`;
+  return d+" Z";
+}
+// Map a string number -> note (from the loaded strings) so plate homes can be picked by note.
+function numNoteMap(){
+  const m={}; stringLines().forEach(el=>{ const n=el.getAttribute("data-num"); if(n!=null) m[n]=(el.getAttribute("data-note")||"").toUpperCase(); });
+  return m;
+}
+// Embedded approved-plate seed (the clements47 plate.svg, z-up: x, z=−y) — 8 cubic segments as
+// [ax,az, c1x,c1z, c2x,c2z, bx,bz]. The plate is bound to the DOTS by a least-squares AFFINE fit
+// (REF_DOTS → the current dots, matched by role+num), so the frozen shape travels with the dot
+// cloud: air-gap (scale), rake (rotation), and align (translation/shear) all carry it faithfully.
+const PLATE_SEED=[[-199.8,5.59,-190.69,84.61,-89.38,-63.12,-71.84,-80.66],[-71.84,-80.66,-54.3,-98.19,32.95,-262.08,111.73,-351.39],[111.73,-351.39,190.53,-440.7,392.53,-605.8,517.12,-651.93],[517.12,-651.93,570.34,-671.64,560.39,-637,559.78,-693.75],[559.78,-693.75,558.74,-790.49,311.26,-641.79,301.02,-633.78],[301.02,-633.78,290.77,-625.78,105.95,-509.69,62,-448.94],[62,-448.94,18.05,-388.2,8.35,-391.83,-98.44,-325.19],[-98.44,-325.19,-205.24,-258.55,-208.91,-73.42,-199.8,5.59]];
+const REF_PLATE_BBOX=[-188.32,-712.6,550.31,11.79];   // minX, minZ, maxX, maxZ (z-up) of the ref dots
+// reference dot positions (z-up) keyed "p"+num (pin) / "s"+num (sharp) — the frame the seed lives in
+const REF_DOTS={"p1":[-188.3,11.8],"p2":[-167.9,-34.7],"p3":[-147.8,-79.9],"p4":[-132.2,-88.8],"p5":[-114.1,-118.3],"p6":[-96.1,-147.7],"p7":[-87,-105.1],"p8":[-74.1,-93.5],"p9":[-54.4,-138.3],"p10":[-34.7,-183.1],"p11":[-19.5,-192],"p12":[-1.8,-221.4],"p13":[15.7,-244.6],"p14":[33.6,-266.9],"p15":[52,-294.3],"p16":[69.8,-316.8],"p17":[87.5,-339.5],"p18":[105.1,-362.6],"p19":[122.7,-385.8],"p20":[139.6,-404.4],"p21":[155.2,-413.4],"p22":[172.1,-432.8],"p23":[188.3,-447.7],"p24":[204.5,-463.2],"p25":[220.6,-477.9],"p26":[236.2,-488.4],"p27":[251.7,-499.5],"p28":[266.7,-506.4],"p29":[284.1,-533.9],"p30":[299.8,-547.1],"p31":[315.5,-561],"p32":[330.7,-570.7],"p33":[345.3,-576.1],"p34":[360.5,-587.2],"p35":[375.8,-599],"p36":[391.8,-616.5],"p37":[407.3,-629.7],"p38":[422.2,-638.6],"p39":[436.8,-645.2],"p40":[451,-648.3],"p41":[465.2,-651.9],"p42":[479,-653.1],"p43":[493.1,-656.6],"p44":[507.1,-660.3],"p45":[521.3,-665.3],"p46":[535.5,-670.5],"p47":[550.3,-680.7],"s1":[-176.8,-188.5],"s2":[-157.4,-227.1],"s3":[-138.2,-264.6],"s4":[-123,-269.8],"s5":[-105.7,-293.3],"s6":[-88.4,-316.8],"s7":[-79.1,-276.1],"s8":[-66.4,-263.1],"s9":[-47.6,-300.4],"s10":[-28.8,-337.6],"s11":[-14.1,-342.9],"s12":[2.9,-366.4],"s13":[19.7,-384.4],"s14":[37,-401.5],"s15":[54.7,-423.1],"s16":[71.9,-440.4],"s17":[88.9,-458],"s18":[105.9,-475.9],"s19":[122.8,-494],"s20":[139.2,-508.1],"s21":[154.4,-513.6],"s22":[170.7,-528.5],"s23":[186.5,-539.5],"s24":[202.2,-551],"s25":[217.9,-562],"s26":[233,-569.1],"s27":[248.1,-577],"s28":[262.8,-581.2],"s29":[279.6,-603.8],"s30":[294.9,-613.8],"s31":[310.2,-624.5],"s32":[325,-631.5],"s33":[339.4,-634.7],"s34":[354.3,-643.1],"s35":[369.2,-652.2],"s36":[384.8,-666.4],"s37":[400,-676.9],"s38":[414.6,-683.7],"s39":[429,-688.4],"s40":[443.1,-690.1],"s41":[457.1,-692.3],"s42":[470.8,-692.4],"s43":[484.6,-694.6],"s44":[498.5,-697],"s45":[512.6,-700.6],"s46":[526.6,-704.4],"s47":[541.1,-712.6]};
+function _solve3(M,v){   // Gaussian elimination on a 3×3 system; null if singular
+  const A=M.map((r,i)=>r.concat(v[i]));
+  for(let i=0;i<3;i++){ let piv=i; for(let r=i+1;r<3;r++) if(Math.abs(A[r][i])>Math.abs(A[piv][i])) piv=r;
+    if(Math.abs(A[piv][i])<1e-9) return null; [A[i],A[piv]]=[A[piv],A[i]];
+    for(let r=0;r<3;r++){ if(r===i) continue; const f=A[r][i]/A[i][i]; for(let c=i;c<4;c++) A[r][c]-=f*A[i][c]; } }
+  return [A[0][3]/A[0][0],A[1][3]/A[1][1],A[2][3]/A[2][2]];
+}
+function _affineFrom(pairs){   // least-squares 2×3 affine mapping ref→cur; returns p=>[x,y] or null
+  let Sxx=0,Sxy=0,Sx=0,Syy=0,Sy=0,S1=0,Axx=0,Ayx=0,Ax=0,Axy=0,Ayy=0,Ay=0;
+  for(const [r,c] of pairs){ const rx=r[0],ry=r[1];
+    Sxx+=rx*rx;Sxy+=rx*ry;Sx+=rx;Syy+=ry*ry;Sy+=ry;S1++;
+    Axx+=rx*c[0];Ayx+=ry*c[0];Ax+=c[0]; Axy+=rx*c[1];Ayy+=ry*c[1];Ay+=c[1]; }
+  const M=[[Sxx,Sxy,Sx],[Sxy,Syy,Sy],[Sx,Sy,S1]];
+  const a=_solve3(M,[Axx,Ayx,Ax]), b=_solve3(M,[Axy,Ayy,Ay]);
+  if(!a||!b) return null;
+  return p=>[a[0]*p[0]+a[1]*p[1]+a[2], b[0]*p[0]+b[1]*p[1]+b[2]];
+}
+// Map PLATE_SEED onto the current harp. curMap: {"p"+num|"s"+num: [x,z]} of the live dots (z-up).
+// Primary: least-squares affine REF_DOTS→curMap (handles air-gap/rake/align). Fallback (too few
+// matches): axis-aligned bbox rescale.
+function fittedPlateSeed(curMap, allp){
+  const pairs=[]; for(const k in REF_DOTS){ if(curMap[k]) pairs.push([REF_DOTS[k], curMap[k]]); }
+  const T = pairs.length>=6 ? _affineFrom(pairs) : null;
+  if(T) return PLATE_SEED.map(s=>[T([s[0],s[1]]),T([s[2],s[3]]),T([s[4],s[5]]),T([s[6],s[7]])]);
+  let minx=Infinity,minz=Infinity,maxx=-Infinity,maxz=-Infinity;
+  for(const p of allp){ if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<minz)minz=p[1]; if(p[1]>maxz)maxz=p[1]; }
+  const [rx0,rz0,rx1,rz1]=REF_PLATE_BBOX, rw=(rx1-rx0)||1, rh=(rz1-rz0)||1, cw=maxx-minx, ch=maxz-minz;
+  const mx=x=>minx+(x-rx0)/rw*cw, mz=z=>minz+(z-rz0)/rh*ch;
+  return PLATE_SEED.map(s=>[[mx(s[0]),mz(s[1])],[mx(s[2]),mz(s[3])],[mx(s[4]),mz(s[5])],[mx(s[6]),mz(s[7])]]);
+}
+// Async: wrap the pins + sharps in the min-area plate and draw it as a green closed path.
+async function fitPlate(){
+  const pinEls=[...contentGroup.querySelectorAll('circle[data-role="pin"]')];
+  const sharpEls=[...contentGroup.querySelectorAll('circle[data-role="sharp"]')];
+  if(pinEls.length<3 || sharpEls.length<3){ setStatus("Fix plate needs pin AND sharp dots — add them first (step 1 dots)."); return; }
+  const toDot=el=>({num:+el.getAttribute("data-num"),p:[+el.getAttribute("cx"), -(+el.getAttribute("cy"))]});  // z-up: z=-y
+  const pins=pinEls.map(toDot).sort((a,b)=>a.num-b.num);
+  const sharps=sharpEls.map(toDot).sort((a,b)=>a.num-b.num);
+  const allDots=pins.concat(sharps);
+  const allp=allDots.map(d=>d.p);
+  const curMap={};   // role+num -> live dot (z-up), for the affine seed fit
+  pins.forEach(d=>curMap["p"+d.num]=d.p); sharps.forEach(d=>curMap["s"+d.num]=d.p);
+  // pick the constraint home dots by note, with ordinal fallbacks
+  const note=numNoteMap();
+  const findP=(arr,nt,fallbackIdx)=>{ const d=arr.find(x=>note[x.num]===nt); return (d||arr[fallbackIdx]||arr[0]).p; };
+  const C1p=findP(pins,"C1",0), C2p=findP(pins,"C2",1),
+        D7p=findP(pins,"D7",pins.length-4), A1s=findP(sharps,"A1",5);
+  const gap=readStringGap();
+  const t0=Date.now();
+  // Plate selection, tiered so the working cases are NEVER lost:
+  //  1) AFFINE-FROZEN plate — the approved curve mapped onto the dots (rake/center/airgap/align that
+  //     keep the band). Used directly (node 4 stays minimized) whenever it's valid. This is the path
+  //     that works today, so it's tried first and kept untouched.
+  //  2) if the affine plate is distorted (band changed shape, e.g. an un-raked wedge): re-OPTIMIZE
+  //     from the uniform ribbon seed with the band constraints; use it if valid.
+  //  3) last resort: a generic min-area wrap (no band-specific homes/angles). Keep the best of all
+  //     attempts by clearance, and warn if even that can't hold the air gap.
+  const plateMin = c => PlateFit.exactMinClear(c, allp, 1200);
+  const plateOK  = c => { if(plateMin(c) < gap*0.5) return false; const pg=PlateFit.curvePolygon(c,400); for(const q of allp) if(!PlateFit.pointInPoly(q,pg)) return false; return true; };
+  const baseOpts = { margin:gap, safety:0.05, nodes:8, start:C1p, per:140, maxIters:80,
+    yield:async(it,mx)=>{ if(it%4===0){ setStatus(`Fix plate: optimizing… ${Math.round(100*it/mx)}%`); await new Promise(r=>setTimeout(r,0)); } } };
+  const bandConstraints = { perimeter:true, free:[4], oncircle:{0:C1p,1:C2p,3:D7p,7:A1s}, angles:{1:-45,5:142} };
+  let cv=fittedPlateSeed(curMap, allp), approx=false;
+  if(!plateOK(cv)){
+    setStatus("Fix plate: layout differs from the reference band — re-optimizing…");
+    const cvBand = await PlateFit.solveAsync(allp, pins.map(d=>d.p), sharps.map(d=>d.p), Object.assign({}, baseOpts, bandConstraints));
+    if(plateOK(cvBand)) cv=cvBand;
+    else {
+      const cvGeneric = await PlateFit.solveAsync(allp, pins.map(d=>d.p), sharps.map(d=>d.p), Object.assign({}, baseOpts, { perimeter:true }));
+      cv = [cv, cvBand, cvGeneric].sort((a,b)=>plateMin(b)-plateMin(a))[0];   // keep the best-clearance attempt
+      approx = !plateOK(cv);
+    }
+  }
+  // draw (replace any existing plate)
+  contentGroup.querySelectorAll('path[data-role="plate"]').forEach(e=>e.remove());
+  const path=document.createElementNS(SVGNS,"path");
+  path.setAttribute("data-role","plate");
+  path.setAttribute("d", plateCurvesToD(cv));
+  path.setAttribute("fill","none");
+  path.setAttribute("stroke", CURVE_GREEN);
+  path.setAttribute("stroke-width","1.5");
+  contentGroup.appendChild(path);
+  const area=PlateFit.polyArea(PlateFit.curvePolygon(cv,400));
+  const minc=PlateFit.exactMinClear(cv,allp,1200);
+  pathModel=null; selectElement(path); renderOverlay(); if(autoFitView()) fitView(); persist();
+  const warn = approx ? ` ⚠ layout too far from the reference band — APPROXIMATE (8 nodes can't hold the air gap here; rake/center first)` : "";
+  setStatus(`Plate fitted: 8-node closed Bézier · area ${Math.round(area).toLocaleString()} mm² · min clearance ${fmt(minc)} mm · ${((Date.now()-t0)/1000).toFixed(1)} s${warn}`);
+}
+function fixPlate(){
+  if(stringLines().length<2){ setStatus("Load strings first (step 1)."); return; }
+  pushUndo();
+  setStatus("Fix plate: optimizing… (running in the background)");
+  fitPlate().catch(err=>{ console.error(err); setStatus("Fix plate failed: "+err.message); });
+}
+
 // ---- Lamé (superellipse) side curves: pillar (−x of c1) and shoulder (+x of last string) ----
-// (X/a)^n + (Y/b)^n = 1 ; we walk the LEFT or RIGHT half so the curve passes through
-// (x_s, y_top) and (x_s, y_bot) and bulges out by `a` perpendicular to the endpoint line.
-function sampleCurveYAtX(path, x){
+// The side curve runs from the neck (top) curve down to the soundboard (bottom) curve at the
+// edge string's x, bowing out by `a`. It is built as TWO cubic Béziers meeting at the outward
+// apex (vertical tangent there → G1), with the endpoint handles made COLLINEAR with the neck /
+// soundboard tangents at the join (G1 there too → no kink). `n` (superellipse exponent) is kept
+// as a fullness knob, mapped to the Bézier handle fraction (n=2 → circle 0.5523, higher → boxier).
+// Built directly as Béziers — no sample-then-refit — so the curve cannot lump/overshoot.
+function sampleCurveAtX(path, x){
   if(!path) return null;
   let total; try { total = path.getTotalLength(); } catch(e){ return null; }
   if(!total) return null;
   const N = Math.max(300, Math.ceil(total));
   let best = null;
   for(let i = 0; i <= N; i++){
-    const q = path.getPointAtLength(total * i / N);
+    const s = total * i / N, q = path.getPointAtLength(s);
     const d = Math.abs(q.x - x);
-    if(!best || d < best.d) best = { d, y: q.y };
+    if(!best || d < best.d) best = { d, y: q.y, s };
   }
-  return best ? best.y : null;
+  if(!best) return null;
+  const a = path.getPointAtLength(Math.max(0, best.s - 0.5));
+  const b = path.getPointAtLength(Math.min(total, best.s + 0.5));
+  let tx = b.x - a.x, ty = b.y - a.y; const m = Math.hypot(tx, ty) || 1;
+  return { y: best.y, tx: tx/m, ty: ty/m };
 }
 function sideStringForSide(side){
   const lines = stringLines(); if(!lines.length) return null;
@@ -3242,37 +3835,64 @@ function findFittedCurveByRoles(roles){
   }
   return null;
 }
-function lameSidePoints(xs, yTop, yBot, side, a, n, count){
-  const cy = (yTop + yBot) / 2, bSigned = (yBot - yTop) / 2;
+// superellipse exponent n → Bézier handle fraction (n=2 ellipse → 0.5523 circle approx;
+// higher n bows fuller/boxier, lower n leaner/diamond-ish). Clamped to a sane Bézier range.
+function lameFullness(n){ return Math.max(0.20, Math.min(0.92, 0.5523 + 0.30 * (1 - 2 / n))); }
+// Two cubic Béziers from (xs,yTop) [tangent tTop] through the apex (xs+dir*a, midY) [vertical]
+// to (xs,yBot) [tangent tBot]. tTop/tBot are unit tangents of the neck/soundboard curve at xs;
+// their SIGN is chosen to point toward the apex so the handles never wiggle backward, while
+// staying collinear with the source tangent (so the join is G1 — smooth, no kink).
+// Two cubic Béziers from the neck point T=[x,y] (tangent tTan) through an outward apex
+// (vertical tangent → G1) to the soundboard point B=[x,y] (tangent bTan). T and B may have
+// different x (raked strings: the neck end and soundboard end sit at different x).
+function lameSideBezier(T, tTan, B, bTan, side, a, n){
   const dir = (side === "left") ? -1 : 1;
-  const N = Math.max(20, count|0);
-  const pts = [];
-  for(let i = 0; i <= N; i++){
-    const theta = Math.PI * i / N;             // 0 → top, π → bottom
-    const c = Math.cos(theta);                 // +1 → 0 → −1
-    const Xrel = Math.pow(Math.max(0, 1 - Math.pow(Math.abs(c), n)), 1 / n);
-    pts.push([xs + dir * a * Xrel, cy - bSigned * c]);
-  }
-  return pts;
+  const cy = (T[1] + B[1]) / 2;
+  const outerX = (dir > 0) ? Math.max(T[0], B[0]) : Math.min(T[0], B[0]);
+  const apex = [outerX + dir * a, cy];              // bow out beyond the outer endpoint by `a`
+  const vDir = Math.sign(B[1] - T[1]) || 1;         // travel direction in y, T → B
+  const v = [0, vDir];                              // shared vertical tangent at the apex (G1)
+  const c = lameFullness(n);
+  const spanT = Math.abs(cy - T[1]), spanB = Math.abs(B[1] - cy);
+  // endpoint handle = source tangent, signed toward the apex; length scales with the bow
+  const orient = (tx, ty, towardX, towardY) => {
+    let ux = tx, uy = ty;
+    if(Math.hypot(ux, uy) < 1e-6){ ux = dir; uy = vDir; }       // degenerate tangent → fall back
+    return (ux * towardX + uy * towardY < 0) ? [-ux, -uy] : [ux, uy];
+  };
+  const uT = orient(tTan[0], tTan[1], apex[0] - T[0], apex[1] - T[1]);
+  const uB = orient(bTan[0], bTan[1], apex[0] - B[0], apex[1] - B[1]);
+  const hT = c * a, hB = c * a;                     // endpoint (outward) handle lengths
+  const seg1 = [ T, [T[0] + uT[0]*hT, T[1] + uT[1]*hT], [apex[0] - v[0]*c*spanT, apex[1] - v[1]*c*spanT], apex ];
+  const seg2 = [ apex, [apex[0] + v[0]*c*spanB, apex[1] + v[1]*c*spanB], [B[0] + uB[0]*hB, B[1] + uB[1]*hB], B ];
+  return [seg1, seg2];
+}
+// the endpoint of a path on the wanted side (max x = right / treble, min x = left / bass),
+// with the curve's unit tangent there — for joining the body side curve G1 to it.
+function curveEndpoint(path, wantMaxX){
+  const total = path.getTotalLength();
+  const a = path.getPointAtLength(0), b = path.getPointAtLength(total);
+  const useB = wantMaxX ? (b.x >= a.x) : (b.x <= a.x);
+  const s = useB ? total : 0, p = path.getPointAtLength(s);
+  const near = path.getPointAtLength(useB ? Math.max(0, total - 0.5) : 0.5);
+  let tx = p.x - near.x, ty = p.y - near.y; const m = Math.hypot(tx, ty) || 1;
+  return { x:p.x, y:p.y, tx:tx/m, ty:ty/m };
 }
 function addLameSide(side){
-  if(!stringLines().length){ setStatus("Load strings first."); return; }
-  const sEl = sideStringForSide(side);
-  if(!sEl){ setStatus("Could not find the " + (side === "left" ? "c1" : "last") + " string."); return; }
-  const xs = parseFloat(sEl.getAttribute("x1")) || 0;
   const bot = findFittedCurveByRoles(["bottom-curve","sb-curve","soundboard-curve"]);
-  if(!bot){ setStatus("Need a soundboard (bottom) curve first — fit it in step 5."); return; }
-  const top = findFittedCurveByRoles(["top-curve","pin-curve","neck-curve","midi-curve"]);
-  if(!top){ setStatus("Need a neck/top curve first — fit pins or string tops in step 5."); return; }
-  const yBot = sampleCurveYAtX(bot, xs), yTop = sampleCurveYAtX(top, xs);
-  if(yBot == null || yTop == null){ setStatus("Could not sample the curves at x = " + fmt(xs) + "."); return; }
+  if(!bot){ setStatus("Need a soundboard (bottom) curve first — fit it in step 2."); return; }
+  const top = findFittedCurveByRoles(["neck-bottom-curve","top-curve","pin-curve","neck-curve","midi-curve"]);   // prefer NB (neck bottom)
+  if(!top){ setStatus("Need a neck curve first — run Fit bottom + neck curves (step 2)."); return; }
+  // connect the soundboard and neck (NB) curve ENDPOINTS on this side — the harp body outline.
+  // Endpoint-based (not string-x-sampled), so it stays correct when the strings are raked.
+  const wantMax = (side === "right");
+  const topE = curveEndpoint(top, wantMax), botE = curveEndpoint(bot, wantMax);
   const bowInput = document.getElementById(side === "left" ? "pillar-bow" : "shoulder-bow");
   const nInput   = document.getElementById(side === "left" ? "pillar-n"   : "shoulder-n");
   const a = Math.max(0.001, parseFloat(bowInput.value) || 0);
   const n = Math.max(1.05, parseFloat(nInput.value) || 2.5);
-  const pts = lameSidePoints(xs, yTop, yBot, side, a, n, 49);
-  const curves = fitSmoothSpline(pts, 9);
-  if(!curves.length){ setStatus("Could not fit the Lamé curve."); return; }
+  const curves = lameSideBezier([topE.x, topE.y], [topE.tx, topE.ty], [botE.x, botE.y], [botE.tx, botE.ty], side, a, n);
+  if(!curves.length){ setStatus("Could not build the Lamé curve."); return; }
   pushUndo();
   const role = (side === "left") ? "pillar-curve" : "shoulder-curve";
   [...contentGroup.querySelectorAll('path[data-role="' + role + '"]')].forEach(p => p.remove());
@@ -3558,7 +4178,7 @@ function placeTuners(){
 const SENSORS = [
   { role:"flat",    k: 0,          color:"#9b51e0" },   // violet — at the tip (the open/flat note)
   { role:"natural", k: 1 - 0.9439, color:"#e6261f" },   // R
-  { role:"sharp",   k: 1 - 0.8909, color:"#3ad13a" },   // G
+  { role:"sharp",   k: 1 - 0.8909, color:"#2255cc" },   // blue
   { role:"midi",    k: 0.125,      color:"#2d7ff9" },   // B
   { role:"eyelet",  k: 1,          color:"#00897b" },   // teal — at the string bottom (soundboard attachment)
 ];
@@ -3578,20 +4198,31 @@ function mkDot(cx, cy, r, role, fill, num){
 function clearByRole(roles){ roles.forEach(r => [...contentGroup.querySelectorAll('[data-role="' + r + '"]')].forEach(e => e.remove())); }
 
 const ALL_DOT_ROLES = ["pin","flat","natural","sharp","midi","eyelet"];
-// place ONE dot layer for every string (no undo/status). pins: 3 air-gaps up-right of the
+const DEFAULT_DOT_ROLES = ["pin","flat","natural","sharp"];   // dot layers on by default after a load
+// turn the default dot layers on (check their boxes), then place every checked dot layer.
+// Used by the string loaders so pins/flats/naturals/sharps appear with the strings (a plain
+// page load runs syncDotCheckboxes, which would otherwise clear the HTML `checked` default).
+function loadDefaultDots(){
+  DEFAULT_DOT_ROLES.forEach(r => { const cb = document.getElementById("dot-" + r); if(cb) cb.checked = true; });
+  ALL_DOT_ROLES.forEach(r => { const cb = document.getElementById("dot-" + r); if(cb && cb.checked) placeDotRole(r); });
+}
+// where a string's tuning pin sits: 2 air-gaps from the top along a ±30° (up-and-to-the-right)
+// direction off the string axis. Flip-aware. Returns [x,y] in content coords.
+function pinPoint(el){
+  const flip = yIsFlipped(), dist = 2 * readStringGap();
+  const ang = (flip ? -30 : 30) * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);
+  const { top, bot } = stringEnds(el);
+  let ux = top[0]-bot[0], uy = top[1]-bot[1]; const L = Math.hypot(ux,uy) || 1; ux/=L; uy/=L;
+  const dx = ux*ca - uy*sa, dy = ux*sa + uy*ca;
+  return [top[0] + dx*dist, top[1] + dy*dist];
+}
+// place ONE dot layer for every string (no undo/status). pins: 2 air-gaps up-right of the
 // top; flat at the tip; natural/sharp/midi at the Paraguayan fractions below the tip.
 function placeDotRole(role){
   const strings = stringLines(); if(!strings.length) return;
   clearByRole([role]);
   if(role === "pin"){
-    const flip = yIsFlipped(), dist = 3 * readStringGap();
-    const ang = (flip ? -30 : 30) * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);   // up-and-to-the-RIGHT
-    strings.forEach(el => {
-      const { top, bot } = stringEnds(el);
-      let ux = top[0]-bot[0], uy = top[1]-bot[1]; const L = Math.hypot(ux,uy) || 1; ux/=L; uy/=L;
-      const dx = ux*ca - uy*sa, dy = ux*sa + uy*ca;
-      mkDot(top[0] + dx*dist, top[1] + dy*dist, 2.5, "pin", "#ffb454", el.getAttribute("data-num"));
-    });
+    strings.forEach(el => { const p = pinPoint(el); mkDot(p[0], p[1], 2.5, "pin", "#ffb454", el.getAttribute("data-num")); });
   } else {
     const s = SENSORS.find(x => x.role === role); if(!s) return;
     strings.forEach(el => {
@@ -3631,6 +4262,17 @@ function clearAnnotations(){ pushUndo(); clearByRole(ALL_DOT_ROLES); renderOverl
 
 // shift the selected path(s), else the fitted curves, vertically (visual up/down)
 // by a specific amount or by the air gap
+// shift one path's nodes + handles vertically by dyStored (content-y units)
+function shiftPathVertical(el, dyStored){
+  const subs = segsToSubpaths(parsePathD(el.getAttribute("d") || ""));
+  subs.forEach(sub => sub.nodes.forEach(nd => { nd.y += dyStored; if(nd.hasIn) nd.inY += dyStored; if(nd.hasOut) nd.outY += dyStored; }));
+  el.setAttribute("d", subsToD(subs));
+}
+// shift a path visually up/down by `amt` mm (flip-aware); no undo/selection side effects
+function shiftCurveBy(el, amt, visualUp){
+  if(!el || !amt) return;
+  shiftPathVertical(el, (yIsFlipped() ? 1 : -1) * amt * (visualUp ? 1 : -1));
+}
 function shiftCurves(visualUp){
   const amtIn = parseFloat(document.getElementById("shift-amt").value) || 0;
   const useGap = document.getElementById("shift-gap").checked;
@@ -3643,11 +4285,7 @@ function shiftCurves(visualUp){
   if(!targets.length && pathModel && isPath(pathModel.el)) targets = [pathModel.el];
   if(!targets.length){ setStatus("Select a curve to shift (or fit one — it becomes the active curve)."); return; }
   pushUndo();
-  targets.forEach(el => {
-    const subs = segsToSubpaths(parsePathD(el.getAttribute("d") || ""));
-    subs.forEach(sub => sub.nodes.forEach(nd => { nd.y += dyStored; if(nd.hasIn) nd.inY += dyStored; if(nd.hasOut) nd.outY += dyStored; }));
-    el.setAttribute("d", subsToD(subs));
-  });
+  targets.forEach(el => shiftPathVertical(el, dyStored));
   // re-enter node-edit on the shifted curve so its handles reappear at the new position
   // (and it stays the active shift target); for multiple, just keep them selected
   selectedNode = null;
