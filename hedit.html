@@ -643,8 +643,8 @@ function yIsFlipped(){ const m = contentGroup.getCTM(); return !!(m && m.d < 0);
 // ---- status / hints ----
 function setStatus(t){ elStatus.textContent = t; }
 const HINTS = {
-  select: "<b>Select:</b> click an object, drag to move. <b>Shift+click</b> adds to selection; drag an empty area for a <b>box-select</b>; <b>Ctrl+A</b> selects all. With 2+ selected, set a <b>Gap</b> and use <b>Distribute →/↓</b> (<kbd>H</kbd> / <kbd>Shift+H</kbd>) to space them evenly — air gap accounts for stroke width.",
-  node:   "<b>Nodes:</b> click a path, drag <b>squares</b> (anchors) &amp; <b>green dots</b> (handles). <b>Double-click</b> a segment to add a node. Click a node + <b>Del</b> to remove.",
+  select: "<b>Select:</b> click an object, drag to move. <b>Double-click a path</b> to edit its nodes. <b>Shift+click</b> adds to selection; drag an empty area for a <b>box-select</b>; <b>Ctrl+A</b> selects all. With 2+ selected, set a <b>Gap</b> and use <b>Distribute →/↓</b> (<kbd>H</kbd> / <kbd>Shift+H</kbd>) to space them evenly — air gap accounts for stroke width.",
+  node:   "<b>Nodes:</b> click a path (or <b>double-click</b> one in Select), drag anchors (blue) &amp; handles (green). <b>Double-click</b> the outline to add a node. Click a node + <b>Del</b> to remove.",
   pen:    "<b>Pen:</b> click to add corner points; <b>click-drag</b> for smooth curves. Click the first node or press <b>Enter</b> to finish; <b>Esc</b> cancels.",
   rect:   "<b>Rectangle:</b> drag on the canvas to draw. Hold while dragging to size it.",
   ellipse:"<b>Ellipse:</b> drag on the canvas to draw."
@@ -1057,10 +1057,13 @@ function drawBBox(el){
 
 function drawNodeEditor(aR, cR){
   const el = pathModel.el;
+  // Two passes so anchors always win the click: handles/lines for ALL nodes first,
+  // then every anchor on top. (Per-node order let a later node's handle, collapsed
+  // onto an earlier node's anchor when zoomed out, steal the click — so the node
+  // couldn't be selected/deleted. See drag-priority note in onDown too.)
   pathModel.subs.forEach((sub, si) => {
     sub.nodes.forEach((nd, ni) => {
       const a = toUserFromLocal(el, { x:nd.x, y:nd.y });
-      // handle lines + control dots
       if(nd.hasIn){
         const h = toUserFromLocal(el, { x:nd.inX, y:nd.inY });
         overlayGroup.appendChild(ovEl("line", { x1:a.x, y1:a.y, x2:h.x, y2:h.y }, "ov-handle-line"));
@@ -1075,6 +1078,11 @@ function drawNodeEditor(aR, cR){
         c.dataset.kind = "out"; c.dataset.si = si; c.dataset.ni = ni;
         overlayGroup.appendChild(c);
       }
+    });
+  });
+  pathModel.subs.forEach((sub, si) => {
+    sub.nodes.forEach((nd, ni) => {
+      const a = toUserFromLocal(el, { x:nd.x, y:nd.y });
       // anchor: square = corner, circle = smooth node
       const sel = selectedNode && selectedNode.si === si && selectedNode.ni === ni;
       const cls = "ov-anchor" + (sel ? " sel" : "");
@@ -1414,13 +1422,23 @@ function finishShape(){
 }
 
 function onDblClick(e){
+  // Already node-editing: double-clicking ON the current path's outline adds a node.
   if(tool === "node" && pathModel){
     const loc = toLocal(pathModel.el, evtUser(e));
     const hit = nearestSegment(loc);
     if(hit){
       const scale = screenScale() || 1;
-      if(hit.d * scale < 40) insertNodeAt(hit);
+      if(hit.d * scale < 40){ insertNodeAt(hit); return; }
     }
+    // not on this path — fall through to (re)enter node-edit on whatever was double-clicked
+  }
+  // From any tool: double-click a path (e.g. the green plate) to enter node-edit on it.
+  const t = e.target;
+  const np = (isContentEl(t) && t.tagName.toLowerCase() === "path")
+    ? t : nearestPathAt(e.clientX, e.clientY, HIT_PX * 2.5);
+  if(np && np.tagName.toLowerCase() === "path"){
+    setTool("node"); enterNodeEdit(np); renderOverlay();
+    setStatus("Editing nodes — drag anchors/handles · double-click outline to add · Del to remove.");
   }
 }
 
