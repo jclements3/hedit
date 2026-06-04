@@ -617,25 +617,6 @@ def solve(allp, strands, margin, n_nodes, base="auto", safety=0.05,
             v = A[i] - np.array([cx, cy]); nn = np.hypot(*v) or 1.0
             A[i] = np.array([cx, cy]) + v / nn * eff               # project node onto its eff circle
             circle[i] = (cx, cy, eff)
-        # spike-repair: a FREE node (not on a circle) that the prior polish left stray — far from
-        # any dot — is in a spike local-min the greedy descent can't escape. Re-seed it onto the
-        # band, at the midpoint of its neighbours pushed eff outward from the nearest dot, so the
-        # next polish refines it instead of being stuck.
-        cen_arr = np.asarray(cen, float)
-        for i in range(n_nodes):
-            if i in circle:
-                continue
-            if math.sqrt(((pts_arr - A[i]) ** 2).sum(1).min()) <= 1.3 * eff:
-                continue
-            mid = 0.5 * (A[(i - 1) % n_nodes] + A[(i + 1) % n_nodes])
-            j = int(((pts_arr - mid) ** 2).sum(1).argmin())
-            out = mid - cen_arr
-            if np.hypot(*out) < 1e-6:
-                out = mid - pts_arr[j]
-            out = out / (np.hypot(*out) or 1.0)
-            A[i] = pts_arr[j] + out * eff
-            if verbose:
-                print(f"  re-seeded stray free node N{i} onto the band")
         cv = _build(A, phi, L, L) if symmetric else _build(A, phi, lin, lout)
         if verbose:
             print(f"[on-circle: {len(circle)} nodes on dot perimeters (r={eff:.2f}); "
