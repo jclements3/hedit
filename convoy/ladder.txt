@@ -1,0 +1,38 @@
+rails from paraguayan_overrides.json (read-only)
+  DP: 577 samples  closure gap 0.000000  area -400737.2 (CW)
+  BP: 641 samples  closure gap 0.000000  area -878498.5 (CW)
+  SP: 577 samples  closure gap 0.000000  area -626649.0 (CW)
+  DP.within(BP): True
+
+seam (mutual-nearest DP/BP pair, J2):
+  DP[256] = (654.84, 119.41)   BP[320] = (661.62, 148.58)   gap = 29.953 mm
+
+J3 self-test: co_orient(red=BP, green=DP) reversed green? False
+  matches the CW measurement -- bypassing co_orient in the loft (J3).
+
+ladder -- iteration: lanes, crossings, min pinch gap, max turn, seam turn, HF
+  iter 1:  1 lanes   0 crossings  pinch    nan mm  turn 16.10 deg  seam  1.24 deg  HF 0.0592 mm  nesting PASS
+  iter 2:  3 lanes   0 crossings  pinch   7.49 mm  turn 22.16 deg  seam  2.63 deg  HF 0.0721 mm  nesting PASS
+  iter 3:  7 lanes   0 crossings  pinch   3.74 mm  turn 27.09 deg  seam  3.99 deg  HF 0.0791 mm  nesting PASS
+  iter 4: 15 lanes   0 crossings  pinch   1.87 mm  turn 29.50 deg  seam  5.31 deg  HF 0.0827 mm  nesting PASS
+  iter 5: 31 lanes   0 crossings  pinch   0.94 mm  turn 32.38 deg  seam  6.41 deg  HF 0.0847 mm  nesting PASS
+
+HF residual: lanes max 0.0791 mm vs rails 0.0492 mm  (trigger 3.0 mm)
+  -> NO sawtooth. Smoothing NOT applied (lanes are lofts of clean
+     Bezier rails; nothing here generates Nyquist content).
+
+acceptance for the shipped iteration=3 (7 lanes):
+  crossings (count_crossings)     : 0 []   <- necessary, NOT sufficient
+  every lane closed (max seam gap): 0.00e+00 mm
+  max seam turn                   : 3.99 deg
+  min lane gap at the pinch       : 3.74 mm
+  STRICT NESTING CHAIN            : PASS
+    BP     > lane1   within=True  touches=False  min sep  3.631 mm  ok
+    lane1  > lane2   within=True  touches=False  min sep  3.739 mm  ok
+    lane2  > lane3   within=True  touches=False  min sep  3.738 mm  ok
+    lane3  > lane4   within=True  touches=False  min sep  3.738 mm  ok
+    lane4  > lane5   within=True  touches=False  min sep  3.737 mm  ok
+    lane5  > lane6   within=True  touches=False  min sep  3.735 mm  ok
+    lane6  > lane7   within=True  touches=False  min sep  3.733 mm  ok
+    lane7  > DP      within=True  touches=False  min sep  3.384 mm  ok
+  render                          : lanes_dp_bp.html -- LOOK AT IT
