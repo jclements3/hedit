@@ -60,9 +60,17 @@ function cubicPathToBeziers(d, H){
   }
   return segs;
 }
+// Reflection constant C for the y-flip (y -> C - y), reflecting about the viewBox's OWN frame.
+// Must be minY + height, NOT height: `return vb[3]` is only correct when min-y == 0. Commit
+// f408936 ("c1-origin canvas") re-datumed strings.svg to viewBox="-120 -1734.9 807.7 1864.9" --
+// a NEGATIVE origin -- which silently offset every flipped y by 1734.9 mm, throwing the strings
+// clear above the frame. vb[0] (min-x) is deliberately NOT used: x is a pass-through, not a
+// reflection, so it needs no axis constant (see DATUM_NOTE.md).
 function svgHeight(svgText){
-  const vb = (attr(svgText, "viewBox") || "0 0 800 600").split(/[\s,]+/).map(Number);
-  return vb[3];
+  const raw = attr(svgText, "viewBox");
+  if(!raw) console.warn("WARN: no viewBox on the SVG; falling back to \"0 0 800 600\" -- every y will be flipped about 600.");
+  const vb = (raw || "0 0 800 600").split(/[\s,]+/).map(Number);
+  return vb[1] + vb[3];
 }
 function loadStrings(svgText){
   const H = svgHeight(svgText);
@@ -148,6 +156,7 @@ function main(){
       const m = { models: {}, layer: cd.layer };
       segs.forEach((bz, i) => { m.models["c" + i] = bz; });
       harp.models[cd.key] = m;
+      if(!segs.length) console.warn(`WARN: no <path data-role="${cd.role}"> in the SVG -- ${cd.label} is empty.`);
       report.push(`${cd.label}: ${segs.length} segs`);
     });
 
@@ -156,6 +165,7 @@ function main(){
     const pm = { paths: {}, layer: "pins" };
     pins.forEach((c, i) => { pm.paths["p" + i] = c; });
     harp.models.pins = pm;
+    if(!pins.length) console.warn('WARN: no <circle data-role="pin"> in the SVG -- pins layer is empty.');
     report.push(`pins: ${pins.length}`);
 
     // 2d) sensor dots: natural / sharp / midi
