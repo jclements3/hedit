@@ -5587,17 +5587,36 @@ function dwWorldRings(){
 function dwSilhouette(rings, proj){
   const P=rings.map(r=>r.map(proj));
   const cen=P.map(Q=>{ let u=0,v=0; for(const p of Q){ u+=p[0]; v+=p[1]; } return [u/Q.length,v/Q.length]; });
-  const L=[],R=[];
+  // stations whose spine runs INTO the view contribute no silhouette — skip them
+  const steps=[]; for(let k=1;k<cen.length;k++) steps.push(Math.hypot(cen[k][0]-cen[k-1][0],cen[k][1]-cen[k-1][1]));
+  const med=steps.slice().sort((a,b)=>a-b)[steps.length>>1]||1;
+  const L=[],R=[]; let pdx=0,pdy=1;
   for(let k=0;k<P.length;k++){
     const a=cen[Math.max(k-1,0)], b=cen[Math.min(k+1,P.length-1)];
-    let dx=b[0]-a[0], dy=b[1]-a[1]; const n=Math.hypot(dx,dy)||1; dx/=n; dy/=n;
+    let dx=b[0]-a[0], dy=b[1]-a[1]; const n=Math.hypot(dx,dy);
+    if(n<0.35*med){ continue; }                                            // edge-on to this view: no silhouette here
+    if(n<1e-6){ dx=pdx; dy=pdy; } else { dx/=n; dy/=n; pdx=dx; pdy=dy; }
     const nx=-dy, ny=dx;
     let lo=0,hi=0,lov=Infinity,hiv=-Infinity;
     for(let i=0;i<P[k].length;i++){ const d=P[k][i][0]*nx+P[k][i][1]*ny;
       if(d<lov){lov=d;lo=i;} if(d>hiv){hiv=d;hi=i;} }
-    L.push(P[k][lo]); R.push(P[k][hi]);
+    let pl2=P[k][lo], pr2=P[k][hi];
+    if(L.length){                            // continuity: keep each rail on its own side
+      const dist=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]);
+      if(dist(L[L.length-1],pl2)+dist(R[R.length-1],pr2) > dist(L[L.length-1],pr2)+dist(R[R.length-1],pl2)){
+        const t=pl2; pl2=pr2; pr2=t;
+      }
+    }
+    L.push(pl2); R.push(pr2);
   }
-  return { L, R, first:P[0], last:P[P.length-1] };
+  // tear the outline instead of drawing across side-flip jumps
+  const JUMP=60;   // mm (world) — larger than any station step, smaller than a section width
+  const runs=arr=>{ const out=[]; let cur=[arr[0]];
+    for(let i=1;i<arr.length;i++){
+      if(Math.hypot(arr[i][0]-arr[i-1][0],arr[i][1]-arr[i-1][1])>JUMP){ if(cur.length>1) out.push(cur); cur=[arr[i]]; }
+      else cur.push(arr[i]); }
+    if(cur.length>1) out.push(cur); return out; };
+  return { Lruns:runs(L), Rruns:runs(R), first:P[0], last:P[P.length-1] };
 }
 const DW_LINE={ vis:{stroke:"#111","stroke-width":0.5,fill:"none"},
                 hid:{stroke:"#111","stroke-width":0.25,fill:"none","stroke-dasharray":"2 1"},
@@ -5631,9 +5650,13 @@ function dwRenderSheet(){
   const ring=(pts,st)=>{ pl(pts.concat([pts[0]]),st); };
   const view=(proj,label,lx,ly)=>{
     const sil=dwSilhouette(W.rings,proj);
-    pl(sil.L,DW_LINE.vis); pl(sil.R,DW_LINE.vis); ring(sil.first,DW_LINE.vis); ring(sil.last,DW_LINE.vis);
+    for(const r of sil.Lruns) pl(r,DW_LINE.vis);
+    for(const r of sil.Rruns) pl(r,DW_LINE.vis);
+    ring(sil.first,DW_LINE.vis); ring(sil.last,DW_LINE.vis);
     const bores=W.rings.map((r,i)=>W.bores[i]).filter(Boolean);
-    if(bores.length>2){ const bs=dwSilhouette(bores,proj); pl(bs.L,DW_LINE.hid); pl(bs.R,DW_LINE.hid); }
+    if(bores.length>2){ const bs=dwSilhouette(bores,proj);
+      for(const r of bs.Lruns) pl(r,DW_LINE.hid);
+      for(const r of bs.Rruns) pl(r,DW_LINE.hid); }
     pl(W.spineW.map(proj),DW_LINE.cen);
     mk("text",{x:lx,y:ly,fill:"#111","font-size":3.5,"font-family":"sans-serif"},label);
   };
@@ -5726,6 +5749,23 @@ function sbShowHarp3D(){
   const Wf=fairRuns(W), Bf=fairRuns(B);
   for(let j=0;j<M;j+=6) lane(Wf,j,null);          // outer lanes, family-colored, faired
   for(let j=0;j<M;j+=12) lane(Bf,j,"#39d47a");    // bore lanes, faired
+  // BASE (the merged root): authored base.svg footprint, rigid placement — rose lobe
+  // pinned under the pillar column axis (local rose centre 54.48 -> world x 166,
+  // HANDOFF/GREEN_ORIENTATION), centreline y 60.05 -> 0. Extruded z=0..69.2 (the
+  // green-reunion merge height). The z 69..130 gap is the launch region — that
+  // geometry belongs to the sweep2/CAD build, not fabricated here.
+  { const BX=166-54.48, BY=-60.05, MZ=69.2, BASE_COL="#8b93a7";
+    const bo=sbFlatten(ST_BASE_RED), bi=sbFlatten(ST_BASE_BLUE);
+    const bw=(p,z)=>[p[0]+BX, p[1]+BY, z];
+    const outline=(P,z,col)=>{ const pts=P.map(p=>bw(p,z)); pts.push(pts[0].slice());
+      view3d.scene.polylines.push({pts,stroke:col}); };
+    outline(bo,0,BASE_COL); outline(bo,MZ,BASE_COL);
+    outline(bi,0,"#39d47a"); outline(bi,MZ,"#39d47a");
+    for(let k=0;k<16;k++){ const p=bo[Math.floor(k*bo.length/16)];
+      view3d.scene.polylines.push({pts:[bw(p,0),bw(p,MZ)],stroke:BASE_COL}); }
+    for(let k=0;k<8;k++){ const p=bi[Math.floor(k*bi.length/8)];
+      view3d.scene.polylines.push({pts:[bw(p,0),bw(p,MZ)],stroke:"#39d47a"}); }
+  }
   fit3d(); render3d(); spin3dStart();
   setStatus("Harp lanes ("+secs.length+" stations) — spinning; click/drag the view to stop and orbit yourself.");
 }
