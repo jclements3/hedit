@@ -57,7 +57,7 @@ function getD(svg, id) {
 
   // world frame (same as hedit/sweep2): x = spine x, y = out-of-plane, z = FLOOR - spine y
   const FLOOR = P.FLOOR;
-  const RING_PTS = 64, STATION_STRIDE = 3;
+  const RING_PTS = 96, STATION_STRIDE = 3;
   const wires = [];
   for (let k = 0; k < stations.length; k += STATION_STRIDE) {
     const st = stations[k];

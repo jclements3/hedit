@@ -5228,7 +5228,7 @@ function sbExportSpec(){
   const spec={
     _comment:"Clements 49 harp_spec — authored in hedit. Drives sweep2.wishbone.",
     windows:{ sh_in:sp.sh_in, sh_out:sp.sh_out, cr_in:sp.cr_in, cr_out:sp.cr_out },
-    sampling:{ S:sp.S, M:90 },
+    sampling:{ S:sp.S, M:96 },
     base:{ trim_z:sp.trimZ, merge_z:"auto", base_stations:6, rise:"prism" },
     launch:{ stations:8, ctrl_height_frac:0.75, flat_underside:true, rose_phase_align:true, soundbox_ease_stations:30, pin:"rose_under_pillar" },
     frames:{ tilt_safety:0.7, spine_smooth_sigma:1.5, cap_consistency_loops:3 },
@@ -5309,9 +5309,9 @@ function stOpened(g,b){ const yc=(g-0.5)/0.5*1.4*b;
   let ymn=Infinity; for(const p of e) if(p[1]<ymn) ymn=p[1]; return e.map(p=>[p[0],p[1]-ymn]); }
 function stPlateU(ow,lw,H){ const o=ow/2, iw=Math.max(o-lw,0.5);
   return [[-o,0],[-o,H],[o,H],[o,0],[iw,0],[iw,H-lw],[-iw,H-lw],[-iw,0]]; }
-function stRoseExt(h,M){ M=M||90; const nf=sbSpec.roseFlutes||12, fd=sbSpec.roseDepth!=null?sbSpec.roseDepth:0.4;
+function stRoseExt(h,M){ M=M||96; const nf=sbSpec.roseFlutes||12, fd=sbSpec.roseDepth!=null?sbSpec.roseDepth:0.4;
   const P=[]; for(let k=0;k<M;k++){ const th=2*Math.PI*k/M, fl=(3+fd*Math.sin(nf*th))/(3+fd); P.push([(h/2)*fl*Math.cos(th), h/2+(h/2)*fl*Math.sin(th)]); } return P; }
-function stRoseBore(h,c,M){ M=M||90; const P=[]; for(let k=0;k<M;k++){ const th=2*Math.PI*k/M; P.push([(c/2)*Math.cos(th), h/2+(c/2)*Math.sin(th)]); } return P; }
+function stRoseBore(h,c,M){ M=M||96; const P=[]; for(let k=0;k<M;k++){ const th=2*Math.PI*k/M; P.push([(c/2)*Math.cos(th), h/2+(c/2)*Math.sin(th)]); } return P; }
 // composite section properties (rings[0]=outer +area, rings[1:]=holes)
 function stSecProps(rings){
   let M0=0,M1x=0,M1y=0,M2xx=0,M2yy=0,M2xy=0;
@@ -5681,7 +5681,7 @@ function sbShowHarp3D(){
   const body=stBuildBody();
   if(typeof enter3d!=="function") return;
   enter3d();
-  const M=90;
+  const M=96;   // 12 flutes x 8 — flute vertices land identically at every pillar station
   const world=(sec,q)=>[sec.sx+q[1]*sec.nx, q[0], (SWEEP_FLOOR-sec.sy)+q[1]*(-sec.ny)];
   const prep=(ring,sec)=>{ let P=ring,k=0,bv=-Infinity;   // roll to apex (core._roll) for lane-index continuity
     for(let i=0;i<P.length;i++){ const v=P[i][1]*1e4-Math.abs(P[i][0]); if(v>bv){bv=v;k=i;} }

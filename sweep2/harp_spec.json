@@ -6,7 +6,7 @@
     "cr_in":  {"x": 348.1, "y": 293.4},
     "cr_out": {"x": 203.1, "y": 395.2}
   },
-  "sampling": { "S": 160, "M": 90 },
+  "sampling": { "S": 160, "M": 96 },
   "base": {
     "trim_z": 130.0,
     "merge_z": "auto",

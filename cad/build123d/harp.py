@@ -149,7 +149,7 @@ def main():
     print(f"stations: {len(stations)}  c_out: {c_out}  b_div: {b_div}")
 
     wires = []
-    RING, STRIDE = 64, 3
+    RING, STRIDE = 96, 3
     for k in stations[::STRIDE]:
         bb = h[k] / b_div
         ring = []

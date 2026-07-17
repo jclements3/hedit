@@ -175,7 +175,7 @@ def _generate_bezier(points, parameters, left_tangent, right_tangent):
     bez = [points[0], None, None, points[-1]]
 
     n = len(points)
-    A = np.zeros((n, 2, 2))
+    A = np.zeros((n, 2, len(np.asarray(points[0]))))   # dimension-agnostic (2-D or 3-D points)
     for i, u in enumerate(parameters):
         A[i][0] = left_tangent  * b1(u)
         A[i][1] = right_tangent * b2(u)
