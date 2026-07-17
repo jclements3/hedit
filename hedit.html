@@ -5729,15 +5729,25 @@ function loadSample(){
   setStatus("Sample document — switch to the Node tool (N) and drag a path's handles. Open… to load your own SVG.");
 }
 
-// Load strings.svg (the harp) as the default document. Falls back to the
-// built-in sample when it can't be fetched (e.g. opened over file:// or served
-// without strings.svg alongside).
+// Default document: the Clements 49 harp (sweep2/frame.svg — green/red/blue
+// frame rails + 49 strings + soundholes). The rails are auto-detected as the
+// live design source, so the whole studio boots ready to edit. Falls back to
+// strings.svg, then to the built-in sample (e.g. over file:// nothing can be
+// fetched).
 async function loadDefaultDoc(){
+  try {
+    const res = await fetch("sweep2/frame.svg", { cache: "no-store" });
+    if(res.ok){
+      loadSVGText(await res.text(), "frame.svg");
+      setStatus("Clements 49 — frame rails (green spine · red reach · blue inner) + 49 strings. Edit the rails with the node tool (N); Sections / Structure / Drawing / 3D follow the live curves.");
+      return;
+    }
+  } catch(e){ /* fall through */ }
   try {
     const res = await fetch("strings.svg", { cache: "no-store" });
     if(res.ok){
       loadSVGText(await res.text(), "strings.svg");
-      setStatus("Loaded strings.svg — the harp. Open… to load a different SVG.");
+      setStatus("Loaded strings.svg — the harp strings. Open… to load a different SVG.");
       return;
     }
   } catch(e){ /* not served alongside / file:// — fall through to the sample */ }
