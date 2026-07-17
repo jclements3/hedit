@@ -364,6 +364,9 @@
       <summary><span class="step">3c</span> Body studio</summary>
       <div class="sec-body">
         <div class="seg">
+          <button id="add-rails-btn" class="btn-primary" title="Put the frame rails (green spine · red reach · blue inner) on the canvas as editable bezier paths. Edit them with the node tool (N) — every studio view and export follows the live curves. Opening an existing frame.svg works the same way.">Add frame rails</button>
+        </div>
+        <div class="seg">
           <button id="sweep-open-btn" class="btn-primary" title="Cross-sections: soundbox limaçon / neck U-beam / pillar rose — knobs, section plot, acoustic readout.">Sections…</button>
           <button id="struct-open-btn" title="Structural analysis: section properties, Euler buckling, stiffness, morph pinch points, under the string load.">Structure…</button>
           <button id="picker-open-btn" title="Morph anchors: drag sh_in/sh_out (shoulder) and cr_in/cr_out (crown) on the spine.">Morph…</button>
@@ -2603,6 +2606,7 @@ document.getElementById("picker-close").onclick = closePicker;
 document.getElementById("picker-reset").onclick = () => { ["sh_in","sh_out","cr_in","cr_out"].forEach(n => { sbSpec[n] = Object.assign({}, SWEEP_DEFAULTS[n]); }); pkUpdate(true); setStatus("Anchors reset to the approved build."); };
 document.getElementById("picker-modal").addEventListener("mousedown", e => { if(e.target.id === "picker-modal") closePicker(); });
 document.getElementById("stage3d").addEventListener("pointerdown", spin3dStop);
+document.getElementById("add-rails-btn").onclick = addFrameRails;
 document.getElementById("drawing-close").onclick = closeDrawing;
 document.getElementById("drawing-export").onclick = dwExportSVG;
 document.getElementById("drawing-modal").addEventListener("mousedown", e => { if(e.target.id === "drawing-modal") closeDrawing(); });
@@ -4853,6 +4857,41 @@ const SWEEP_DEFAULTS = {
   plateOut:35.3, plateLeg:3.4,               // neck U-beam: channel width, leg thickness (mm)
 };
 let sbSpec = Object.assign({}, SWEEP_DEFAULTS);
+// THE DESIGN SOURCE. The frame rails (green spine / red reach / blue inner) are
+// first-class editable canvas paths — tagged data-role="frame-green|red|blue" or
+// carrying sweep2's ids (green_curve/red_curve/blue_curve). When present, every
+// studio view (sections, structure, ISO sheet, lanes, morph picker, export)
+// derives from the LIVE canvas geometry; the embedded constants are only the
+// template for a new design and the fallback for an empty canvas. Editing a rail
+// with the node tool re-derives the whole harp.
+function sbRailEl(color){
+  if(typeof contentGroup==="undefined" || !contentGroup) return null;
+  return contentGroup.querySelector('path[data-role="frame-'+color+'"]')
+      || contentGroup.querySelector('path[id="'+color+'_curve"]');
+}
+function sbFrameSource(){
+  const g=sbRailEl("green"), r=sbRailEl("red"), b=sbRailEl("blue");
+  return {
+    green: (g && g.getAttribute("d")) || SWEEP_FRAME_GREEN,
+    red:   (r && r.getAttribute("d")) || SWEEP_FRAME_RED,
+    blue:  (b && b.getAttribute("d")) || SWEEP_FRAME_BLUE,
+    live:  !!(g || r),
+  };
+}
+// Start (or continue) a design: put the template rails on the canvas as editable paths.
+function addFrameRails(){
+  if(sbRailEl("green") || sbRailEl("red")){ setStatus("Frame rails already on the canvas — edit them with the node tool (N)."); return; }
+  pushUndo();
+  const mk=(color,d,stroke)=>{ const p=document.createElementNS(SVGNS,"path");
+    p.setAttribute("id",color+"_curve"); p.setAttribute("data-role","frame-"+color);
+    p.setAttribute("d",d); p.setAttribute("fill","none");
+    p.setAttribute("stroke",stroke); p.setAttribute("stroke-width","2");
+    contentGroup.appendChild(p); return p; };
+  mk("red",SWEEP_FRAME_RED,"#e63030"); mk("blue",SWEEP_FRAME_BLUE,"#3b82f6"); mk("green",SWEEP_FRAME_GREEN,"#22c55e");
+  sbInvalidate(); if(typeof fitView==="function") try{ fitView(); }catch(e){}
+  renderOverlay();
+  setStatus("Frame rails added (green = spine, red = reach, blue = inner). Edit with the node tool (N) — sections, structure, drawing, 3D and Export all follow the live curves. Save keeps them; the saved SVG doubles as frame.svg for the Python/CAD builds.");
+}
 let sbStation = 0;              // scrubbed station index for the cross-section modal
 let sbCache = null;            // memoized {green,red,stations,...}; cleared when a knob changes
 
@@ -4997,9 +5036,11 @@ function sbVariableBore(ext,sp,tSpine,tWing,tShell){
 }
 // Build the whole soundbox arm from the current sbSpec. Memoized.
 function sbBuild(){
-  if(sbCache && sbCache.key===JSON.stringify(sbSpec)) return sbCache;
+  const src=sbFrameSource();
+  const key=JSON.stringify(sbSpec)+"|"+src.green.length+":"+src.green+"|"+src.red.length+":"+src.red;
+  if(sbCache && sbCache.key===key) return sbCache;
   const sp=sbSpec;
-  const green=sbFlatten(SWEEP_FRAME_GREEN), red=sbFlatten(SWEEP_FRAME_RED);
+  const green=sbFlatten(src.green), red=sbFlatten(src.red);
   sbAssertGreen(green);
   let a=0,b=green.length-1;
   while(a<green.length/2 && (SWEEP_FLOOR-green[a][1])<sp.trimZ) a++;
@@ -5034,7 +5075,7 @@ function sbBuild(){
   let vCh=0,vMat=0;
   for(let k=0;k<stations.length-1;k++){ const d=stations[k+1].s-stations[k].s;
     vCh+=0.5*(stations[k].aCh+stations[k+1].aCh)*d; vMat+=0.5*(stations[k].aWall+stations[k+1].aWall)*d; }
-  sbCache={ key:JSON.stringify(sbSpec), green, red, spine, N, h, us, arc1, stations, vCh, vMat, armLen:stations.length?stations[stations.length-1].s:0 };
+  sbCache={ key, green, red, spine, N, h, us, arc1, stations, vCh, vMat, armLen:stations.length?stations[stations.length-1].s:0 };
   return sbCache;
 }
 function sbInvalidate(){ sbCache=null; }
@@ -5450,7 +5491,7 @@ const PK_NAMES=["sh_in","sh_out","cr_in","cr_out"];
 const PK_COL={sh_in:"#a855f7",sh_out:"#a855f7",cr_in:"#ef4444",cr_out:"#ef4444"};
 const PK_LBL={sh_in:"shoulder morph START",sh_out:"shoulder morph STOP",cr_in:"crown morph START",cr_out:"crown morph STOP = rose start"};
 let pkSpine=null, pkSpineD=null, pkDrag=null, pkPan=null, pkV=null;
-function pkEnsure(){ if(!pkSpine){ pkSpine=sbFlatten(SWEEP_FRAME_GREEN);
+function pkEnsure(force){ if(!pkSpine || force){ pkSpine=sbFlatten(sbFrameSource().green);
   pkSpineD="M "+pkSpine.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" L "); } }
 function pkNearest(x,y){ pkEnsure(); let bi=0,bd=Infinity;
   for(let i=0;i<pkSpine.length;i++){ const dx=pkSpine[i][0]-x,dy=pkSpine[i][1]-y,d=dx*dx+dy*dy; if(d<bd){bd=d;bi=i;} } return bi; }
@@ -5486,9 +5527,10 @@ function pkUpdate(recompute){
   }
 }
 function openPicker(){
-  pkEnsure();
-  document.getElementById("picker-rrail").setAttribute("d",SWEEP_FRAME_RED);
-  document.getElementById("picker-brail").setAttribute("d",SWEEP_FRAME_BLUE);
+  pkEnsure(true);                      // rails may have been edited on the canvas
+  const src=sbFrameSource();
+  document.getElementById("picker-rrail").setAttribute("d",src.red);
+  document.getElementById("picker-brail").setAttribute("d",src.blue);
   document.getElementById("picker-gspine").setAttribute("d",pkSpineD);
   pkV={x:-20,y:-20,w:1370,h:1966}; pkApplyView();
   document.getElementById("picker-modal").hidden=false; pkUpdate(false);

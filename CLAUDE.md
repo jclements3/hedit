@@ -195,6 +195,20 @@ fails — `frame.svg` (and other hand-authored SVGs) use `<!-- ---- … ---- -->
 
 ### Harp Studio (the integrated app)
 
+**The design source.** The frame rails — green spine, red reach, blue inner — are
+first-class editable canvas paths (`data-role="frame-green|red|blue"`, also matched by
+sweep2's `green_curve`/`red_curve`/`blue_curve` ids). `sbFrameSource()` resolves them:
+when rails are on the canvas, **every** studio view (sections, structure, ISO sheet,
+lanes 3D, morph picker, Export spec) derives from the live geometry — `sbBuild`'s cache
+keys on the rail `d` strings, so a node-tool edit re-derives the whole harp. The embedded
+`SWEEP_FRAME_*` constants are only the new-design template ("Add frame rails" in Body
+studio, `addFrameRails`) and the empty-canvas fallback. This is the workflow: **Add frame
+rails** (new design) or **Open…** an existing frame SVG (auto-detected, immediately live)
+→ edit rails with N → tune knobs/anchors → Save. The saved SVG keeps the rail ids, so it
+doubles directly as `frame.svg` for `sweep2.py` and both `cad/` builds (verified
+end-to-end). `sbAssertGreen` still guards every build — a rail edit that swaps the arms
+fails loudly instead of silently designing the wrong harp.
+
 hedit is one integrated studio, navigated by the **header mode bar** (`#studio-bar`):
 **Build** (the 2-D canvas + pipeline cards) · **Morph** (anchor picker) · **Sections**
 (math cross-section pickers) · **Structure** (structural report) · **Drawing** (ISO 128
