@@ -5681,6 +5681,12 @@ function sbShowHarp3D(){
   const body=stBuildBody();
   if(typeof enter3d!=="function") return;
   enter3d();
+  // register the flat 2-D content with the body: content maps z=-y, the body
+  // z=FLOOR-y — shift the scene by +FLOOR so rails/strings overlay the lanes.
+  if(!frameXZ && view3d.scene){
+    for(const pl of view3d.scene.polylines) for(const p of pl.pts) p[2]+=SWEEP_FLOOR;
+    for(const d of view3d.scene.dots) d.p[2]+=SWEEP_FLOOR;
+  }
   const M=96;   // 12 flutes x 8 — flute vertices land identically at every pillar station
   const world=(sec,q)=>[sec.sx+q[1]*sec.nx, q[0], (SWEEP_FLOOR-sec.sy)+q[1]*(-sec.ny)];
   const prep=(ring,sec)=>{ let P=ring,k=0,bv=-Infinity;   // roll to apex (core._roll) for lane-index continuity
@@ -5690,6 +5696,17 @@ function sbShowHarp3D(){
   const secs=body.secs.filter(s2=>s2.ring&&s2.ring.length>3);
   const W=secs.map(s2=>prep(s2.ring,s2));
   const B=secs.map(s2=>(s2.bore&&s2.valid)?prep(s2.bore,s2):null);
+  // lane-first fairing for display: gaussian-smooth each lane along the
+  // station axis (the flow direction), mirroring cad/build123d/harp_lanes.py.
+  const fairLane=pts=>{ const n=pts.length; if(n<7) return pts;
+    const half=3, k=[]; let ks=0;
+    for(let j=-half;j<=half;j++){ const w=Math.exp(-0.5*(j/1.5)*(j/1.5)); k.push(w); ks+=w; }
+    const out=[];
+    for(let i=0;i<n;i++){ const p=[0,0,0];
+      for(let j=-half;j<=half;j++){ let src=i+j; src=src<0?0:src>=n?n-1:src;
+        for(let c=0;c<3;c++) p[c]+=k[j+half]*pts[src][c]; }
+      out.push([p[0]/ks,p[1]/ks,p[2]/ks]); }
+    return out; };
   const lane=(arr,j,col)=>{ let cur=null,fam=null;
     const flush=()=>{ if(cur&&cur.length>1) view3d.scene.polylines.push({pts:cur,stroke:col||ST_FAMCOL[fam]||"#888"}); };
     for(let k=0;k<arr.length;k++){
@@ -5698,8 +5715,17 @@ function sbShowHarp3D(){
       if(f!==fam){ const last=cur&&cur.length?cur[cur.length-1]:null; flush(); cur=last?[last]:[]; fam=f; }
       cur.push(arr[k][j]); }
     flush(); };
-  for(let j=0;j<M;j+=6) lane(W,j,null);          // outer lanes, family-colored
-  for(let j=0;j<M;j+=12) lane(B,j,"#39d47a");    // bore lanes
+  const fairRuns=arr=>{ /* fair each contiguous non-null run of stations */
+    const out=arr.map(a=>a?a.map(r=>r):null); let i=0;
+    while(i<arr.length){ if(!arr[i]){ i++; continue; }
+      let j2=i; while(j2<arr.length&&arr[j2]) j2++;
+      for(let v=0;v<M;v++){ const lanePts=[]; for(let k=i;k<j2;k++) lanePts.push(arr[k][v]);
+        const sm=fairLane(lanePts); for(let k=i;k<j2;k++) out[k][v]=sm[k-i]; }
+      i=j2; }
+    return out; };
+  const Wf=fairRuns(W), Bf=fairRuns(B);
+  for(let j=0;j<M;j+=6) lane(Wf,j,null);          // outer lanes, family-colored, faired
+  for(let j=0;j<M;j+=12) lane(Bf,j,"#39d47a");    // bore lanes, faired
   fit3d(); render3d(); spin3dStart();
   setStatus("Harp lanes ("+secs.length+" stations) — spinning; click/drag the view to stop and orbit yourself.");
 }
