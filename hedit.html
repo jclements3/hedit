@@ -5716,9 +5716,54 @@ function sbShowHarp3D(){
     for(let i=0;i<P.length;i++){ const v=P[i][1]*1e4-Math.abs(P[i][0]); if(v>bv){bv=v;k=i;} }
     P=P.slice(k).concat(P.slice(0,k));
     return sbResample(P,M).map(q=>world(sec,q)); };
-  const secs=body.secs.filter(s2=>s2.ring&&s2.ring.length>3);
-  const W=secs.map(s2=>prep(s2.ring,s2));
-  const B=secs.map(s2=>(s2.bore&&s2.valid)?prep(s2.bore,s2):null);
+  let secs=body.secs.filter(s2=>s2.ring&&s2.ring.length>3);
+  let W=secs.map(s2=>prep(s2.ring,s2));
+  let B=secs.map(s2=>(s2.bore&&s2.valid)?prep(s2.bore,s2):null);
+  // ---- LAUNCHES (HANDOFF §2.6): per-vertex cubic bridges from the authored
+  // floor mouths to each arm's end ring — lanes run floor-to-floor. Mouths are
+  // the two SEPARATE complete lobes at z=0 (rose R=47.07 under the pillar axis,
+  // limaçon b=23.95 with the dimple toward the reunion); NL=8 stations; vertical
+  // takeoff via ctrl_height_frac=0.75; 0-swirl correspondence by a data-locked
+  // roll (which also phase-locks the rose flutes, 12-fold).
+  { const NL=8, CTRL=0.75, BX=166-54.48;
+    const cen3=R2=>{ let x=0,y=0,z=0; for(const p of R2){x+=p[0];y+=p[1];z+=p[2];} const n=R2.length; return [x/n,y/n,z/n]; };
+    const mouthRing=kind=>{ const pts=[];
+      if(kind==="rose"){ const cx=166.0, R=47.07;
+        for(let j=0;j<M;j++){ const th=2*Math.PI*j/M, r=R*(3+0.4*Math.sin(12*th))/3.4;
+          pts.push([cx+r*Math.cos(th), r*Math.sin(th), 0]); } }
+      else { const px=138.45+BX, b2=23.95;
+        for(let j=0;j<M;j++){ const th=2*Math.PI*j/M, r=b2*(2+Math.cos(th));
+          pts.push([px+r*Math.cos(th), r*Math.sin(th), 0]); } }   // dimple (θ=π) faces the reunion (−x)
+      return pts; };
+    const bestRoll=(mo,F)=>{ let best=Infinity, br=0, brev=false;
+      for(const rev of [false,true]){ const mm=rev?mo.slice().reverse():mo;
+        for(let r=0;r<M;r++){ let s2=0;
+          for(let j=0;j<M;j+=4){ const p=mm[(j+r)%M], q=F[j]; s2+=(p[0]-q[0])*(p[0]-q[0])+(p[1]-q[1])*(p[1]-q[1]); }
+          if(s2<best){ best=s2; br=r; brev=rev; } } }
+      const mm=brev?mo.slice().reverse():mo;
+      const out=[]; for(let j=0;j<M;j++) out.push(mm[(j+br)%M].slice()); return out; };
+    const unit=v=>{ const n=Math.hypot(v[0],v[1],v[2])||1; return [v[0]/n,v[1]/n,v[2]/n]; };
+    const bridge=(mouth,F,T)=>{ const CF=cen3(F), C0=cen3(mouth);
+      const Hz=Math.abs(CF[2]-C0[2])||100, L=Math.hypot(CF[0]-C0[0],CF[1]-C0[1],CF[2]-C0[2]);
+      const rings2=[];
+      for(let k=0;k<=NL;k++){ const t=k/(NL+1), mt=1-t, ring=[];
+        for(let j=0;j<M;j++){ const P0=mouth[j], P3=F[j];
+          const P1=[P0[0],P0[1],P0[2]+CTRL*Hz];
+          const P2=[P3[0]-T[0]*0.35*L, P3[1]-T[1]*0.35*L, P3[2]-T[2]*0.35*L];
+          ring.push([mt*mt*mt*P0[0]+3*mt*mt*t*P1[0]+3*mt*t*t*P2[0]+t*t*t*P3[0],
+                     mt*mt*mt*P0[1]+3*mt*mt*t*P1[1]+3*mt*t*t*P2[1]+t*t*t*P3[1],
+                     mt*mt*mt*P0[2]+3*mt*mt*t*P1[2]+3*mt*t*t*P2[2]+t*t*t*P3[2]]); }
+        rings2.push(ring); }
+      return rings2; };
+    const s0=secs[0], s1=secs[1], sl=secs[secs.length-1], sl1=secs[secs.length-2];
+    const Tsb=unit([s1.sx-s0.sx, 0, s0.sy-s1.sy]);        // into the sweep at the soundbox foot
+    const Tpl=unit([sl1.sx-sl.sx, 0, sl.sy-sl1.sy]);      // into the sweep at the pillar foot
+    const sbL=bridge(bestRoll(mouthRing("limacon"),W[0]), W[0], Tsb);
+    const plL=bridge(bestRoll(mouthRing("rose"),W[W.length-1]), W[W.length-1], Tpl);
+    W=[...sbL, ...W, ...plL.slice().reverse()];
+    B=[...sbL.map(()=>null), ...B, ...plL.map(()=>null)];
+    secs=[...sbL.map(()=>({fam:"soundbox"})), ...secs, ...plL.map(()=>({fam:"pillar"}))];
+  }
   // lane-first fairing for display: gaussian-smooth each lane along the
   // station axis (the flow direction), mirroring cad/build123d/harp_lanes.py.
   const fairLane=pts=>{ const n=pts.length; if(n<7) return pts;
