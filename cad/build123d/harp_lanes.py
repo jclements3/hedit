@@ -177,7 +177,9 @@ def main():
         o = np.array([spine[i][0], 0.0, H.FLOOR - spine[i][1]])
         nx, ny = N[i]
         v = np.array([nx, 0.0, -ny]); u2 = np.array([0.0, 1.0, 0.0])
-        rings[i] = o + np.outer(prof[:, 1], v) + np.outer(prof[:, 0], u2)
+        R = o + np.outer(prof[:, 1], v) + np.outer(prof[:, 0], u2)
+        R[:, 2] = np.maximum(R[:, 2], 0.0)          # sweep2 flat-floor invariant (min z 0.00)
+        rings[i] = R
 
     # ---- lanes across ALL stations: fit -> fair ----
     def window_stats(turn_by_lane, lo, hi):
