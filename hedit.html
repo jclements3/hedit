@@ -5739,7 +5739,7 @@ async function loadDefaultDoc(){
     const res = await fetch("sweep2/frame.svg", { cache: "no-store" });
     if(res.ok){
       loadSVGText(await res.text(), "frame.svg");
-      setStatus("Clements 49 — frame rails (green spine · red reach · blue inner) + 49 strings. Edit the rails with the node tool (N); Sections / Structure / Drawing / 3D follow the live curves.");
+      setStatus("Clements 49 — the three frame rails (green spine · red reach · blue inner). Edit with the node tool (N); Sections / Structure / Drawing / 3D follow the live curves. Card 1 loads strings.");
       return;
     }
   } catch(e){ /* fall through */ }
