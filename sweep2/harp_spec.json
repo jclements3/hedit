@@ -1,0 +1,57 @@
+{
+  "_comment": "Clements 49 harp_spec — the COMPLETE parameter set for sweep2.wishbone. Defaults = the JC-approved build of 2026-07-17. Everything beyond frame.svg + base.svg + section math lives here.",
+  "windows": {
+    "sh_in":  {"x": 965.2, "y": 525.3},
+    "sh_out": {"x": 955.5, "y": 520.8},
+    "cr_in":  {"x": 348.1, "y": 293.4},
+    "cr_out": {"x": 203.1, "y": 395.2}
+  },
+  "sampling": { "S": 160, "M": 90 },
+  "base": {
+    "trim_z": 130.0,
+    "merge_z": "auto",
+    "base_stations": 6,
+    "rise": "prism"
+  },
+  "launch": {
+    "stations": 8,
+    "ctrl_height_frac": 0.75,
+    "flat_underside": true,
+    "rose_phase_align": true,
+    "soundbox_ease_stations": 30,
+    "pin": "rose_under_pillar"
+  },
+  "frames": {
+    "tilt_safety": 0.7,
+    "spine_smooth_sigma": 1.5,
+    "cap_consistency_loops": 3
+  },
+  "fields": {
+    "spike_factor": 3.0,
+    "min_scalar": 10.0,
+    "blue_select": "viterbi",
+    "blue_t_min": 3.0,
+    "blue_t_max_frac_h": 0.98
+  },
+  "rose": {
+    "turns": 0.5,
+    "flutes": 12,
+    "flute_depth": 0.4,
+    "bore_diameter": "auto_base_circle"
+  },
+  "structure": {
+    "wall_min_shoulder": 4.4,
+    "wall_min_global": 0.0,
+    "shoulder_blue": "straight_path",
+    "shoulder_zone_halfwidth": 6,
+    "shoulder_smooth_iters": 22,
+    "crown_zone_pad": 3,
+    "crown_smooth_iters": 5,
+    "outer_zone_smooth_iters": 4,
+    "global_fair_iters": 1
+  },
+  "geometry_constants": {
+    "plate_out": "from_core_PARAMS",
+    "t_shell": "from_core_variable_bore"
+  }
+}

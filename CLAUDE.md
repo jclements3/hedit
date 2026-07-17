@@ -154,6 +154,111 @@ browsers without the API (or `file://`) to a plain download (`downloadSVG`, land
 browser's download folder). `<input>`/drag-drop opens give no writable handle, so they
 reset `fileHandle = null` (Save then behaves as Save As). `newDoc` clears it too.
 
+## Soundbox sweep (Clements-49 acoustics)
+
+The `sweep2/` directory vendors the **Clements-49 wishbone package** (the authoritative
+Python `sweep2.py`/`core.py`, the `spec_studio.html` knob editor, and `frame.svg`/
+`base.svg`). hedit folds the **soundbox-arm cross-section** into the browser as an
+interactive acoustic tuner — the one part of the harp body whose shape is tuned for
+sound. Left card **"3c Soundbox (acoustics)"** + the **Soundbox cross-section** modal
+(`#sweep-modal`) drive it; all code is in the `// SOUNDBOX SWEEP` section of `hedit.html`
+(names are `sb*` / `sweep-*`, no collisions).
+
+- **The math** (`sbBuild`) is a vanilla-JS port of the essential soundbox path from
+  `core.py`: `_flatten` (M/L/C/V/H/Z, 48 steps/cubic) → trim z<130 → arc-length resample
+  to S → gaussian tangents → sign-propagated normals → `fh` ray-cast against the red reach
+  curve → `_field` (spike/validity filter) giving `h`; then per station the outer limaçon
+  `_curve(c,b)` with `b=h/4` and the angle-graded `_variable_bore` chamber wall. The
+  frame's green (spine) + red (reach) `d` strings are **embedded** (`SWEEP_FRAME_GREEN/RED`)
+  so the tuner works standalone. `sbAssertGreen` ports the four-month green-orientation
+  invariant (see `sweep2/GREEN_ORIENTATION.md`) and refuses to build a swapped frame.
+- **Verified**: `sweep2/ref_dump.py` emits `golden.json` from the real `core.py`; the JS
+  port matches it to <0.004 mm² (chamber/outer/wall areas) and 2e-5 mm (arc-lengths).
+  Re-run after any change to the section math. See `sweep2/PORT_NOTES.md`.
+- **Why knobs**: in the as-built sweep2 the soundbox outer section is a *fixed* `c=2`
+  limaçon scaled only by `h` — `g`/`c`/the blue curve don't move it, and the wall schedule
+  is hardcoded. hedit promotes those hardcoded constants (`c_out`, the `b` divisor, the six
+  wall thicknesses `t_spine/t_wing/t_shell` base+τ, and the ramp angles A/B/C) to sliders,
+  and reports **chamber cross-section area, wall area, and swept volume** as the acoustic
+  proxies (the modal draws the section + a chamber-area taper curve along the arm). The
+  reported closed-limaçon volume is an *upper bound* (the real chamber shares volume with
+  the base and has soundboard cuts).
+- **Round-trip**: the knobs live in `sbSpec`; when tuned away from the approved 2026-07-17
+  build they serialize into the `hedit-harp` metadata `soundbox` field (via `buildHarpModel`/
+  `applyHarpModel`), so Save/Open/autosave preserve them. **Export spec** writes the exact
+  `harp_spec.json` (with a `soundbox` block) that drives `sweep2.wishbone`. **Show in 3D**
+  injects the swept soundbox rings into the existing 3D view.
+
+**Loader note**: `loadSVGText` now retries with XML comments stripped if the first parse
+fails — `frame.svg` (and other hand-authored SVGs) use `<!-- ---- … ---- -->` banners whose
+`--` is illegal in XML and previously made the whole file unloadable.
+
+### Harp Studio (the integrated app)
+
+hedit is one integrated studio, navigated by the **header mode bar** (`#studio-bar`):
+**Build** (the 2-D canvas + pipeline cards) · **Morph** (anchor picker) · **Sections**
+(math cross-section pickers) · **Structure** (structural report) · **Drawing** (ISO 128
+sheet) · **3D ⟳** (rotating lanes). Each mode closes the others' modals — one tool in
+front at a time, all driven by the same live `sbSpec`.
+
+- **Sections** has piece tabs (Soundbox / Neck / Pillar). Soundbox = the acoustic tuner;
+  Neck exposes `plateOut`/`plateLeg` (U-channel); Pillar exposes `roseFlutes`/`roseDepth`/
+  `roseBoreD` — all in `sbSpec`, all live in the structural report, harp lanes, drawing,
+  and **Export spec** (`rose` + `neck` blocks in the JSON).
+- **Drawing** (`openDrawing`/`dwRenderSheet`, `#drawing-modal`) — native ISO 128 A3 sheet:
+  first-angle FRONT / VIEW FROM LEFT / PLAN silhouettes (`dwWorldRings`/`dwSilhouette`
+  over all body stations), ISO line types (thick visible, dashed hidden bore, chain
+  centerline), oblique-tick dimensions, ISO 7200-style title block + notes, standard
+  scale auto-picked (1:10 for the current body), **Export SVG** downloads the standalone
+  sheet. It's silhouette-approximate by design — kernel-exact profiles come from `cad/`.
+- **`cad/`** — the OpenCascade downstream (see `cad/README.md`): `cad/replicad` (JS,
+  OCC-WASM; `node build.js` → kernel projections + STEP) and `cad/build123d` (Python;
+  `python3 harp.py` → STEP + profile; FreeCAD TechDraw for certified ISO sheets). Both
+  consume the hedit-exported `harp_spec.json` and rebuild sections with the same
+  golden-tested math. Both currently loft the soundbox arm; the full wishbone union is
+  blocked on the §6.2 pillar conflict.
+
+### Morph picker + harp lanes 3D
+
+- **Anchors…** (card 3c → `#picker-modal`, `openPicker`/`pkUpdate`) — the in-hedit port of
+  `sweep2/morph_picker.html`: the frame's red/blue rails + green spine with the four
+  transition anchors (`sh_in`/`sh_out` = shoulder window, `cr_in`/`cr_out` = crown window)
+  as draggable dots that snap to the spine. Dragging writes `sbSpec.windows` directly, so
+  the soundbox tuner, structural report, station slider, and **Export spec** all follow on
+  pointer-up (`pkUpdate(true)` → `sbInvalidate()` + refresh of any open modal). Wheel zoom +
+  background-drag pan via viewBox mutation.
+- **Harp 3D ⟳** (`sbShowHarp3D`/`spin3dStart`) — the rotating whole-harp view, in-hedit port
+  of `sweep2/lanes.html`: every spine station's section (all five families) rolled to the
+  apex (`core._roll`), resampled to M, mapped to world (`o + q1·v + q0·u`), and drawn as
+  **longitudinal lanes** into the existing 3D view — outer lanes family-colored, bore lanes
+  green, **never ring hoops** (explicitly rejected). Auto-spins (`view3d.yaw` via rAF);
+  any pointer-down on the 3D stage stops the spin so normal orbit takes over. The base/launch
+  bridging (z 0→130) is not drawn — that geometry belongs to the Python build.
+
+### The body model + structural analysis
+
+The body is exactly **three pieces + a base + three morphs**: an open **base** (the merged
+root, from `base.svg`) branches into the **soundbox arm** (limaçon) and the **pillar arm**
+(12-flute rose + Ø60.9 bore), which meet at the **U-beam neck**. The three transitions are the
+**base→arms launch**, the **crown** (pillar↔U-beam) and the **shoulder** (soundbox↔U-beam).
+hedit's `// SOUNDBOX SWEEP` and `// STRUCTURAL ANALYSIS` sections model this whole frame.
+
+The **"Structural…"** button (card 3c) opens `#struct-modal` (`stAnalyze`/`stRenderReport`).
+It classifies every spine station into its piece, builds the exact section (soundbox limaçon+bore,
+neck `plate_u` U-channel, pillar rose+circle bore, base `base.svg` footprint — all ports of
+`core.py`, verified against `golden.json`), and computes per piece: material area, principal
+second moments, section modulus, radius of gyration, min wall, **Euler buckling** margin (pillar —
+the buckling-governed strut), **bending stiffness EI** (the deflection-governed metric for
+neck/soundbox), and **bearing FoS** (base). Loads come from the strings' `data-ten` (or the default
+47-string Erard schedule, ΣT≈6655 N); material is CF (E=135 GPa, allowable/FPF 900 MPa, min wall
+4.4 mm) per `clements47_cf.md`. Morphs are reported as stress risers (min wall vs 4.4 mm + the
+section-modulus step). It surfaces the unresolved **HANDOFF §6.2 pillar conflict** (the frame's
+Ø68 column can't contain the authored Ø60.9 bore) instead of emitting negative walls. Consistent
+with the source, the body is **deflection- and buckling-governed** (stress is trivial); applied
+bending moments need the frame FE solve, which is hardcoded in the source and not ported, so the
+neck/soundbox report moment *capacity*, not applied stress. Neck-bore and shoulder-wall offsets
+are approximate (non-convex); everything else is exact.
+
 ## Paraguayan harp curves (DP/BP/SP/WP)
 
 hedit's real purpose: author the four curves that drive the Paraguayan harp body —

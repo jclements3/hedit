@@ -1,0 +1,141 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clements 49 — spec studio</title><style>
+html,body{margin:0;height:100%;background:#111;font:12px system-ui,-apple-system,sans-serif;color:#ddd;overflow:hidden}
+#wrap{position:absolute;inset:0}
+svg{width:100%;height:100%;touch-action:none}
+#t{position:fixed;top:8px;left:12px;font-weight:700;color:#eee;pointer-events:none;line-height:1.35}
+#t small{display:block;font-weight:400;color:#999}
+#out{position:fixed;right:10px;top:10px;background:#1a1a20ee;border:1px solid #3a3a42;border-radius:8px;padding:8px 10px;width:270px}
+#out table{width:100%;border-collapse:collapse;font-size:11px}
+#out td{padding:2px 4px;color:#ccc}#out td:first-child{font-weight:700}
+#out textarea{width:100%;height:74px;background:#0c0c10;color:#9fe0a8;border:1px solid #333;border-radius:5px;font:10px ui-monospace,monospace;margin-top:6px}
+button{background:#232329;color:#eee;border:1px solid #4a4a52;border-radius:6px;padding:4px 10px;cursor:pointer;margin-top:6px}
+.dot{cursor:grab}.dot:active{cursor:grabbing}
+#hint{position:fixed;left:12px;bottom:10px;color:#888}
+</style></head><body>
+<div id="t">Spec studio<small>drag the four anchors · adjust the knobs · copy ONE spec — no more discussion</small></div>
+<div id="wrap"><svg id="svg" viewBox="-20 -20 1370 1965">
+<path id="rrail" fill="none" stroke="#e63030" stroke-width="2" opacity="0.4"/>
+<path id="brail" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.4"/>
+<path id="gspine" fill="none" stroke="#22c55e" stroke-width="4"/>
+<path id="shseg" fill="none" stroke="#a855f7" stroke-width="9" stroke-linecap="round"/>
+<path id="crseg" fill="none" stroke="#ef4444" stroke-width="9" stroke-linecap="round"/>
+<g id="marks"></g>
+</svg></div>
+<div id="out"><b>transition anchors</b>
+<table id="tab"></table>
+<div id="knobs" style="max-height:46vh;overflow-y:auto;margin-top:6px;border-top:1px solid #333;padding-top:6px"></div>
+<textarea id="json" readonly></textarea>
+<button id="cp">copy full spec</button> <button id="rs">reset to approved build</button></div>
+<div id="hint">sh_in→sh_out = shoulder morph window · cr_in→cr_out = crown morph window (cr_out = rose start)</div>
+<script>
+var D=__DATA__;
+var NS='http://www.w3.org/2000/svg';
+var svg=document.getElementById('svg');
+document.getElementById('rrail').setAttribute('d',D.red);
+document.getElementById('brail').setAttribute('d',D.blue);
+document.getElementById('gspine').setAttribute('d','M '+D.spine.map(function(p){return p[0]+','+p[1];}).join(' L '));
+var NAMES=["sh_in","sh_out","cr_in","cr_out"];
+var LBL={sh_in:"shoulder morph START",sh_out:"shoulder morph STOP",cr_in:"crown morph START",cr_out:"crown morph STOP = rose start"};
+var COLS={sh_in:"#a855f7",sh_out:"#a855f7",cr_in:"#ef4444",cr_out:"#ef4444"};
+function nearest(x,y){var bi=0,bd=1e18;for(var i=0;i<D.spine.length;i++){var dx=D.spine[i][0]-x,dy=D.spine[i][1]-y,d=dx*dx+dy*dy;if(d<bd){bd=d;bi=i;}}return bi;}
+var idx={};NAMES.forEach(function(n){idx[n]=nearest(D.init[n][0],D.init[n][1]);});
+var g=document.getElementById('marks'),dots={},labels={};
+NAMES.forEach(function(n){
+  var c=document.createElementNS(NS,'circle');c.setAttribute('r','14');c.setAttribute('fill',COLS[n]);
+  c.setAttribute('stroke','#fff');c.setAttribute('stroke-width','3');c.setAttribute('class','dot');c.dataset.n=n;
+  g.appendChild(c);dots[n]=c;
+  var t=document.createElementNS(NS,'text');t.setAttribute('fill','#fff');t.setAttribute('font-size','24');t.setAttribute('font-weight','700');
+  g.appendChild(t);labels[n]=t;
+});
+function stOf(i){return Math.round(D.s[i]/D.total*(D.S-1));}
+function upd(){
+  NAMES.forEach(function(n){
+    var p=D.spine[idx[n]];dots[n].setAttribute('cx',p[0]);dots[n].setAttribute('cy',p[1]);
+    labels[n].setAttribute('x',p[0]+20);labels[n].setAttribute('y',p[1]-14);labels[n].textContent=n+' st'+stOf(idx[n]);
+  });
+  function seg(a,b){var i0=Math.min(idx[a],idx[b]),i1=Math.max(idx[a],idx[b]);
+    return 'M '+D.spine.slice(i0,i1+1).map(function(p){return p[0]+','+p[1];}).join(' L ');}
+  document.getElementById('shseg').setAttribute('d',seg('sh_in','sh_out'));
+  document.getElementById('crseg').setAttribute('d',seg('cr_in','cr_out'));
+  var rows='',spec={S:D.S};
+  NAMES.forEach(function(n){var i=idx[n],p=D.spine[i];
+    rows+='<tr><td style="color:'+COLS[n]+'">'+n+'</td><td>('+p[0].toFixed(1)+', '+p[1].toFixed(1)+')</td><td>s='+D.s[i].toFixed(0)+'</td><td>st'+stOf(i)+'</td></tr>';
+    spec[n]={x:+p[0].toFixed(1),y:+p[1].toFixed(1),s:+D.s[i].toFixed(1),st:stOf(i)};
+  });
+  document.getElementById('tab').innerHTML=rows;
+  var full={windows:{}, sampling:{S:KV('S'),M:KV('M')},
+    base:{trim_z:KV('trim_z'),merge_z:'auto',base_stations:KV('base_stations'),rise:'prism'},
+    launch:{stations:KV('launch_st'),ctrl_height_frac:KV('ctrl'),flat_underside:!!KV('flat'),
+            rose_phase_align:!!KV('phase'),soundbox_ease_stations:KV('ease'),pin:'rose_under_pillar'},
+    rose:{turns:KV('turns'),flutes:12,flute_depth:0.4,
+          bore_diameter:(KV('boreauto')?'auto_base_circle':KV('bore_d'))},
+    structure:{wall_min_shoulder:KV('wall'),shoulder_blue:(KV('shmode')?'straight_path':'smoothed'),
+               shoulder_zone_halfwidth:KV('sh_half'),shoulder_smooth_iters:KV('sh_iters'),
+               crown_zone_pad:KV('cr_pad'),crown_smooth_iters:KV('cr_iters'),
+               outer_zone_smooth_iters:KV('out_iters'),global_fair_iters:KV('fair')}};
+  NAMES.forEach(function(n){var p=D.spine[idx[n]];full.windows[n]={x:+p[0].toFixed(1),y:+p[1].toFixed(1)};});
+  document.getElementById('json').value=JSON.stringify(full);
+}
+var KNOBS=[
+ ['Sampling',[['S','stations S',120,240,1,160],['M','ring points M',60,144,2,90]]],
+ ['Base',[['trim_z','tail trim z (mm)',80,220,5,130],['base_stations','base rings',3,12,1,6]]],
+ ['Launches',[['launch_st','launch stations',4,16,1,8],['ctrl','takeoff pull (0-1)',0.4,0.95,0.05,0.75],
+  ['ease','soundbox ease (st)',10,50,2,30],
+  ['flat','flat underside',0,1,1,1],['phase','rose phase align',0,1,1,1]]],
+ ['Rose / bore',[['turns','helix turns',0,1,0.05,0.5],
+  ['boreauto','bore Ø from base.svg',0,1,1,1],['bore_d','manual bore Ø (mm)',20,90,0.5,60.9]]],
+ ['Structure',[['wall','min wall shoulder (mm)',2,10,0.2,4.4],
+  ['shmode','blue: straight path',0,1,1,1],
+  ['sh_half','shoulder zone ±st',3,12,1,6],['sh_iters','shoulder smooth',4,40,2,22],
+  ['cr_pad','crown zone pad',1,8,1,3],['cr_iters','crown smooth',2,12,1,5],
+  ['out_iters','outer zone smooth',0,10,1,4],['fair','global fairing',0,3,1,1]]]
+];
+var KVv={};
+function KV(id){return KVv[id];}
+(function(){
+ var host=document.getElementById('knobs'),h='';
+ KNOBS.forEach(function(grp){
+  h+='<div style="font-weight:700;color:#ddd;margin:6px 0 2px">'+grp[0]+'</div>';
+  grp[1].forEach(function(k){
+   KVv[k[0]]=k[5];
+   h+='<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#bbb;margin:1px 0">'
+     +'<span style="flex:1">'+k[1]+'</span>'
+     +'<input type="range" id="kn_'+k[0]+'" min="'+k[2]+'" max="'+k[3]+'" step="'+k[4]+'" value="'+k[5]+'" style="width:110px">'
+     +'<span id="kv_'+k[0]+'" style="width:40px;text-align:right;color:#9fe0a8">'+k[5]+'</span></div>';
+  });
+ });
+ host.innerHTML=h;
+ KNOBS.forEach(function(grp){grp[1].forEach(function(k){
+  var el=document.getElementById('kn_'+k[0]);
+  el.oninput=function(){KVv[k[0]]=parseFloat(this.value);
+    document.getElementById('kv_'+k[0]).textContent=this.value;upd();};
+ });});
+})();
+upd();
+/* interactions */
+var V={x:-20,y:-20,w:1370,h:1965},B=Object.assign({},V);
+function A(){svg.setAttribute('viewBox',V.x+' '+V.y+' '+V.w+' '+V.h);}
+function toSvg(e){var r=svg.getBoundingClientRect();
+  /* meet scaling */
+  var sc=Math.min(r.width/V.w,r.height/V.h);
+  var ox=(r.width-V.w*sc)/2, oy=(r.height-V.h*sc)/2;
+  return [V.x+(e.clientX-r.left-ox)/sc, V.y+(e.clientY-r.top-oy)/sc];
+}
+var dragDot=null,panning=false,px,py;
+svg.addEventListener('pointerdown',function(e){
+  if(e.target.classList&&e.target.classList.contains('dot')){dragDot=e.target.dataset.n;svg.setPointerCapture(e.pointerId);}
+  else{panning=true;px=e.clientX;py=e.clientY;}
+});
+svg.addEventListener('pointermove',function(e){
+  if(dragDot){var q=toSvg(e);idx[dragDot]=nearest(q[0],q[1]);upd();}
+  else if(panning){var r=svg.getBoundingClientRect();var sc=Math.min(r.width/V.w,r.height/V.h);
+    V.x-=(e.clientX-px)/sc;V.y-=(e.clientY-py)/sc;px=e.clientX;py=e.clientY;A();}
+});
+addEventListener('pointerup',function(){dragDot=null;panning=false;});
+svg.addEventListener('wheel',function(e){e.preventDefault();var q=toSvg(e),f=e.deltaY<0?0.87:1.15;
+  V.x=q[0]-(q[0]-V.x)*f;V.y=q[1]-(q[1]-V.y)*f;V.w*=f;V.h*=f;A();},{passive:false});
+document.getElementById('cp').onclick=function(){var ta=document.getElementById('json');ta.select();document.execCommand('copy');this.textContent='copied ✓';var b=this;setTimeout(function(){b.textContent='copy spec';},1200);};
+document.getElementById('rs').onclick=function(){NAMES.forEach(function(n){idx[n]=nearest(D.init[n][0],D.init[n][1]);});upd();};
+</script></body></html>

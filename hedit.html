@@ -162,6 +162,15 @@
   <input type="file" id="bg-input" accept="image/*" hidden>
   <input type="file" id="import-input" accept=".svg,image/svg+xml" hidden>
   <span class="filename" id="filename">untitled.svg</span>
+  <div class="divider"></div>
+  <div class="hgroup" id="studio-bar">
+    <button id="mode-builder" title="2-D builder — the drawing canvas and harp pipeline (cards on the left)">Build</button>
+    <button id="mode-morph" title="Morph assistant — drag the shoulder/crown transition anchors on the spine">Morph</button>
+    <button id="mode-section" title="Math cross-section pickers — soundbox limaçon / neck U-beam / pillar rose, with knobs">Sections</button>
+    <button id="mode-struct" title="Structural analysis — section properties, Euler buckling, stiffness, morph pinch points">Structure</button>
+    <button id="mode-drawing" title="ISO 128 drawing sheet — first-angle views, dimensions, title block, SVG export">Drawing</button>
+    <button id="mode-3d" title="Rotating whole-harp lanes view">3D ⟳</button>
+  </div>
   <div class="spacer"></div>
   <div class="hgroup">
     <button id="btn-reset" class="danger" title="Reset the design: remove air gap, alignment, S-axis, fitted curves, pins &amp; dots — back to the bare strings on the x=0 axis (undoable)">Reset</button>
@@ -331,6 +340,54 @@
           <input type="number" id="shoulder-n" step="0.1" min="1.05" value="2.5">
         </div>
         <button id="add-shoulder-btn" class="btn-primary" title="Lamé right-side curve from the SB (bottom) curve to the neck/top curve at the last string's x, bowing +x by 'Shoulder bow' mm.">Add shoulder</button>
+      </div>
+    </details>
+
+    <details class="sec harp">
+      <summary><span class="step">3c</span> Soundbox (acoustics)</summary>
+      <div class="sec-body">
+        <div class="row">
+          <label title="Outer limaçon shape: r=b(c+cosθ). 2 = the approved convex section; &gt;2 rounder/shallower dimple; &lt;2 deepens the dimple (re-entrant).">Outer c</label>
+          <input type="number" id="sb-cout" step="0.05" min="1.7" max="3.2" value="2">
+          <label title="Section height H = 4b, with b = h / divisor. 4 lands the belly on the red reach curve; smaller = taller.">b = h/</label>
+          <input type="number" id="sb-bdiv" step="0.25" min="2" value="4">
+        </div>
+        <div class="row">
+          <label title="Dimple / stringbar wall at the treble end (mm). Grows toward the bass by the τ term.">t_spine</label>
+          <input type="number" id="sb-tspine0" step="0.1" value="1.5">
+          <label title="Extra spine wall added at the bass end (× τ), mm">+τ</label>
+          <input type="number" id="sb-tspinek" step="0.1" value="2.5">
+        </div>
+        <div class="row">
+          <label title="Radiating-panel (wing) wall, constant along the arm (mm)">t_wing</label>
+          <input type="number" id="sb-twing" step="0.1" value="2.5">
+          <label title="Belly (shell) wall at the treble end (mm)">t_shell</label>
+          <input type="number" id="sb-tshell0" step="0.1" value="2.5">
+          <label title="Extra belly wall added at the bass end (× τ), mm">+τ</label>
+          <input type="number" id="sb-tshellk" step="0.1" value="1">
+        </div>
+        <div class="row">
+          <label title="Wall-thickness ramp breakpoints, degrees from the spine: ≤A spine plateau, A→B spine→wing, B→C wing→shell, ≥C belly plateau.">∠ A</label>
+          <input type="number" id="sb-anga" step="1" value="20">
+          <label>B</label>
+          <input type="number" id="sb-angb" step="1" value="70">
+          <label>C</label>
+          <input type="number" id="sb-angc" step="1" value="90">
+        </div>
+        <div class="row">
+          <label title="Cross-section station to preview (0 = floor/bass end, last = shoulder/treble end)">Station</label>
+          <input type="range" id="sweep-station" min="0" max="58" step="1" value="0" style="flex:1">
+        </div>
+        <div class="seg">
+          <button id="sweep-open-btn" class="btn-primary" title="Open the soundbox cross-section tuner (section + chamber-area taper + live acoustic readout).">Cross-section…</button>
+          <button id="struct-open-btn" title="Structural analysis of the whole body: section properties, Euler buckling, deflection stiffness, and morph pinch points, under the string load.">Structural…</button>
+          <button id="picker-open-btn" title="Drag the four transition anchors (sh_in/sh_out = shoulder window, cr_in/cr_out = crown window) on the green spine — the soundbox tuner, structural report, and exported spec follow immediately.">Anchors…</button>
+        </div>
+        <div class="seg">
+          <button id="sweep-3d-btn" title="Rotating whole-harp lanes view (soundbox + shoulder + neck + crown + pillar, outer + bore lanes, family-colored) in the 3D view. Lanes only — no ring hoops. Click the view to stop the spin and orbit yourself.">Harp 3D ⟳</button>
+          <button id="sweep-export-btn" title="Export the exact harp_spec.json (with these soundbox knobs) that drives the Python sweep2 build">Export spec</button>
+          <button id="sweep-reset-btn" title="Reset the knobs to the approved 2026-07-17 build">Reset</button>
+        </div>
       </div>
     </details>
 
@@ -521,6 +578,94 @@
     </div>
     <div class="modal-body">
       <svg id="wp-plot" viewBox="0 0 520 280" style="width:100%; height:auto; background:var(--panel2); border-radius:6px; touch-action:none"></svg>
+    </div>
+  </div>
+</div>
+
+<div id="sweep-modal" class="modal" hidden>
+  <div class="modal-box" style="width:min(640px,96vw)">
+    <div class="modal-head">
+      <h3>Cross-sections</h3>
+      <div class="seg" style="margin-left:10px">
+        <button id="sect-tab-soundbox" class="btn-primary">Soundbox</button>
+        <button id="sect-tab-neck">Neck</button>
+        <button id="sect-tab-pillar">Pillar</button>
+      </div>
+      <span class="hint" style="margin-left:8px">station slider in card 3c scrubs along the piece</span>
+      <div class="spacer"></div>
+      <button id="sweep-close">Close</button>
+    </div>
+    <div class="modal-body">
+      <div id="sect-knobs-neck" class="row" hidden style="margin-bottom:6px">
+        <label title="U-channel outer width (PLATE_OUT), mm">Plate out</label>
+        <input type="number" id="sb-plateout" step="0.1" value="35.3">
+        <label title="U-channel leg thickness (PLATE_LEG), mm">Leg</label>
+        <input type="number" id="sb-plateleg" step="0.1" min="0.5" value="3.4">
+      </div>
+      <div id="sect-knobs-pillar" class="row" hidden style="margin-bottom:6px">
+        <label title="Number of rose flutes">Flutes</label>
+        <input type="number" id="sb-flutes" step="1" min="3" max="24" value="12">
+        <label title="Flute depth ratio (0 = smooth circle)">Depth</label>
+        <input type="number" id="sb-fldepth" step="0.05" min="0" max="1" value="0.4">
+        <label title="Constant cylinder bore Ø, mm">Bore Ø</label>
+        <input type="number" id="sb-bore" step="0.1" value="60.9">
+      </div>
+      <svg id="sweep-plot" viewBox="0 0 520 300" style="width:100%; height:auto; background:var(--panel2); border-radius:6px; touch-action:none"></svg>
+      <div id="sweep-readout" style="margin-top:8px; font-size:11px; line-height:1.5; color:var(--ink); font-family:ui-monospace,monospace"></div>
+      <div class="hint" style="margin-top:4px">Closed-limaçon chamber — the real soundbox shares volume with the base and has soundboard cuts, so V is an upper bound.</div>
+    </div>
+  </div>
+</div>
+
+<div id="struct-modal" class="modal" hidden>
+  <div class="modal-box" style="width:min(640px,96vw)">
+    <div class="modal-head">
+      <h3>Structural analysis</h3>
+      <span class="hint" style="margin-left:8px">section properties · Euler buckling · deflection stiffness · morph pinch points</span>
+      <div class="spacer"></div>
+      <button id="struct-close">Close</button>
+    </div>
+    <div class="modal-body">
+      <svg id="struct-plot" viewBox="0 0 520 220" style="width:100%; height:auto; background:var(--panel2); border-radius:6px"></svg>
+      <div id="struct-readout" style="margin-top:8px; font-size:11px; line-height:1.45; color:var(--ink)"></div>
+    </div>
+  </div>
+</div>
+
+<div id="picker-modal" class="modal" hidden>
+  <div class="modal-box" style="width:min(560px,95vw); height:86vh; display:flex; flex-direction:column">
+    <div class="modal-head">
+      <h3>Morph picker</h3>
+      <span class="hint" style="margin-left:8px">drag the four anchors · purple = shoulder window · red = crown window · wheel zoom · drag background to pan</span>
+      <div class="spacer"></div>
+      <button id="picker-reset" title="Reset the four anchors to the approved build">Reset</button>
+      <button id="picker-close">Close</button>
+    </div>
+    <div class="modal-body" style="flex:1; display:flex; flex-direction:column; min-height:0">
+      <svg id="picker-svg" viewBox="-20 -20 1370 1966" style="flex:1; min-height:0; width:100%; background:var(--panel2); border-radius:6px; touch-action:none">
+        <path id="picker-rrail" fill="none" stroke="#e63030" stroke-width="2" opacity="0.4"/>
+        <path id="picker-brail" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.4"/>
+        <path id="picker-gspine" fill="none" stroke="#22c55e" stroke-width="4"/>
+        <path id="picker-shseg" fill="none" stroke="#a855f7" stroke-width="9" stroke-linecap="round"/>
+        <path id="picker-crseg" fill="none" stroke="#ef4444" stroke-width="9" stroke-linecap="round"/>
+        <g id="picker-marks"></g>
+      </svg>
+      <div id="picker-readout" style="margin-top:6px"></div>
+    </div>
+  </div>
+</div>
+
+<div id="drawing-modal" class="modal" hidden>
+  <div class="modal-box" style="width:min(980px,97vw)">
+    <div class="modal-head">
+      <h3>ISO 128 drawing</h3>
+      <span class="hint" style="margin-left:8px">first-angle · front / left / plan · silhouettes from the live spec · hidden = dashed, centerline = chain</span>
+      <div class="spacer"></div>
+      <button id="drawing-export" class="btn-primary" title="Download the sheet as a standalone SVG (A3 mm)">Export SVG</button>
+      <button id="drawing-close">Close</button>
+    </div>
+    <div class="modal-body">
+      <svg id="drawing-sheet" viewBox="0 0 420 297" style="width:100%; height:auto; background:#f8f7f2; border-radius:4px"></svg>
     </div>
   </div>
 </div>
@@ -1564,7 +1709,14 @@ function sanitizeSVG(root){
   });
 }
 function loadSVGText(text, name){
-  const parsed = new DOMParser().parseFromString(text, "image/svg+xml");
+  let parsed = new DOMParser().parseFromString(text, "image/svg+xml");
+  if(parsed.querySelector("parsererror")){
+    // Common real-world breakage: XML comments containing "--" (illegal in XML),
+    // e.g. Inkscape/hand-authored banners like <!-- ---- section ---- -->. Comments
+    // never carry drawable content, so strip them and re-parse before giving up.
+    const stripped = text.replace(/<!--[\s\S]*?-->/g, "");
+    parsed = new DOMParser().parseFromString(stripped, "image/svg+xml");
+  }
   const err = parsed.querySelector("parsererror");
   if(err){ setStatus("Parse error — not a valid SVG."); return; }
   const root = parsed.querySelector("svg");
@@ -2409,6 +2561,42 @@ document.getElementById("js-close").onclick = closeJsEditor;
 document.getElementById("wp-edit-btn").onclick = openWpEditor;
 document.getElementById("wp-close").onclick = closeWpEditor;
 document.getElementById("wp-reset").onclick = () => { harpWP = { nodes:[{f:0,r:1},{f:0.5,r:1},{f:1,r:1}] }; wpSel=-1; renderWpPlot(); setStatus("WP reset to flat (r=1)."); };
+// Soundbox (acoustics) card + cross-section modal
+["sect-tab-soundbox","sect-tab-neck","sect-tab-pillar"].forEach(id => {
+  const b = document.getElementById(id); if(b) b.onclick = () => sectSetPiece(id.replace("sect-tab-",""));
+});
+["sb-cout","sb-bdiv","sb-tspine0","sb-tspinek","sb-twing","sb-tshell0","sb-tshellk","sb-anga","sb-angb","sb-angc","sb-flutes","sb-fldepth","sb-bore","sb-plateout","sb-plateleg"].forEach(id => {
+  const el = document.getElementById(id); if(el) el.addEventListener("input", sbReadInputs);
+});
+{ const sl = document.getElementById("sweep-station");
+  if(sl) sl.oninput = () => { sbStation = parseInt(sl.value, 10) || 0; if(!document.getElementById("sweep-modal").hidden) sbRenderPlot(); }; }
+document.getElementById("sweep-open-btn").onclick = openSbSweep;
+document.getElementById("sweep-close").onclick = closeSbSweep;
+document.getElementById("sweep-3d-btn").onclick = sbShowHarp3D;   // lanes, never ring hoops
+document.getElementById("picker-open-btn").onclick = openPicker;
+document.getElementById("picker-close").onclick = closePicker;
+document.getElementById("picker-reset").onclick = () => { ["sh_in","sh_out","cr_in","cr_out"].forEach(n => { sbSpec[n] = Object.assign({}, SWEEP_DEFAULTS[n]); }); pkUpdate(true); setStatus("Anchors reset to the approved build."); };
+document.getElementById("picker-modal").addEventListener("mousedown", e => { if(e.target.id === "picker-modal") closePicker(); });
+document.getElementById("stage3d").addEventListener("pointerdown", spin3dStop);
+document.getElementById("drawing-close").onclick = closeDrawing;
+document.getElementById("drawing-export").onclick = dwExportSVG;
+document.getElementById("drawing-modal").addEventListener("mousedown", e => { if(e.target.id === "drawing-modal") closeDrawing(); });
+// Studio mode bar — one integrated app: every tool reachable from the header
+{ const closeAll = () => { ["sweep-modal","struct-modal","picker-modal","drawing-modal"].forEach(id => { const m = document.getElementById(id); if(m) m.hidden = true; }); };
+  const mode = (id, fn) => { const b = document.getElementById(id); if(b) b.onclick = () => { closeAll(); fn(); }; };
+  mode("mode-builder", () => { spin3dStop(); if(view3d.on) exit3d(); setStatus("Builder — the 2-D canvas; harp pipeline in the left cards."); });
+  mode("mode-morph",   openPicker);
+  mode("mode-section", openSbSweep);
+  mode("mode-struct",  openStruct);
+  mode("mode-drawing", () => openDrawing());
+  mode("mode-3d",      sbShowHarp3D);
+}
+document.getElementById("sweep-export-btn").onclick = sbExportSpec;
+document.getElementById("sweep-reset-btn").onclick = sbResetSpec;
+document.getElementById("sweep-modal").addEventListener("mousedown", e => { if(e.target.id === "sweep-modal") closeSbSweep(); });
+document.getElementById("struct-open-btn").onclick = openStruct;
+document.getElementById("struct-close").onclick = closeStruct;
+document.getElementById("struct-modal").addEventListener("mousedown", e => { if(e.target.id === "struct-modal") closeStruct(); });
 document.getElementById("js-modal").addEventListener("mousedown", e => { if(e.target.id === "js-modal") closeJsEditor(); });
 document.getElementById("vim-modal").addEventListener("mousedown", e => { if(e.target.id === "vim-modal") closeVimSource(); });
 jsonInput.addEventListener("change", e => {
@@ -3138,7 +3326,8 @@ function docUnits(){
 function buildHarpModel(){
   const lines = stringLines();
   // emit metadata for any harp doc: strings, OR harp-role curves, OR an edited WP
-  if(!lines.length && !harpWP && !contentGroup.querySelector("path[data-role]")) return null;
+  const sbCustom = (typeof sbSpec !== "undefined") && JSON.stringify(sbSpec) !== JSON.stringify(SWEEP_DEFAULTS);
+  if(!lines.length && !harpWP && !sbCustom && !contentGroup.querySelector("path[data-role]")) return null;
   const strings = lines.map(el => ({
     num:  el.getAttribute("data-num")  || "",
     note: el.getAttribute("data-note") || "",
@@ -3160,6 +3349,7 @@ function buildHarpModel(){
     layout: { airGap: measuredAirGap(), rotationDeg: measuredRotationDeg(), alignment: harpAlignment, frame: frameXZ ? "RH-XZ" : "SVG" },
     strings,
     wp: harpWP || undefined,   // persist the WP waterfall profile so autosave keeps it
+    soundbox: sbCustom ? Object.assign({}, sbSpec) : undefined,   // soundbox acoustic knobs (only when tuned away from the approved build)
     extra: (harpExtra && Object.keys(harpExtra).length) ? harpExtra : undefined,   // column_width, _comment, ... (Paraguayan extras) — keep the SVG fully self-contained
   };
 }
@@ -3180,6 +3370,10 @@ function applyHarpModel(model){
     harpAlignment = model.layout.alignment != null ? model.layout.alignment : null;
   }
   if(model.wp && model.wp.nodes) harpWP = model.wp;   // restore WP waterfall profile
+  if(model.soundbox && typeof model.soundbox === "object" && typeof sbSpec !== "undefined"){
+    sbSpec = Object.assign({}, SWEEP_DEFAULTS, model.soundbox); sbInvalidate();
+    if(typeof sbSyncInputs === "function") sbSyncInputs();
+  }
   if(model.extra && typeof model.extra === "object") harpExtra = model.extra;   // restore column_width, _comment, ...
   const n = model.strings ? model.strings.length : 0;
   setStatus(`Loaded harp spec: ${n} strings, air gap ${model.layout ? model.layout.airGap : "?"} ${model.units||""}.`);
@@ -4602,6 +4796,838 @@ function closeWpEditor(){ document.getElementById("wp-modal").hidden=true; }
   });
   document.getElementById("wp-modal").addEventListener("mousedown", e => { if(e.target.id==="wp-modal") closeWpEditor(); });
 })();
+// =====================================================================
+// SOUNDBOX SWEEP (acoustics)  — the Clements-49 wishbone soundbox arm.
+// Vanilla-JS port of sweep2.py / core.py (verified against sweep2/golden.json
+// to <0.004 mm²). The frame's green (spine) + red (outer reach) curves are
+// embedded so the tuner works standalone. The soundbox cross-section is a
+// c-limaçon scaled by b=h/bDiv; the chamber wall is the angle-graded
+// "spine-and-wings" bore. hedit exposes the knobs that sweep2 hardcodes so the
+// section can be tuned for acoustic quality; it exports the exact harp_spec.json
+// that drives the Python 3-D build. See sweep2/HANDOFF_SWEEP2.md.
+// =====================================================================
+const SWEEP_FLOOR = 1915.254;
+const SWEEP_FRAME_GREEN = "m 183.9566,1920.6178 c 0,-8.6024 3.7745,-18.241 8.564,-30.0516 10.6381,-26.2322 32.088,-61.244 59.899,-108.884 155.0411,-265.5849 647.7156,-1113.5147 692.417,-1189.2364 8.5192,-14.431 13.57105,-24.67143 18.0365,-32.6689 4.46545,-7.99747 14.31962,-42.02005 -11.87153,-38.74506 -26.19116,3.27498 -92.31469,70.8154 -121.6053,97.10307 -29.29061,26.28767 -126.91121,75.55451 -183.49391,36.42518 C 589.31967,615.43076 536.1258,437.9343 476.025,362.772 426.6464,301.0189 360.6259,292.977 325.314,291.67 c -33.8761,-1.307 -122.12434,7.31962 -122.189,76.53 -0.0647,69.21038 0,1391.2857 0,1442.8 0,51.4378 44.21447,35.2948 45.7832,109.6178";
+const SWEEP_FRAME_RED   = "M 89.3420,1920.6178 C 89.3420,1846.2948 135.1250,1862.4378 135.1250,1811.0000 C 135.1250,1811.0000 135.1250,368.2000 135.1250,368.2000 C 133.2023,303.5280 136.1631,271.4255 117.0002,201.4959 C 99.2731,131.5662 14.4176,49.9225 107.9350,20.4850 C 142.6703,9.5510 184.6690,3.6736 229.3312,2.9122 C 304.9122,1.6238 388.1208,14.9865 456.6635,43.2878 C 565.6231,90.2756 603.3788,211.4461 638.7127,314.3955 C 666.0601,375.4178 675.7716,481.6624 752.7108,498.0408 C 826.9331,513.8409 922.1084,418.2527 977.2492,419.6138 C 1032.3899,420.9750 1083.5449,486.1516 1050.8259,562.8928 C 1021.6183,631.3981 909.4273,1066.4990 883.8447,1156.3232 C 860.8157,1237.1810 860.4081,1401.3860 797.0710,1538.7749 C 748.9335,1643.1932 689.4245,1793.6009 596.7410,1810.7635 C 504.0575,1827.9261 504.7771,1863.9661 506.2590,1920.6178";
+// Defaults = the JC-approved build of 2026-07-17 (sweep2/harp_spec.json).
+const SWEEP_DEFAULTS = {
+  sh_in:{x:965.2,y:525.3}, sh_out:{x:955.5,y:520.8},
+  cr_in:{x:348.1,y:293.4}, cr_out:{x:203.1,y:395.2},
+  S:160, trimZ:130,
+  cOut:2.0, bDiv:4,                          // outer limaçon: r=b(cOut+cosθ), b=h/bDiv
+  tSpine0:1.5, tSpineK:2.5,                  // t_spine = tSpine0 + tSpineK·τ   (dimple/stringbar wall)
+  tWing:2.5,                                 // t_wing (radiating panel wall)
+  tShell0:2.5, tShellK:1.0,                  // t_shell = tShell0 + tShellK·τ   (belly wall)
+  angA:20, angB:70, angC:90,                 // wall-thickness ramp breakpoints (deg from the spine)
+  roseFlutes:12, roseDepth:0.4, roseBoreD:60.9,   // pillar rose: flute count, depth ratio, bore Ø (mm)
+  plateOut:35.3, plateLeg:3.4,               // neck U-beam: channel width, leg thickness (mm)
+};
+let sbSpec = Object.assign({}, SWEEP_DEFAULTS);
+let sbStation = 0;              // scrubbed station index for the cross-section modal
+let sbCache = null;            // memoized {green,red,stations,...}; cleared when a knob changes
+
+// ---- core._flatten: M/L/C/V/H/Z, abs+rel, 48 uniform steps per cubic --------
+function sbFlatten(d, steps){
+  steps = steps || 48;
+  const toks = d.match(/[MmCcLlVvHhZz]|[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/g) || [];
+  const pts=[]; let i=0,x=0,y=0,cmd=null;
+  const num=()=>parseFloat(toks[i++]);
+  while(i<toks.length){
+    if(/[MmCcLlVvHhZz]/.test(toks[i])){ cmd=toks[i]; i++; }
+    if(cmd===null){ i++; continue; }
+    const C=cmd.toUpperCase(), rel=cmd!==C;
+    if(C==="M"){ let a=num(),b=num(); if(rel&&pts.length){x+=a;y+=b;}else{x=a;y=b;} pts.push([x,y]); cmd=rel?"l":"L"; }
+    else if(C==="L"){ let a=num(),b=num(); if(rel){x+=a;y+=b;}else{x=a;y=b;} pts.push([x,y]); }
+    else if(C==="H"){ let a=num(); x=rel?x+a:a; pts.push([x,y]); }
+    else if(C==="V"){ let a=num(); y=rel?y+a:a; pts.push([x,y]); }
+    else if(C==="C"){ let x1=num(),y1=num(),x2=num(),y2=num(),ex=num(),ey=num();
+      if(rel){x1+=x;y1+=y;x2+=x;y2+=y;ex+=x;ey+=y;}
+      const cx=x,cy=y;
+      for(let s=1;s<=steps;s++){ const u=s/steps,m=1-u;
+        pts.push([m*m*m*cx+3*m*m*u*x1+3*m*u*u*x2+u*u*u*ex, m*m*m*cy+3*m*m*u*y1+3*m*u*u*y2+u*u*u*ey]); }
+      x=ex;y=ey;
+    }
+  }
+  return pts;
+}
+function sbCumseg(P){ const s=[0]; for(let i=1;i<P.length;i++) s.push(s[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1])); return s; }
+function sbInterpXY(us,seg,P){
+  const out=[];
+  for(const u of us){ let lo=0,hi=seg.length-1;
+    if(u<=0){ out.push(P[0].slice()); continue; }
+    if(u>=seg[hi]){ out.push(P[hi].slice()); continue; }
+    while(hi-lo>1){ const m=(lo+hi)>>1; if(seg[m]<=u) lo=m; else hi=m; }
+    const f=(u-seg[lo])/(seg[hi]-seg[lo]||1);
+    out.push([P[lo][0]+f*(P[hi][0]-P[lo][0]), P[lo][1]+f*(P[hi][1]-P[lo][1])]);
+  }
+  return out;
+}
+function sbLinspace(a,b,n){ const o=[]; for(let k=0;k<n;k++) o.push(a+(b-a)*k/(n-1)); return o; }
+function sbGaussSmooth(P,sigma,half){ sigma=sigma||1.5; half=half||4;
+  const k=[]; let ks=0; for(let j=-half;j<=half;j++){ const w=Math.exp(-0.5*(j/sigma)*(j/sigma)); k.push(w); ks+=w; }
+  for(let j=0;j<k.length;j++) k[j]/=ks;
+  const n=P.length, out=P.map(p=>p.slice());
+  for(let c=0;c<2;c++) for(let idx=0;idx<n;idx++){ let acc=0;
+    for(let j=-half;j<=half;j++){ let src=idx+j; src=src<0?0:src>=n?n-1:src; acc+=k[j+half]*P[src][c]; }
+    out[idx][c]=acc; }
+  return out;
+}
+function sbRayHit(p,d,poly){ let best=null;
+  for(let k=0;k<poly.length-1;k++){ const a=poly[k],b=poly[k+1],ex=b[0]-a[0],ey=b[1]-a[1];
+    const den=d[0]*(-ey)-d[1]*(-ex); if(Math.abs(den)<1e-9) continue;
+    const rx=a[0]-p[0], ry=a[1]-p[1];
+    const t=(rx*(-ey)-ry*(-ex))/den, u=(d[0]*ry-d[1]*rx)/den;
+    if(u>=0&&u<=1&&t>1e-3&&(best===null||t<best)) best=t;
+  }
+  return best;
+}
+// sweep2._field: validity + spike reject + interp + edge extrap + 3-tap + clamp
+function sbField(vals,s,spike,minScalar){ spike=spike==null?3.0:spike; minScalar=minScalar==null?10.0:minScalar;
+  const n=vals.length;
+  let v=vals.map(x=>(x===null||x<minScalar)?NaN:+x);
+  let ok=v.map(x=>!Number.isNaN(x));
+  const okIdx=()=>{ const o=[]; for(let i=0;i<n;i++) if(ok[i]) o.push(i); return o; };
+  let idx=okIdx();
+  if(idx.length>=4){
+    const diffs=[]; for(let j=1;j<idx.length;j++) diffs.push(Math.abs(v[idx[j]]-v[idx[j-1]]));
+    diffs.sort((a,b)=>a-b);
+    const med=diffs.length%2?diffs[(diffs.length-1)/2]:0.5*(diffs[diffs.length/2-1]+diffs[diffs.length/2]);
+    for(let j=1;j<idx.length;j++){ const a=idx[j-1],b=idx[j];
+      if(Math.abs(v[b]-v[a])>spike*Math.max(med,1.0)*(b-a)) v[b]=NaN; }
+    ok=v.map(x=>!Number.isNaN(x)); idx=okIdx();
+  }
+  const f=new Array(n);
+  for(let i=0;i<n;i++){ if(ok[i]){ f[i]=v[i]; continue; }
+    let lo=idx[0],hi=idx[idx.length-1];
+    for(let j=0;j<idx.length;j++){ if(idx[j]<=i) lo=idx[j]; if(idx[j]>=i){ hi=idx[j]; break; } }
+    if(i<=idx[0]) f[i]=v[idx[0]];
+    else if(i>=idx[idx.length-1]) f[i]=v[idx[idx.length-1]];
+    else { const t=(s[i]-s[lo])/(s[hi]-s[lo]||1); f[i]=v[lo]+t*(v[hi]-v[lo]); }
+  }
+  const i0=idx[0],i1=idx[idx.length-1];
+  if(i0>0){ const j=Math.min(i0+6,i1),sl=(f[j]-f[i0])/(s[j]-s[i0]+1e-9); for(let i=0;i<i0;i++) f[i]=f[i0]+sl*(s[i]-s[i0]); }
+  if(i1<n-1){ const j=Math.max(i1-6,i0),sl=(f[i1]-f[j])/(s[i1]-s[j]+1e-9); for(let i=i1+1;i<n;i++) f[i]=f[i1]+sl*(s[i]-s[i1]); }
+  const g=f.slice(); for(let i=1;i<n-1;i++) g[i]=0.25*f[i-1]+0.5*f[i]+0.25*f[i+1];
+  return g.map(x=>Math.max(x,minScalar));
+}
+// THE FOUR-MONTH INVARIANT (GREEN_ORIENTATION.md): never pair arms by the floor.
+function sbAssertGreen(green){
+  const seg=sbCumseg(green), total=seg[seg.length-1];
+  const at=s=>sbInterpXY([s],seg,green)[0];
+  const p=at(0.376*total);
+  if(Math.hypot(p[0]-968,p[1]-545)>=60) throw new Error("GREEN SWAPPED: start does not climb to the shoulder");
+  const xs=[400,800,1200].map(s=>at(total-s)[0]);
+  if(!((Math.max.apply(null,xs)-Math.min.apply(null,xs))<25 && Math.abs((xs[0]+xs[1]+xs[2])/3-203)<40))
+    throw new Error("GREEN SWAPPED: end is not the vertical pillar column");
+  return true;
+}
+// limaçon outer ring: r=b(c+cosθ); (x,y)=(-r sinθ, r cosθ)
+function sbLimacon(c,b,n){ n=n||720; const P=[];
+  for(let k=0;k<n;k++){ const th=2*Math.PI*k/n, r=b*(c+Math.cos(th)); P.push([-r*Math.sin(th), r*Math.cos(th)]); }
+  return P;
+}
+function sbPolyArea(P){ let a=0; for(let i=0;i<P.length;i++){ const p=P[i],qq=P[(i+1)%P.length]; a+=p[0]*qq[1]-qq[0]*p[1]; } return Math.abs(a)/2; }
+function sbResample(poly,n){ const pts=poly.concat([poly[0]]); const d=[0];
+  for(let i=1;i<pts.length;i++) d.push(d[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+  const total=d[d.length-1]; if(total===0) return Array.from({length:n},()=>poly[0].slice());
+  const out=[]; let j=0;
+  for(let k=0;k<n;k++){ const u=total*k/n; while(j<d.length-2&&d[j+1]<u) j++;
+    const seg=d[j+1]-d[j]||1e-12, t=(u-d[j])/seg;
+    out.push([pts[j][0]+t*(pts[j+1][0]-pts[j][0]), pts[j][1]+t*(pts[j+1][1]-pts[j][1])]); }
+  return out;
+}
+function sbCentroid(P){ let a=0,cx=0,cy=0;
+  for(let i=0;i<P.length;i++){ const p=P[i],qq=P[(i+1)%P.length], cr=p[0]*qq[1]-qq[0]*p[1]; a+=cr; cx+=(p[0]+qq[0])*cr; cy+=(p[1]+qq[1])*cr; }
+  a*=0.5; if(Math.abs(a)<1e-12){ let mx=0,my=0; for(const p of P){ mx+=p[0]; my+=p[1]; } return [mx/P.length,my/P.length]; }
+  return [cx/(6*a), cy/(6*a)];
+}
+// outer contour: limaçon, dimple shifted to y=0 (spine)
+function sbOuter(sp,b){ const outer=sbLimacon(sp.cOut,b);
+  let ymin=Infinity; for(const p of outer) if(p[1]<ymin) ymin=p[1];
+  return outer.map(p=>[p[0],p[1]-ymin]);
+}
+// core._variable_bore with the ramp breakpoints exposed (angA/angB/angC)
+function sbVariableBore(ext,sp,tSpine,tWing,tShell){
+  const e=sbResample(ext,720), C=sbCentroid(e), N=e.length, inn=[];
+  const A=sp.angA, B=sp.angB, Cc=sp.angC;
+  for(let i=0;i<N;i++){
+    const a=e[(i-1+N)%N], c=e[(i+1)%N], dx=c[0]-a[0], dy=c[1]-a[1];
+    let nx=dy, ny=-dx; const nl=Math.hypot(nx,ny)+1e-12; nx/=nl; ny/=nl;
+    if(nx*(C[0]-e[i][0])+ny*(C[1]-e[i][1])<0){ nx=-nx; ny=-ny; }
+    const ddx=e[i][0]-C[0], ddy=e[i][1]-C[1], dn=Math.hypot(ddx,ddy)+1e-12;
+    let cth=-ddy/dn; cth=Math.max(-1,Math.min(1,cth));
+    const th=Math.acos(cth)*180/Math.PI;
+    let t;
+    if(th<=A) t=tSpine;
+    else if(th<=B) t=tSpine+(tWing-tSpine)*(th-A)/((B-A)||1);
+    else t=tWing+(tShell-tWing)*Math.min((th-B)/((Cc-B)||1),1);
+    inn.push([e[i][0]+nx*t, e[i][1]+ny*t]);
+  }
+  return inn;
+}
+// Build the whole soundbox arm from the current sbSpec. Memoized.
+function sbBuild(){
+  if(sbCache && sbCache.key===JSON.stringify(sbSpec)) return sbCache;
+  const sp=sbSpec;
+  const green=sbFlatten(SWEEP_FRAME_GREEN), red=sbFlatten(SWEEP_FRAME_RED);
+  sbAssertGreen(green);
+  let a=0,b=green.length-1;
+  while(a<green.length/2 && (SWEEP_FLOOR-green[a][1])<sp.trimZ) a++;
+  while(b>green.length/2 && (SWEEP_FLOOR-green[b][1])<sp.trimZ) b--;
+  const g=green.slice(a,b+1);
+  const seg=sbCumseg(g), us=sbLinspace(0,seg[seg.length-1],sp.S), spine=sbInterpXY(us,seg,g);
+  const sm=sbGaussSmooth(spine);
+  const T=spine.map((_,i)=>{ let dx,dy;
+    if(i===0){ dx=sm[1][0]-sm[0][0]; dy=sm[1][1]-sm[0][1]; }
+    else if(i===sp.S-1){ dx=sm[sp.S-1][0]-sm[sp.S-2][0]; dy=sm[sp.S-1][1]-sm[sp.S-2][1]; }
+    else { dx=(sm[i+1][0]-sm[i-1][0])/2; dy=(sm[i+1][1]-sm[i-1][1])/2; }
+    const nl=Math.hypot(dx,dy)+1e-12; return [dx/nl,dy/nl]; });
+  const N=T.map(t=>[-t[1],t[0]]); const q=sp.S>>2, cen=[400,900];
+  if((spine[q][0]-cen[0])*N[q][0]+(spine[q][1]-cen[1])*N[q][1]<0) for(const nn of N){ nn[0]=-nn[0]; nn[1]=-nn[1]; }
+  for(let i=1;i<sp.S;i++) if(N[i][0]*N[i-1][0]+N[i][1]*N[i-1][1]<0){ N[i][0]=-N[i][0]; N[i][1]=-N[i][1]; }
+  const h=sbField(spine.map((p,i)=>sbRayHit(p,N[i],red)), us);
+  let si=0,sd=Infinity; for(let i=0;i<sp.S;i++){ const dd=Math.hypot(spine[i][0]-sp.sh_in.x,spine[i][1]-sp.sh_in.y); if(dd<sd){ sd=dd; si=i; } }
+  const arc1=us[si];
+  const sbI=[]; for(let i=0;i<sp.S;i++) if(us[i]<arc1) sbI.push(i);
+  let ymin=Infinity,ymax=-Infinity; for(const i of sbI){ ymin=Math.min(ymin,spine[i][1]); ymax=Math.max(ymax,spine[i][1]); }
+  const stations=sbI.map(i=>{
+    const b=h[i]/sp.bDiv;
+    const tau=Math.min(Math.max((spine[i][1]-ymin)/(ymax-ymin+1e-9),0),1);
+    const tSpine=sp.tSpine0+sp.tSpineK*tau, tWing=sp.tWing, tShell=sp.tShell0+sp.tShellK*tau;
+    const outer=sbOuter(sp,b);
+    const bore=sbVariableBore(outer,sp,tSpine,tWing,tShell);
+    const aOut=sbPolyArea(outer), aCh=sbPolyArea(bore);
+    return { i, s:us[i], spine:spine[i].slice(), N:N[i].slice(), h:h[i], b, tau,
+             tSpine, tWing, tShell, outer, bore, aOut, aCh, aWall:aOut-aCh, z:SWEEP_FLOOR-spine[i][1] };
+  });
+  // cumulative swept volumes (trapezoid over the along-spine spacing)
+  let vCh=0,vMat=0;
+  for(let k=0;k<stations.length-1;k++){ const d=stations[k+1].s-stations[k].s;
+    vCh+=0.5*(stations[k].aCh+stations[k+1].aCh)*d; vMat+=0.5*(stations[k].aWall+stations[k+1].aWall)*d; }
+  sbCache={ key:JSON.stringify(sbSpec), green, red, spine, N, h, us, arc1, stations, vCh, vMat, armLen:stations.length?stations[stations.length-1].s:0 };
+  return sbCache;
+}
+function sbInvalidate(){ sbCache=null; }
+
+// ---- cross-section modal -----------------------------------------------------
+const SB_PLOT={ w:520, h:300, ml:44, mr:14, mt:14, mb:26 };
+function sbSectView(build){
+  // fit both plots' left half (section) into a square; return a mapper
+  const st=build.stations[Math.min(sbStation,build.stations.length-1)];
+  if(!st) return null;
+  let minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;
+  for(const p of st.outer){ minx=Math.min(minx,p[0]); maxx=Math.max(maxx,p[0]); miny=Math.min(miny,p[1]); maxy=Math.max(maxy,p[1]); }
+  return { st, minx, maxx, miny, maxy };
+}
+let sbPiece="soundbox";
+function sectSetPiece(p){
+  sbPiece=p;
+  ["soundbox","neck","pillar"].forEach(n=>{ const b=document.getElementById("sect-tab-"+n); if(b) b.className=(n===p)?"btn-primary":""; });
+  const kn=document.getElementById("sect-knobs-neck"); if(kn) kn.hidden=(p!=="neck");
+  const kp=document.getElementById("sect-knobs-pillar"); if(kp) kp.hidden=(p!=="pillar");
+  const sl=document.getElementById("sweep-station");
+  if(sl){ let n=1;
+    try { n = (p==="soundbox") ? sbBuild().stations.length : stBuildBody().secs.filter(z=>z.fam===p).length; } catch(e){}
+    sl.max=Math.max(0,n-1); if(+sl.value>+sl.max) sl.value=sl.max; sbStation=+sl.value; }
+  sbRenderPlot();
+}
+function sectRenderOther(){
+  const svg=document.getElementById("sweep-plot"); while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const mk=(tag,at,txt)=>{ const e=document.createElementNS(SVGNS,tag); for(const k in at) e.setAttribute(k,at[k]); if(txt!=null) e.textContent=txt; svg.appendChild(e); return e; };
+  let body; try { body=stBuildBody(); } catch(e){ mk("text",{x:20,y:30,fill:"#e06666","font-size":13},"Build failed: "+e.message); return; }
+  const g=body.secs.filter(z=>z.fam===sbPiece);
+  if(!g.length){ mk("text",{x:20,y:30,fill:"#e06666","font-size":13},"No "+sbPiece+" stations."); return; }
+  const k=Math.min(sbStation,g.length-1), st=g[k];
+  const boxW=250, halfH=SB_PLOT.h-SB_PLOT.mt-SB_PLOT.mb;
+  const all=st.bore?st.ring.concat(st.bore):st.ring;
+  let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
+  for(const p of all){ if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<miny)miny=p[1]; if(p[1]>maxy)maxy=p[1]; }
+  const sc=Math.min((boxW-20)/((maxx-minx)||1),(halfH-10)/((maxy-miny)||1));
+  const midx=SB_PLOT.ml+boxW/2, topy=SB_PLOT.mt+5;
+  const map=p=>[midx+(p[0]-(minx+maxx)/2)*sc, topy+(maxy-p[1])*sc];
+  const path=(ring,fill,stroke)=>{ let d="M "+map(ring[0]).map(v=>v.toFixed(2)).join(" ");
+    for(let i=1;i<ring.length;i++) d+=" L "+map(ring[i]).map(v=>v.toFixed(2)).join(" "); d+=" Z";
+    mk("path",{d,fill,stroke,"stroke-width":1.3}); };
+  path(st.ring,"#2b3a55","#6ea8fe");
+  if(st.bore) path(st.bore,"#10131a","#7ee787");
+  // right: Z_min along the piece
+  const rx0=SB_PLOT.ml+boxW+30, rw=SB_PLOT.w-SB_PLOT.mr-rx0, ry0=SB_PLOT.mt, rh=halfH;
+  const zs=g.map(z=>Math.max(z.Zmin,0)), zmax=Math.max.apply(null,zs.concat([1]));
+  const px=i=>rx0+rw*i/(g.length-1||1), py=v=>ry0+rh-(v/zmax)*rh;
+  mk("line",{x1:rx0,y1:ry0+rh,x2:rx0+rw,y2:ry0+rh,stroke:"#3a3d4d","stroke-width":1});
+  mk("line",{x1:rx0,y1:ry0,x2:rx0,y2:ry0+rh,stroke:"#3a3d4d","stroke-width":1});
+  let td="M "+px(0).toFixed(1)+" "+py(zs[0]).toFixed(1);
+  for(let i=1;i<zs.length;i++) td+=" L "+px(i).toFixed(1)+" "+py(zs[i]).toFixed(1);
+  mk("path",{d:td,fill:"none",stroke:"#ffb454","stroke-width":2});
+  mk("line",{x1:px(k),y1:ry0,x2:px(k),y2:ry0+rh,stroke:"#e06666","stroke-width":1.5});
+  mk("text",{x:rx0,y:ry0-2,fill:"#9aa0b4","font-size":10},"section modulus Z_min (mm\u00B3) along the "+sbPiece);
+  const ro=document.getElementById("sweep-readout");
+  if(ro){ const cmp=(sbPiece==="pillar")?body.pillarAuthored:null;
+    ro.innerHTML="<b>"+sbPiece+" station "+k+"</b> / "+(g.length-1)+" \u00B7 s="+st.s.toFixed(0)+" mm \u00B7 z="+st.z.toFixed(0)+" mm \u00B7 h="+st.h.toFixed(1)+"<br>"+
+      "A="+st.A.toFixed(0)+" mm\u00B2 \u00B7 I_min="+(st.Imin/1e6).toFixed(2)+"e6 mm\u2074 \u00B7 Z_min="+st.Zmin.toFixed(0)+" mm\u00B3 \u00B7 wall="+(st.wall||0).toFixed(1)+" mm"+
+      (st.valid?"":" <span style=\'color:#e06666\'>\u26A0 invalid \u2014 bore exceeds the frame outer (HANDOFF \u00A76.2)</span>")+"<br>"+
+      (cmp?("authored \u00D894 foot: A="+cmp.A.toFixed(0)+" mm\u00B2 \u00B7 I_min="+(cmp.Imin/1e6).toFixed(2)+"e6 \u00B7 wall="+cmp.wall.toFixed(1)+" mm"):"");
+  }
+}
+function sbRenderPlot(){
+  if(sbPiece!=="soundbox") return sectRenderOther();
+  const build=sbBuild();
+  const svg=document.getElementById("sweep-plot"); while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const mk=(tag,at,txt)=>{ const e=document.createElementNS(SVGNS,tag); for(const k in at) e.setAttribute(k,at[k]); if(txt!=null) e.textContent=txt; svg.appendChild(e); return e; };
+  const st=build.stations[Math.min(sbStation,build.stations.length-1)];
+  if(!st){ mk("text",{x:20,y:30,fill:"#e06666","font-size":13},"No soundbox stations."); return; }
+  // --- left: cross-section (outer + bore) ---
+  const boxW=250, cx0=SB_PLOT.ml, halfH=SB_PLOT.h-SB_PLOT.mt-SB_PLOT.mb;
+  // measure the ring — section height is 2·cOut·b, so 4b only when cOut=2
+  const H=Math.max(...st.outer.map(p=>p[1])), W=Math.max(...st.outer.map(p=>p[0]))-Math.min(...st.outer.map(p=>p[0]));
+  const sc=Math.min((boxW-20)/(W||1), (halfH-10)/(H||1));
+  const midx=cx0+boxW/2, topy=SB_PLOT.mt+5;
+  const map=p=>[midx+p[0]*sc, topy+(H-p[1])*sc];   // y-up: dimple(spine) at bottom
+  const path=(ring,fill,stroke)=>{ let d="M "+map(ring[0]).map(v=>v.toFixed(2)).join(" ");
+    for(let i=1;i<ring.length;i++) d+=" L "+map(ring[i]).map(v=>v.toFixed(2)).join(" "); d+=" Z";
+    mk("path",{d,fill,stroke,"stroke-width":1.3}); };
+  path(st.outer,"#2b3a55","#6ea8fe");     // outer envelope
+  path(st.bore,"#10131a","#7ee787");      // chamber (bore)
+  // spine marker
+  mk("line",{x1:midx-boxW/2+4,y1:topy+H*sc,x2:midx+boxW/2-4,y2:topy+H*sc,stroke:"#9aa0b4","stroke-dasharray":"3 3","stroke-width":1});
+  mk("text",{x:cx0,y:topy+H*sc+13,fill:"#9aa0b4","font-size":10},"spine (green)");
+  mk("text",{x:cx0,y:topy+10,fill:"#9aa0b4","font-size":10},"belly (red)");
+  // --- right: chamber-area taper across the arm ---
+  const rx0=cx0+boxW+30, rw=SB_PLOT.w-SB_PLOT.mr-rx0, ry0=SB_PLOT.mt, rh=halfH;
+  const areas=build.stations.map(s=>s.aCh), amax=Math.max(...areas,1);
+  const px=k=>rx0+rw*k/(build.stations.length-1||1), py=v=>ry0+rh-(v/amax)*rh;
+  mk("line",{x1:rx0,y1:ry0+rh,x2:rx0+rw,y2:ry0+rh,stroke:"#3a3d4d","stroke-width":1});
+  mk("line",{x1:rx0,y1:ry0,x2:rx0,y2:ry0+rh,stroke:"#3a3d4d","stroke-width":1});
+  let td="M "+px(0).toFixed(2)+" "+py(areas[0]).toFixed(2);
+  for(let k=1;k<areas.length;k++) td+=" L "+px(k).toFixed(2)+" "+py(areas[k]).toFixed(2);
+  mk("path",{d:td,fill:"none",stroke:"#ffb454","stroke-width":2});
+  const cur=Math.min(sbStation,build.stations.length-1);
+  mk("line",{x1:px(cur),y1:ry0,x2:px(cur),y2:ry0+rh,stroke:"#e06666","stroke-width":1.5});
+  mk("circle",{cx:px(cur),cy:py(areas[cur]),r:3.5,fill:"#e06666"});
+  mk("text",{x:rx0,y:ry0+rh+16,fill:"#9aa0b4","font-size":10},"floor / bass");
+  mk("text",{x:rx0+rw-52,y:ry0+rh+16,fill:"#9aa0b4","font-size":10},"→ shoulder");
+  mk("text",{x:rx0,y:ry0-2,fill:"#9aa0b4","font-size":10},"chamber area (mm²) along the arm");
+  // readout
+  const ro=document.getElementById("sweep-readout");
+  if(ro) ro.innerHTML =
+    "<b>station "+cur+"</b> / "+(build.stations.length-1)+"  ·  s="+st.s.toFixed(0)+" mm  ·  z="+st.z.toFixed(0)+" mm  ·  τ="+st.tau.toFixed(3)+"<br>"+
+    "h="+st.h.toFixed(1)+"  b="+st.b.toFixed(1)+"  H="+(2*sbSpec.cOut*st.b).toFixed(1)+(Math.abs(2*sbSpec.cOut*st.b-st.h)>0.5?" ⚠ (≠h: belly misses the red rail — set b=h/ to "+(2*sbSpec.cOut).toFixed(1)+" to re-land it)":"")+"  outer A="+st.aOut.toFixed(0)+" mm²<br>"+
+    "wall  t_spine="+st.tSpine.toFixed(2)+"  t_wing="+st.tWing.toFixed(2)+"  t_shell="+st.tShell.toFixed(2)+" mm<br>"+
+    "<b>chamber A="+st.aCh.toFixed(0)+" mm²</b> ("+(100*st.aCh/st.aOut).toFixed(1)+"% of outer)  ·  wall A="+st.aWall.toFixed(0)+" mm²<br>"+
+    "arm: length "+build.armLen.toFixed(0)+" mm  ·  V_chamber="+(build.vCh/1000).toFixed(1)+" cm³  ·  V_material="+(build.vMat/1000).toFixed(1)+" cm³";
+}
+function openSbSweep(){
+  try { const b=sbBuild();
+    document.getElementById("sweep-modal").hidden=false;
+    const sl=document.getElementById("sweep-station"); if(sl){ sl.max=Math.max(0,b.stations.length-1); if(sbStation>sl.max) sbStation=0; sl.value=sbStation; }
+    sbRenderPlot();
+    setStatus("Soundbox cross-section — scrub the station; tune knobs in card 3c.");
+  } catch(e){ setStatus("Soundbox build failed: "+e.message); }
+}
+function closeSbSweep(){ document.getElementById("sweep-modal").hidden=true; }
+
+// sync the card's number inputs from sbSpec
+function sbSyncInputs(){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+  set("sb-cout",sbSpec.cOut); set("sb-bdiv",sbSpec.bDiv);
+  set("sb-tspine0",sbSpec.tSpine0); set("sb-tspinek",sbSpec.tSpineK);
+  set("sb-twing",sbSpec.tWing); set("sb-tshell0",sbSpec.tShell0); set("sb-tshellk",sbSpec.tShellK);
+  set("sb-anga",sbSpec.angA); set("sb-angb",sbSpec.angB); set("sb-angc",sbSpec.angC);
+  set("sb-flutes",sbSpec.roseFlutes); set("sb-fldepth",sbSpec.roseDepth); set("sb-bore",sbSpec.roseBoreD);
+  set("sb-plateout",sbSpec.plateOut); set("sb-plateleg",sbSpec.plateLeg);
+}
+function sbReadInputs(){
+  const g=(id,d)=>{ const el=document.getElementById(id); const v=el?parseFloat(el.value):NaN; return isNaN(v)?d:v; };
+  sbSpec.cOut=g("sb-cout",2.0); sbSpec.bDiv=Math.max(2,g("sb-bdiv",4));
+  sbSpec.tSpine0=g("sb-tspine0",1.5); sbSpec.tSpineK=g("sb-tspinek",2.5);
+  sbSpec.tWing=g("sb-twing",2.5); sbSpec.tShell0=g("sb-tshell0",2.5); sbSpec.tShellK=g("sb-tshellk",1.0);
+  sbSpec.angA=g("sb-anga",20); sbSpec.angB=g("sb-angb",70); sbSpec.angC=g("sb-angc",90);
+  sbSpec.roseFlutes=Math.max(3,Math.round(g("sb-flutes",12))); sbSpec.roseDepth=g("sb-fldepth",0.4); sbSpec.roseBoreD=g("sb-bore",60.9);
+  sbSpec.plateOut=g("sb-plateout",35.3); sbSpec.plateLeg=Math.max(0.5,g("sb-plateleg",3.4));
+  sbInvalidate();
+  if(!document.getElementById("sweep-modal").hidden) sbRenderPlot();
+  const sm=document.getElementById("struct-modal"); if(sm && !sm.hidden) stRenderReport();
+}
+// export the exact harp_spec.json that drives sweep2.wishbone
+function sbExportSpec(){
+  const sp=sbSpec;
+  const spec={
+    _comment:"Clements 49 harp_spec — authored in hedit. Drives sweep2.wishbone.",
+    windows:{ sh_in:sp.sh_in, sh_out:sp.sh_out, cr_in:sp.cr_in, cr_out:sp.cr_out },
+    sampling:{ S:sp.S, M:90 },
+    base:{ trim_z:sp.trimZ, merge_z:"auto", base_stations:6, rise:"prism" },
+    launch:{ stations:8, ctrl_height_frac:0.75, flat_underside:true, rose_phase_align:true, soundbox_ease_stations:30, pin:"rose_under_pillar" },
+    frames:{ tilt_safety:0.7, spine_smooth_sigma:1.5, cap_consistency_loops:3 },
+    fields:{ spike_factor:3.0, min_scalar:10.0, blue_select:"viterbi", blue_t_min:3.0, blue_t_max_frac_h:0.98 },
+    rose:{ turns:0.5, flutes:sp.roseFlutes, flute_depth:sp.roseDepth, bore_diameter:sp.roseBoreD },
+    structure:{ wall_min_shoulder:4.4, wall_min_global:0.0, shoulder_blue:"straight_path", shoulder_zone_halfwidth:6, shoulder_smooth_iters:22, crown_zone_pad:3, crown_smooth_iters:5, outer_zone_smooth_iters:4, global_fair_iters:1 },
+    soundbox:{ c_out:sp.cOut, b_divisor:sp.bDiv,
+      wall:{ t_spine_base:sp.tSpine0, t_spine_tau:sp.tSpineK, t_wing:sp.tWing, t_shell_base:sp.tShell0, t_shell_tau:sp.tShellK, angle_spine:sp.angA, angle_wing:sp.angB, angle_shell:sp.angC } },
+    neck:{ plate_out:sp.plateOut, plate_leg:sp.plateLeg },
+    geometry_constants:{ plate_out:"from_neck", t_shell:"from_soundbox.wall" }
+  };
+  const blob=new Blob([JSON.stringify(spec,null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="harp_spec.json"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  setStatus("Exported harp_spec.json (soundbox knobs baked in).");
+}
+function sbResetSpec(){ sbSpec=Object.assign({},SWEEP_DEFAULTS); sbInvalidate(); sbSyncInputs(); if(!document.getElementById("sweep-modal").hidden) sbRenderPlot(); setStatus("Soundbox knobs reset to the approved build."); }
+// inject the swept soundbox into the existing 3D view
+function sbShow3D(){
+  const build=sbBuild();
+  if(typeof enter3d!=="function") return;
+  enter3d();
+  const step=Math.max(1,Math.floor(build.stations.length/40));
+  const ring3=(ring,st,stride)=>{ const pts=[]; const rs=sbResample(ring,Math.ceil(ring.length/stride));
+    for(const qxy of rs){ // section-local (q0,q1) -> world  o + q1*v + q0*u ; v=(Nx,0,-Ny), u=(0,1,0)
+      const o=[st.spine[0],0,SWEEP_FLOOR-st.spine[1]];
+      pts.push([o[0]+qxy[1]*st.N[0]+qxy[0]*0, o[1]+qxy[0]*1, o[2]+qxy[1]*(-st.N[1])]); }
+    pts.push(pts[0].slice()); return pts;
+  };
+  for(let k=0;k<build.stations.length;k+=step){ const st=build.stations[k];
+    view3d.scene.polylines.push({pts:ring3(st.outer,st,6), stroke:"#6ea8fe"});
+    view3d.scene.polylines.push({pts:ring3(st.bore,st,6), stroke:"#7ee787"});
+  }
+  fit3d(); render3d();
+  setStatus("Swept soundbox drawn in the 3D view ("+build.stations.length+" stations).");
+}
+// =====================================================================
+// STRUCTURAL ANALYSIS  — the whole Clements-49 body as a load-bearing frame.
+// The sweep2 body is deflection/buckling-governed (per clements47_cf.md): the
+// strings' closing load (ΣT≈6655 N) pulls the neck toward the soundbox; the
+// PILLAR is a compression strut that fails by BUCKLING, the neck/soundbox bend,
+// the BASE is the merged root that carries the combined reaction. This computes
+// exact section properties (area, second moments, section modulus, radius of
+// gyration, min wall) for each piece + morph from the verified geometry, then
+// the Euler buckling margin, bending stiffness EI, and stress FoS. Material = CF.
+// Section families are ports of core.py, verified against sweep2/golden.json.
+// =====================================================================
+const ST_MAT = { name:"CF/epoxy UD (58% Vf)", E:135000, UTS:1800, FPF:900, ILSS:70, rho:1.55e-3, wallMin:4.4 };  // MPa, g/mm³, mm
+const ST_BASE_RED  = "M 8.121,60.050 L 8.118,60.752 L 8.268,61.353 L 8.488,61.909 L 8.770,62.423 L 9.110,62.897 L 9.501,63.336 L 9.937,63.741 L 10.413,64.117 L 10.922,64.466 L 11.458,64.792 L 12.015,65.098 L 12.588,65.386 L 13.169,65.661 L 13.754,65.924 L 14.336,66.180 L 14.909,66.432 L 15.468,66.682 L 16.005,66.934 L 16.528,67.172 L 17.089,67.394 L 17.661,67.671 L 18.219,67.998 L 18.740,68.372 L 19.201,68.791 L 19.578,69.251 L 19.849,69.749 L 19.990,70.281 L 19.977,70.845 L 19.788,71.437 L 19.420,72.043 L 19.127,72.565 L 18.810,73.082 L 18.472,73.594 L 18.119,74.103 L 17.754,74.610 L 17.383,75.116 L 17.008,75.623 L 16.636,76.131 L 16.269,76.642 L 15.914,77.157 L 15.572,77.677 L 15.250,78.203 L 14.952,78.736 L 14.681,79.278 L 14.442,79.830 L 14.240,80.392 L 14.079,80.967 L 13.963,81.555 L 13.896,82.157 L 13.884,82.775 L 14.026,83.402 L 14.332,83.955 L 14.704,84.419 L 15.134,84.802 L 15.617,85.110 L 16.143,85.350 L 16.708,85.529 L 17.304,85.655 L 17.924,85.734 L 18.561,85.774 L 19.209,85.781 L 19.860,85.762 L 20.508,85.725 L 21.146,85.676 L 21.766,85.622 L 22.362,85.571 L 22.927,85.530 L 23.480,85.483 L 24.086,85.410 L 24.728,85.328 L 25.390,85.252 L 26.058,85.199 L 26.714,85.183 L 27.344,85.220 L 27.932,85.326 L 28.462,85.517 L 28.917,85.808 L 29.283,86.215 L 29.544,86.753 L 29.683,87.436 L 29.725,88.026 L 29.736,88.625 L 29.722,89.233 L 29.685,89.848 L 29.632,90.468 L 29.567,91.093 L 29.494,91.721 L 29.418,92.351 L 29.343,92.981 L 29.274,93.610 L 29.217,94.236 L 29.174,94.859 L 29.152,95.476 L 29.154,96.087 L 29.185,96.690 L 29.250,97.283 L 29.354,97.866 L 29.500,98.437 L 29.694,98.994 L 29.941,99.536 L 30.244,100.063 L 30.609,100.571 L 31.054,101.034 L 31.680,101.165 L 32.294,101.225 L 32.895,101.221 L 33.484,101.156 L 34.063,101.037 L 34.631,100.868 L 35.189,100.654 L 35.738,100.401 L 36.279,100.114 L 36.812,99.798 L 37.338,99.458 L 37.858,99.100 L 38.372,98.727 L 38.880,98.346 L 39.385,97.962 L 39.885,97.580 L 40.383,97.204 L 40.878,96.841 L 41.371,96.495 L 41.863,96.171 L 42.378,95.748 L 42.931,95.418 L 43.506,95.218 L 44.088,95.141 L 44.662,95.183 L 45.212,95.339 L 45.725,95.604 L 46.184,95.973 L 46.576,96.441 L 46.884,97.003 L 47.113,97.631 L 47.378,98.185 L 47.637,98.742 L 47.890,99.302 L 48.139,99.863 L 48.388,100.424 L 48.637,100.985 L 48.890,101.544 L 49.149,102.101 L 49.415,102.654 L 49.692,103.203 L 49.980,103.747 L 50.215,104.176 L 50.528,104.701 L 50.903,105.205 L 51.330,105.676 L 51.801,106.102 L 52.308,106.471 L 52.842,106.768 L 53.394,106.983 L 53.957,107.102 L 54.521,107.112 L 55.079,107.002 L 55.621,106.758 L 56.140,106.369 L 56.623,105.873 L 57.057,105.433 L 57.453,104.965 L 57.814,104.473 L 58.145,103.960 L 58.450,103.428 L 58.734,102.881 L 59.001,102.323 L 59.254,101.755 L 59.499,101.182 L 59.739,100.606 L 59.979,100.031 L 60.223,99.460 L 60.476,98.895 L 60.741,98.340 L 61.023,97.798 L 61.326,97.273 L 61.654,96.767 L 62.012,96.283 L 62.405,95.825 L 62.835,95.396 L 63.315,95.025 L 63.921,95.138 L 64.506,95.299 L 65.073,95.503 L 65.623,95.745 L 66.158,96.021 L 66.681,96.326 L 67.194,96.655 L 67.699,97.004 L 68.199,97.367 L 68.695,97.740 L 69.189,98.118 L 69.684,98.497 L 70.183,98.871 L 70.686,99.237 L 71.197,99.588 L 71.717,99.921 L 72.249,100.231 L 72.795,100.512 L 73.357,100.761 L 73.932,100.983 L 74.477,101.269 L 75.024,101.553 L 75.572,101.833 L 76.121,102.110 L 76.672,102.384 L 77.225,102.654 L 77.778,102.922 L 78.333,103.186 L 78.890,103.447 L 79.448,103.705 L 80.007,103.960 L 80.567,104.212 L 81.129,104.460 L 81.692,104.706 L 82.257,104.948 L 82.823,105.187 L 83.390,105.423 L 83.958,105.655 L 84.527,105.884 L 85.098,106.111 L 85.670,106.333 L 86.243,106.553 L 86.817,106.770 L 87.393,106.983 L 87.970,107.193 L 88.547,107.400 L 89.126,107.603 L 89.706,107.804 L 90.288,108.001 L 90.870,108.195 L 91.453,108.386 L 92.038,108.573 L 92.623,108.757 L 93.210,108.938 L 93.797,109.116 L 94.386,109.290 L 94.975,109.461 L 95.566,109.629 L 96.158,109.794 L 96.750,109.955 L 97.344,110.113 L 97.938,110.268 L 98.533,110.420 L 99.130,110.568 L 99.727,110.713 L 100.325,110.855 L 100.924,110.993 L 101.523,111.128 L 102.124,111.260 L 102.725,111.388 L 103.328,111.513 L 103.931,111.635 L 104.535,111.754 L 105.138,111.892 L 105.741,112.029 L 106.346,112.156 L 106.952,112.275 L 107.560,112.384 L 108.168,112.485 L 108.777,112.577 L 109.387,112.659 L 109.997,112.733 L 110.609,112.799 L 111.220,112.855 L 111.832,112.903 L 112.445,112.943 L 113.058,112.973 L 113.670,112.996 L 114.283,113.009 L 114.896,113.015 L 115.509,113.012 L 116.122,113.000 L 116.734,112.981 L 117.346,112.953 L 117.958,112.916 L 118.569,112.872 L 119.179,112.820 L 119.789,112.759 L 120.398,112.691 L 121.006,112.614 L 121.612,112.529 L 122.218,112.437 L 122.823,112.337 L 123.426,112.229 L 124.028,112.113 L 124.629,111.989 L 125.228,111.858 L 125.826,111.719 L 126.421,111.573 L 127.015,111.419 L 127.607,111.257 L 128.198,111.088 L 128.786,110.912 L 129.371,110.728 L 129.955,110.537 L 130.536,110.338 L 131.115,110.133 L 131.692,109.920 L 132.265,109.700 L 132.837,109.473 L 133.405,109.239 L 133.970,108.998 L 134.533,108.750 L 135.092,108.495 L 135.649,108.233 L 136.202,107.964 L 136.752,107.689 L 137.298,107.407 L 137.841,107.118 L 138.380,106.822 L 138.916,106.520 L 139.448,106.211 L 139.976,105.896 L 140.500,105.574 L 141.020,105.246 L 141.536,104.912 L 142.048,104.571 L 142.555,104.224 L 143.058,103.870 L 143.557,103.511 L 144.051,103.145 L 144.541,102.773 L 145.025,102.395 L 145.505,102.011 L 145.980,101.621 L 146.450,101.225 L 146.915,100.823 L 147.375,100.415 L 147.829,100.002 L 148.278,99.583 L 148.722,99.158 L 149.160,98.727 L 149.592,98.291 L 150.019,97.849 L 150.440,97.401 L 150.855,96.949 L 151.264,96.490 L 151.667,96.026 L 152.068,95.559 L 152.471,95.091 L 152.867,94.618 L 153.257,94.140 L 153.641,93.658 L 154.019,93.171 L 154.390,92.679 L 154.755,92.184 L 155.114,91.684 L 155.466,91.180 L 155.813,90.672 L 156.152,90.160 L 156.486,89.644 L 156.813,89.124 L 157.134,88.601 L 157.448,88.074 L 157.756,87.543 L 158.058,87.008 L 158.353,86.470 L 158.642,85.929 L 158.925,85.385 L 159.201,84.837 L 159.470,84.286 L 159.734,83.732 L 159.991,83.175 L 160.241,82.615 L 160.485,82.052 L 160.722,81.486 L 160.953,80.918 L 161.178,80.347 L 161.396,79.773 L 161.607,79.198 L 161.812,78.619 L 162.010,78.039 L 162.202,77.456 L 162.388,76.871 L 162.567,76.284 L 162.739,75.694 L 162.905,75.103 L 163.064,74.510 L 163.216,73.916 L 163.362,73.319 L 163.502,72.721 L 163.635,72.122 L 163.761,71.521 L 163.880,70.918 L 163.993,70.315 L 164.100,69.710 L 164.199,69.104 L 164.292,68.497 L 164.379,67.888 L 164.458,67.279 L 164.531,66.669 L 164.597,66.059 L 164.657,65.447 L 164.710,64.835 L 164.756,64.222 L 164.795,63.609 L 164.828,62.996 L 164.854,62.382 L 164.873,61.768 L 164.886,61.154 L 164.891,60.540 L 164.892,59.806 L 164.889,59.192 L 164.879,58.577 L 164.863,57.963 L 164.839,57.350 L 164.809,56.736 L 164.773,56.123 L 164.729,55.510 L 164.679,54.898 L 164.622,54.286 L 164.559,53.675 L 164.488,53.065 L 164.411,52.455 L 164.328,51.847 L 164.237,51.239 L 164.140,50.633 L 164.037,50.027 L 163.926,49.423 L 163.809,48.820 L 163.686,48.218 L 163.556,47.618 L 163.419,47.020 L 163.276,46.423 L 163.126,45.827 L 162.969,45.234 L 162.806,44.642 L 162.636,44.052 L 162.460,43.464 L 162.277,42.878 L 162.088,42.294 L 161.892,41.713 L 161.690,41.134 L 161.481,40.557 L 161.266,39.982 L 161.044,39.410 L 160.815,38.841 L 160.580,38.274 L 160.339,37.710 L 160.091,37.149 L 159.837,36.591 L 159.577,36.035 L 159.309,35.483 L 159.036,34.934 L 158.756,34.388 L 158.470,33.846 L 158.177,33.306 L 157.878,32.771 L 157.572,32.238 L 157.260,31.710 L 156.942,31.184 L 156.618,30.663 L 156.287,30.146 L 155.949,29.632 L 155.606,29.122 L 155.256,28.617 L 154.899,28.115 L 154.537,27.618 L 154.168,27.125 L 153.793,26.637 L 153.411,26.153 L 153.024,25.673 L 152.630,25.198 L 152.230,24.727 L 151.826,24.261 L 151.426,23.795 L 151.019,23.334 L 150.606,22.879 L 150.188,22.429 L 149.763,21.985 L 149.333,21.547 L 148.897,21.114 L 148.456,20.687 L 148.009,20.265 L 147.557,19.849 L 147.099,19.439 L 146.637,19.035 L 146.169,18.637 L 145.696,18.244 L 145.218,17.858 L 144.735,17.478 L 144.247,17.103 L 143.755,16.735 L 143.258,16.373 L 142.757,16.017 L 142.251,15.667 L 141.741,15.324 L 141.227,14.987 L 140.708,14.656 L 140.186,14.332 L 139.659,14.014 L 139.129,13.703 L 138.595,13.398 L 138.057,13.100 L 137.516,12.808 L 136.971,12.523 L 136.422,12.245 L 135.870,11.974 L 135.315,11.709 L 134.757,11.451 L 134.196,11.200 L 133.631,10.957 L 133.064,10.720 L 132.494,10.490 L 131.922,10.267 L 131.346,10.051 L 130.768,9.843 L 130.188,9.642 L 129.605,9.448 L 129.020,9.261 L 128.433,9.082 L 127.844,8.910 L 127.252,8.745 L 126.659,8.588 L 126.064,8.439 L 125.467,8.297 L 124.869,8.162 L 124.269,8.036 L 123.667,7.917 L 123.064,7.806 L 122.460,7.702 L 121.855,7.607 L 121.248,7.519 L 120.641,7.439 L 120.032,7.367 L 119.423,7.304 L 118.813,7.248 L 118.202,7.200 L 117.591,7.161 L 116.979,7.130 L 116.367,7.107 L 115.754,7.092 L 115.142,7.085 L 114.529,7.087 L 113.916,7.098 L 113.303,7.117 L 112.690,7.144 L 112.077,7.180 L 111.465,7.224 L 110.853,7.278 L 110.242,7.339 L 109.631,7.410 L 109.021,7.489 L 108.411,7.577 L 107.803,7.674 L 107.195,7.780 L 106.589,7.895 L 105.983,8.019 L 105.379,8.152 L 104.776,8.294 L 104.172,8.417 L 103.569,8.537 L 102.966,8.661 L 102.364,8.788 L 101.763,8.919 L 101.163,9.053 L 100.564,9.190 L 99.966,9.330 L 99.368,9.474 L 98.772,9.621 L 98.176,9.771 L 97.581,9.924 L 96.987,10.081 L 96.395,10.241 L 95.803,10.404 L 95.212,10.571 L 94.622,10.741 L 94.033,10.914 L 93.445,11.090 L 92.858,11.270 L 92.272,11.453 L 91.687,11.639 L 91.103,11.828 L 90.520,12.021 L 89.939,12.217 L 89.358,12.416 L 88.779,12.618 L 88.201,12.824 L 87.623,13.033 L 87.048,13.245 L 86.473,13.460 L 85.899,13.678 L 85.327,13.900 L 84.755,14.125 L 84.185,14.353 L 83.617,14.584 L 83.049,14.819 L 82.483,15.056 L 81.918,15.297 L 81.354,15.541 L 80.792,15.788 L 80.231,16.039 L 79.671,16.292 L 79.113,16.549 L 78.556,16.809 L 78.000,17.072 L 77.446,17.338 L 76.893,17.608 L 76.341,17.880 L 75.791,18.156 L 75.243,18.435 L 74.696,18.717 L 74.150,19.002 L 73.587,19.250 L 73.018,19.484 L 72.466,19.753 L 71.928,20.052 L 71.404,20.376 L 70.889,20.721 L 70.383,21.081 L 69.883,21.452 L 69.387,21.830 L 68.892,22.209 L 68.397,22.585 L 67.900,22.952 L 67.397,23.307 L 66.887,23.645 L 66.369,23.960 L 65.838,24.248 L 65.295,24.505 L 64.735,24.725 L 64.158,24.903 L 63.560,25.036 L 63.019,24.867 L 62.572,24.450 L 62.165,24.003 L 61.794,23.529 L 61.454,23.032 L 61.141,22.514 L 60.851,21.978 L 60.580,21.428 L 60.323,20.867 L 60.076,20.298 L 59.835,19.724 L 59.595,19.148 L 59.353,18.574 L 59.103,18.003 L 58.843,17.441 L 58.566,16.889 L 58.270,16.351 L 57.950,15.830 L 57.601,15.329 L 57.220,14.851 L 56.802,14.400 L 56.339,13.931 L 55.832,13.479 L 55.298,13.179 L 54.746,13.017 L 54.183,12.980 L 53.619,13.057 L 53.061,13.235 L 52.519,13.501 L 52.000,13.843 L 51.514,14.247 L 51.068,14.702 L 50.671,15.195 L 50.332,15.712 L 50.099,16.137 L 49.805,16.679 L 49.525,17.225 L 49.255,17.777 L 48.993,18.333 L 48.738,18.891 L 48.487,19.451 L 48.239,20.013 L 47.990,20.574 L 47.738,21.134 L 47.483,21.693 L 47.220,22.248 L 46.981,22.847 L 46.710,23.445 L 46.350,23.951 L 45.916,24.361 L 45.423,24.668 L 44.885,24.868 L 44.319,24.956 L 43.739,24.928 L 43.159,24.777 L 42.595,24.499 L 42.063,24.090 L 41.568,23.738 L 41.075,23.400 L 40.581,23.043 L 40.085,22.672 L 39.585,22.291 L 39.083,21.907 L 38.576,21.524 L 38.064,21.148 L 37.547,20.783 L 37.023,20.435 L 36.493,20.109 L 35.956,19.810 L 35.410,19.542 L 34.855,19.313 L 34.291,19.125 L 33.717,18.985 L 33.132,18.898 L 32.536,18.869 L 31.927,18.903 L 31.306,19.005 L 30.773,19.331 L 30.382,19.832 L 30.055,20.351 L 29.786,20.887 L 29.572,21.439 L 29.407,22.004 L 29.287,22.582 L 29.207,23.171 L 29.163,23.771 L 29.149,24.378 L 29.162,24.993 L 29.197,25.614 L 29.250,26.239 L 29.314,26.867 L 29.387,27.497 L 29.463,28.127 L 29.538,28.756 L 29.607,29.382 L 29.666,30.005 L 29.709,30.622 L 29.733,31.233 L 29.733,31.836 L 29.704,32.429 L 29.615,33.091 L 29.401,33.687 L 29.075,34.144 L 28.654,34.480 L 28.152,34.709 L 27.585,34.847 L 26.970,34.910 L 26.323,34.913 L 25.657,34.873 L 24.991,34.804 L 24.339,34.723 L 23.717,34.644 L 23.141,34.585 L 22.593,34.547 L 22.008,34.499 L 21.396,34.445 L 20.765,34.394 L 20.120,34.351 L 19.470,34.324 L 18.820,34.320 L 18.177,34.346 L 17.550,34.408 L 16.943,34.514 L 16.365,34.671 L 15.822,34.886 L 15.321,35.166 L 14.869,35.518 L 14.473,35.949 L 14.140,36.466 L 13.895,37.073 L 13.885,37.698 L 13.930,38.306 L 14.027,38.900 L 14.171,39.480 L 14.357,40.047 L 14.581,40.603 L 14.840,41.148 L 15.128,41.685 L 15.441,42.214 L 15.775,42.736 L 16.126,43.253 L 16.488,43.765 L 16.859,44.274 L 17.233,44.781 L 17.606,45.287 L 17.974,45.794 L 18.332,46.302 L 18.677,46.813 L 19.003,47.328 L 19.306,47.847 L 19.658,48.419 L 19.924,49.022 L 20.004,49.597 L 19.922,50.142 L 19.701,50.654 L 19.363,51.129 L 18.933,51.565 L 18.433,51.958 L 17.887,52.304 L 17.318,52.601 L 16.750,52.846 L 16.213,53.064 L 15.685,53.317 L 15.135,53.568 L 14.567,53.819 L 13.988,54.072 L 13.403,54.333 L 12.819,54.603 L 12.243,54.885 L 11.679,55.184 L 11.133,55.501 L 10.613,55.840 L 10.123,56.205 L 9.670,56.598 L 9.261,57.023 L 8.900,57.483 L 8.593,57.980 L 8.348,58.519 L 8.170,59.102 L 8.064,59.732 L 8.121,60.050 Z";   // base.svg red_outer (floor footprint outer)
+const ST_BASE_BLUE = "M 156.741,60.050 L 156.742,60.509 L 156.739,60.959 L 156.731,61.410 L 156.720,61.861 L 156.704,62.311 L 156.684,62.761 L 156.660,63.211 L 156.632,63.661 L 156.599,64.111 L 156.562,64.560 L 156.521,65.009 L 156.476,65.457 L 156.427,65.905 L 156.373,66.352 L 156.315,66.799 L 156.253,67.246 L 156.187,67.691 L 156.117,68.137 L 156.042,68.581 L 155.964,69.025 L 155.881,69.467 L 155.794,69.910 L 155.703,70.351 L 155.607,70.791 L 155.507,71.230 L 155.404,71.669 L 155.296,72.106 L 155.184,72.542 L 155.067,72.977 L 154.947,73.411 L 154.822,73.844 L 154.693,74.275 L 154.560,74.706 L 154.423,75.135 L 154.282,75.562 L 154.136,75.988 L 153.987,76.413 L 153.833,76.836 L 153.675,77.258 L 153.513,77.678 L 153.346,78.096 L 153.176,78.513 L 153.001,78.928 L 152.822,79.342 L 152.640,79.753 L 152.453,80.163 L 152.261,80.571 L 152.066,80.977 L 151.867,81.381 L 151.663,81.783 L 151.455,82.183 L 151.243,82.581 L 151.027,82.977 L 150.807,83.371 L 150.583,83.762 L 150.354,84.152 L 150.122,84.539 L 149.885,84.923 L 149.644,85.306 L 149.399,85.686 L 149.150,86.063 L 148.897,86.438 L 148.640,86.811 L 148.378,87.181 L 148.113,87.548 L 147.843,87.913 L 147.569,88.275 L 147.291,88.634 L 147.022,88.997 L 146.749,89.357 L 146.472,89.713 L 146.190,90.066 L 145.904,90.416 L 145.615,90.762 L 145.321,91.105 L 145.023,91.444 L 144.722,91.780 L 144.417,92.112 L 144.108,92.440 L 143.795,92.765 L 143.478,93.087 L 143.158,93.404 L 142.835,93.718 L 142.508,94.029 L 142.177,94.335 L 141.843,94.638 L 141.505,94.937 L 141.165,95.233 L 140.820,95.525 L 140.473,95.812 L 140.123,96.096 L 139.769,96.377 L 139.413,96.653 L 139.053,96.925 L 138.690,97.194 L 138.325,97.458 L 137.956,97.719 L 137.585,97.975 L 137.211,98.228 L 136.834,98.476 L 136.455,98.721 L 136.073,98.961 L 135.688,99.198 L 135.301,99.430 L 134.912,99.658 L 134.520,99.882 L 134.126,100.102 L 133.729,100.317 L 133.330,100.529 L 132.929,100.736 L 132.526,100.939 L 132.120,101.137 L 131.713,101.332 L 131.303,101.521 L 130.892,101.707 L 130.478,101.888 L 130.063,102.065 L 129.646,102.237 L 129.227,102.405 L 128.807,102.569 L 128.385,102.728 L 127.961,102.882 L 127.535,103.032 L 127.109,103.178 L 126.680,103.319 L 126.251,103.455 L 125.819,103.587 L 125.387,103.714 L 124.953,103.836 L 124.519,103.954 L 124.083,104.067 L 123.645,104.175 L 123.207,104.279 L 122.768,104.377 L 122.328,104.471 L 121.887,104.561 L 121.445,104.645 L 121.002,104.724 L 120.559,104.799 L 120.115,104.869 L 119.670,104.934 L 119.224,104.993 L 118.778,105.048 L 118.332,105.098 L 117.885,105.143 L 117.438,105.183 L 116.990,105.218 L 116.542,105.248 L 116.094,105.273 L 115.645,105.292 L 115.197,105.307 L 114.748,105.316 L 114.299,105.320 L 113.851,105.319 L 113.402,105.313 L 112.953,105.301 L 112.505,105.285 L 112.057,105.263 L 111.609,105.235 L 111.161,105.203 L 110.714,105.165 L 110.267,105.121 L 109.820,105.072 L 109.374,105.018 L 108.929,104.958 L 108.484,104.893 L 108.040,104.823 L 107.597,104.747 L 107.154,104.665 L 106.712,104.578 L 106.271,104.485 L 105.831,104.387 L 105.392,104.283 L 104.954,104.173 L 104.516,104.058 L 104.080,103.937 L 103.646,103.811 L 103.212,103.678 L 102.780,103.540 L 102.349,103.397 L 101.919,103.247 L 101.491,103.092 L 101.064,102.930 L 100.639,102.763 L 100.215,102.590 L 99.801,102.413 L 99.391,102.230 L 98.984,102.040 L 98.580,101.846 L 98.178,101.645 L 97.779,101.440 L 97.383,101.229 L 96.989,101.014 L 96.597,100.794 L 96.208,100.570 L 95.820,100.342 L 95.435,100.110 L 95.051,99.874 L 94.669,99.635 L 94.289,99.393 L 93.910,99.148 L 93.533,98.901 L 93.156,98.650 L 92.781,98.398 L 92.407,98.144 L 92.034,97.888 L 91.662,97.630 L 91.290,97.371 L 90.919,97.111 L 90.549,96.850 L 90.179,96.588 L 89.809,96.326 L 89.439,96.064 L 89.069,95.802 L 88.699,95.541 L 88.329,95.279 L 87.959,95.019 L 87.588,94.759 L 87.217,94.501 L 86.845,94.244 L 86.472,93.989 L 86.099,93.736 L 85.724,93.484 L 85.349,93.236 L 84.972,92.989 L 84.593,92.746 L 84.214,92.505 L 83.833,92.268 L 83.450,92.035 L 83.065,91.805 L 82.678,91.579 L 82.290,91.357 L 81.899,91.140 L 81.506,90.927 L 81.111,90.719 L 80.713,90.516 L 80.313,90.319 L 79.910,90.127 L 79.504,89.941 L 79.095,89.761 L 78.684,89.587 L 78.269,89.419 L 77.851,89.259 L 77.429,89.105 L 77.004,88.958 L 76.576,88.819 L 76.144,88.688 L 75.708,88.564 L 75.268,88.448 L 74.824,88.341 L 74.375,88.242 L 73.923,88.152 L 73.466,88.071 L 73.009,87.997 L 72.557,87.934 L 72.105,87.883 L 71.654,87.844 L 71.204,87.818 L 70.755,87.802 L 70.307,87.798 L 69.859,87.804 L 69.411,87.819 L 68.965,87.844 L 68.519,87.878 L 68.073,87.920 L 67.629,87.970 L 67.184,88.027 L 66.740,88.091 L 66.297,88.162 L 65.853,88.238 L 65.411,88.319 L 64.968,88.406 L 64.526,88.497 L 64.084,88.591 L 63.643,88.689 L 63.201,88.790 L 62.760,88.893 L 62.319,88.998 L 61.878,89.105 L 61.437,89.212 L 60.997,89.320 L 60.556,89.427 L 60.115,89.534 L 59.674,89.640 L 59.234,89.744 L 58.793,89.846 L 58.352,89.945 L 57.910,90.042 L 57.469,90.134 L 57.027,90.223 L 56.585,90.307 L 56.143,90.386 L 55.701,90.459 L 55.258,90.526 L 54.814,90.586 L 54.450,90.630 L 54.108,90.663 L 53.764,90.688 L 53.416,90.707 L 53.065,90.718 L 52.711,90.722 L 52.354,90.718 L 51.994,90.708 L 51.632,90.691 L 51.268,90.666 L 50.901,90.635 L 50.531,90.597 L 50.160,90.551 L 49.787,90.499 L 49.412,90.440 L 49.035,90.375 L 48.657,90.302 L 48.278,90.223 L 47.897,90.137 L 47.515,90.044 L 47.131,89.945 L 46.747,89.839 L 46.363,89.726 L 45.977,89.607 L 45.591,89.481 L 45.205,89.349 L 44.818,89.211 L 44.431,89.066 L 44.044,88.915 L 43.658,88.758 L 43.271,88.594 L 42.885,88.424 L 42.499,88.248 L 42.114,88.065 L 41.730,87.877 L 41.347,87.682 L 40.965,87.481 L 40.584,87.274 L 40.204,87.062 L 39.825,86.843 L 39.449,86.618 L 39.073,86.388 L 38.700,86.151 L 38.329,85.909 L 37.959,85.661 L 37.592,85.407 L 37.227,85.148 L 36.864,84.883 L 36.505,84.612 L 36.147,84.336 L 35.793,84.054 L 35.442,83.766 L 35.093,83.473 L 34.748,83.174 L 34.406,82.871 L 34.068,82.561 L 33.733,82.247 L 33.403,81.927 L 33.075,81.601 L 32.752,81.271 L 32.433,80.935 L 32.119,80.594 L 31.808,80.248 L 31.503,79.897 L 31.201,79.540 L 30.905,79.179 L 30.613,78.813 L 30.327,78.441 L 30.046,78.065 L 29.769,77.684 L 29.499,77.298 L 29.234,76.907 L 28.974,76.511 L 28.721,76.111 L 28.473,75.706 L 28.231,75.296 L 27.996,74.882 L 27.767,74.463 L 27.544,74.039 L 27.328,73.611 L 27.118,73.178 L 26.916,72.741 L 26.720,72.299 L 26.531,71.853 L 26.350,71.403 L 26.176,70.948 L 26.010,70.489 L 25.851,70.026 L 25.700,69.558 L 25.556,69.086 L 25.421,68.611 L 25.294,68.131 L 25.175,67.647 L 25.064,67.158 L 24.962,66.666 L 24.869,66.170 L 24.784,65.670 L 24.708,65.166 L 24.642,64.658 L 24.584,64.147 L 24.536,63.631 L 24.497,63.112 L 24.468,62.589 L 24.448,62.062 L 24.438,61.532 L 24.438,60.998 L 24.448,60.461 L 24.455,59.855 L 24.441,59.316 L 24.437,58.781 L 24.443,58.249 L 24.459,57.721 L 24.484,57.197 L 24.519,56.676 L 24.564,56.159 L 24.617,55.646 L 24.681,55.136 L 24.753,54.631 L 24.834,54.129 L 24.924,53.632 L 25.022,53.138 L 25.130,52.648 L 25.245,52.163 L 25.369,51.681 L 25.501,51.203 L 25.641,50.730 L 25.789,50.261 L 25.945,49.796 L 26.109,49.335 L 26.280,48.879 L 26.458,48.427 L 26.644,47.979 L 26.837,47.535 L 27.036,47.096 L 27.243,46.662 L 27.457,46.232 L 27.677,45.806 L 27.903,45.385 L 28.136,44.969 L 28.375,44.557 L 28.621,44.150 L 28.872,43.748 L 29.129,43.351 L 29.392,42.958 L 29.661,42.570 L 29.934,42.187 L 30.214,41.809 L 30.498,41.435 L 30.788,41.067 L 31.082,40.704 L 31.381,40.345 L 31.685,39.992 L 31.994,39.644 L 32.307,39.301 L 32.624,38.963 L 32.946,38.630 L 33.271,38.303 L 33.601,37.981 L 33.934,37.664 L 34.271,37.353 L 34.611,37.046 L 34.955,36.746 L 35.302,36.451 L 35.652,36.161 L 36.005,35.877 L 36.361,35.598 L 36.720,35.325 L 37.082,35.058 L 37.446,34.796 L 37.812,34.540 L 38.180,34.289 L 38.551,34.045 L 38.924,33.806 L 39.298,33.573 L 39.675,33.346 L 40.052,33.125 L 40.432,32.910 L 40.812,32.701 L 41.194,32.498 L 41.577,32.301 L 41.961,32.110 L 42.345,31.925 L 42.731,31.746 L 43.117,31.573 L 43.503,31.407 L 43.890,31.247 L 44.276,31.093 L 44.663,30.946 L 45.050,30.805 L 45.436,30.671 L 45.823,30.542 L 46.208,30.421 L 46.594,30.306 L 46.978,30.197 L 47.361,30.095 L 47.744,30.000 L 48.125,29.911 L 48.506,29.829 L 48.884,29.754 L 49.262,29.685 L 49.637,29.623 L 50.011,29.569 L 50.383,29.521 L 50.753,29.479 L 51.121,29.445 L 51.487,29.418 L 51.850,29.398 L 52.210,29.385 L 52.568,29.379 L 52.923,29.380 L 53.276,29.388 L 53.625,29.404 L 53.971,29.426 L 54.313,29.456 L 54.653,29.493 L 55.080,29.549 L 55.523,29.614 L 55.966,29.684 L 56.408,29.761 L 56.850,29.843 L 57.292,29.930 L 57.734,30.021 L 58.175,30.116 L 58.616,30.214 L 59.057,30.315 L 59.498,30.418 L 59.939,30.523 L 60.380,30.630 L 60.820,30.737 L 61.261,30.845 L 61.702,30.952 L 62.143,31.059 L 62.584,31.165 L 63.025,31.269 L 63.466,31.371 L 63.908,31.470 L 64.349,31.566 L 64.791,31.658 L 65.234,31.747 L 65.676,31.830 L 66.119,31.909 L 66.563,31.981 L 67.006,32.048 L 67.451,32.108 L 67.895,32.161 L 68.341,32.206 L 68.786,32.243 L 69.233,32.272 L 69.680,32.291 L 70.127,32.301 L 70.576,32.301 L 71.025,32.290 L 71.474,32.268 L 71.925,32.234 L 72.376,32.188 L 72.828,32.130 L 73.282,32.059 L 73.741,31.982 L 74.195,31.895 L 74.645,31.800 L 75.091,31.696 L 75.532,31.583 L 75.970,31.463 L 76.403,31.334 L 76.833,31.198 L 77.260,31.055 L 77.683,30.904 L 78.102,30.746 L 78.518,30.581 L 78.931,30.410 L 79.341,30.232 L 79.748,30.048 L 80.152,29.859 L 80.553,29.663 L 80.952,29.463 L 81.348,29.257 L 81.742,29.046 L 82.134,28.831 L 82.523,28.611 L 82.911,28.386 L 83.296,28.158 L 83.680,27.926 L 84.061,27.690 L 84.442,27.451 L 84.821,27.208 L 85.198,26.963 L 85.574,26.715 L 85.949,26.465 L 86.323,26.213 L 86.696,25.958 L 87.068,25.702 L 87.440,25.444 L 87.811,25.185 L 88.181,24.925 L 88.552,24.664 L 88.921,24.402 L 89.291,24.141 L 89.661,23.878 L 90.031,23.616 L 90.401,23.355 L 90.771,23.093 L 91.142,22.833 L 91.513,22.574 L 91.885,22.315 L 92.258,22.059 L 92.632,21.803 L 93.006,21.550 L 93.382,21.299 L 93.759,21.050 L 94.137,20.804 L 94.517,20.561 L 94.898,20.321 L 95.281,20.084 L 95.666,19.851 L 96.053,19.621 L 96.441,19.395 L 96.832,19.174 L 97.225,18.956 L 97.621,18.744 L 98.018,18.536 L 98.419,18.334 L 98.822,18.137 L 99.228,17.945 L 99.637,17.760 L 100.049,17.580 L 100.469,17.405 L 100.894,17.236 L 101.320,17.072 L 101.747,16.914 L 102.177,16.762 L 102.607,16.616 L 103.039,16.476 L 103.472,16.341 L 103.906,16.213 L 104.342,16.089 L 104.779,15.972 L 105.216,15.860 L 105.655,15.754 L 106.095,15.653 L 106.536,15.558 L 106.977,15.469 L 107.419,15.385 L 107.863,15.307 L 108.306,15.234 L 108.751,15.167 L 109.196,15.105 L 109.642,15.049 L 110.088,14.998 L 110.535,14.952 L 110.982,14.912 L 111.430,14.877 L 111.877,14.848 L 112.326,14.824 L 112.774,14.805 L 113.222,14.791 L 113.671,14.783 L 114.120,14.780 L 114.569,14.782 L 115.017,14.789 L 115.466,14.801 L 115.914,14.819 L 116.363,14.842 L 116.811,14.869 L 117.259,14.902 L 117.706,14.940 L 118.153,14.983 L 118.600,15.031 L 119.046,15.084 L 119.492,15.142 L 119.937,15.205 L 120.381,15.272 L 120.825,15.345 L 121.268,15.423 L 121.710,15.505 L 122.152,15.592 L 122.592,15.684 L 123.032,15.781 L 123.470,15.883 L 123.908,15.989 L 124.344,16.101 L 124.780,16.216 L 125.214,16.337 L 125.647,16.462 L 126.078,16.592 L 126.509,16.726 L 126.937,16.865 L 127.365,17.009 L 127.791,17.157 L 128.215,17.310 L 128.638,17.467 L 129.059,17.629 L 129.479,17.795 L 129.897,17.965 L 130.312,18.141 L 130.727,18.320 L 131.139,18.504 L 131.549,18.692 L 131.957,18.885 L 132.364,19.081 L 132.768,19.282 L 133.170,19.488 L 133.570,19.698 L 133.967,19.911 L 134.362,20.130 L 134.755,20.352 L 135.146,20.578 L 135.534,20.809 L 135.920,21.044 L 136.303,21.282 L 136.683,21.525 L 137.061,21.772 L 137.436,22.023 L 137.808,22.278 L 138.178,22.537 L 138.544,22.800 L 138.908,23.067 L 139.269,23.338 L 139.627,23.612 L 139.982,23.891 L 140.333,24.174 L 140.682,24.460 L 141.027,24.750 L 141.369,25.044 L 141.708,25.342 L 142.044,25.643 L 142.376,25.948 L 142.704,26.257 L 143.029,26.570 L 143.351,26.886 L 143.669,27.206 L 143.983,27.529 L 144.294,27.856 L 144.600,28.187 L 144.903,28.521 L 145.202,28.859 L 145.498,29.200 L 145.789,29.545 L 146.076,29.893 L 146.359,30.245 L 146.639,30.600 L 146.913,30.959 L 147.184,31.321 L 147.459,31.681 L 147.734,32.042 L 148.005,32.406 L 148.273,32.772 L 148.536,33.141 L 148.795,33.512 L 149.049,33.886 L 149.300,34.263 L 149.547,34.642 L 149.789,35.023 L 150.028,35.407 L 150.262,35.793 L 150.492,36.182 L 150.718,36.572 L 150.940,36.965 L 151.157,37.360 L 151.371,37.757 L 151.580,38.156 L 151.786,38.558 L 151.987,38.961 L 152.184,39.366 L 152.377,39.773 L 152.565,40.183 L 152.750,40.593 L 152.930,41.006 L 153.107,41.421 L 153.279,41.837 L 153.447,42.255 L 153.610,42.674 L 153.770,43.095 L 153.925,43.518 L 154.077,43.942 L 154.224,44.367 L 154.367,44.794 L 154.506,45.223 L 154.640,45.652 L 154.771,46.083 L 154.897,46.516 L 155.020,46.949 L 155.138,47.384 L 155.251,47.820 L 155.361,48.256 L 155.466,48.694 L 155.568,49.133 L 155.665,49.573 L 155.758,50.014 L 155.847,50.456 L 155.931,50.898 L 156.012,51.341 L 156.088,51.786 L 156.160,52.230 L 156.228,52.676 L 156.291,53.122 L 156.351,53.569 L 156.406,54.016 L 156.457,54.464 L 156.504,54.912 L 156.546,55.361 L 156.585,55.810 L 156.619,56.259 L 156.649,56.709 L 156.675,57.159 L 156.697,57.609 L 156.714,58.059 L 156.727,58.510 L 156.736,58.960 L 156.741,59.411 L 156.742,59.862 L 156.741,60.050 Z";   // base.svg blue_outer (floor footprint inner)
+// Default Erard 47-string tension schedule (lbf 52.693→10.976, ×4.4482216 N/lbf).
+function stDefaultTensions(){ const n=47, out=[]; for(let i=0;i<n;i++) out.push((52.693+(10.976-52.693)*i/(n-1))*4.4482216); return out; }
+function stStringLoad(){
+  let tens=[];
+  try { const lines=(typeof stringLines==="function")?stringLines():[];
+    for(const el of lines){ const t=parseFloat(el.getAttribute("data-ten")); if(!isNaN(t)&&t>0) tens.push(t); } } catch(e){}
+  let src="loaded strings";
+  if(tens.length<2){ tens=stDefaultTensions(); src="default Erard schedule"; }
+  const total=tens.reduce((a,b)=>a+b,0);
+  const rakeDeg=7.0;   // clements47_cf 7° rake
+  return { tens, total, n:tens.length, src, rakeDeg, closing:total*Math.cos(rakeDeg*Math.PI/180), lateral:total*Math.sin(rakeDeg*Math.PI/180) };
+}
+
+// ---- section families (ports of core.py; verified) ----
+function stArgminY(P){ let bi=0,bv=Infinity; for(let i=0;i<P.length;i++) if(P[i][1]<bv){bv=P[i][1];bi=i;} return bi; }
+function stRoll(P,k){ k=((k%P.length)+P.length)%P.length; return P.slice(k).concat(P.slice(0,k)); }
+function stLongestRun(mask){ let best=[0,0],i=0,n=mask.length;
+  while(i<n){ if(mask[i]){ let j=i; while(j<n&&mask[j])j++; if(j-i>best[1]-best[0]) best=[i,j]; i=j; } else i++; }
+  const o=[]; for(let k=best[0];k<best[1];k++) o.push(k); return o; }
+function stArc(c,b,yc,l2r){ let P=sbLimacon(c,b); P=stRoll(P,stArgminY(P));
+  const idx=stLongestRun(P.map(p=>p[1]>=yc)); let A=idx.map(k=>P[k]);
+  if(A.length && ((A[0][0]>A[A.length-1][0])===l2r)) A=A.slice().reverse(); return A; }
+function stOpened(g,b){ const yc=(g-0.5)/0.5*1.4*b;
+  const oa=stArc(2.0,b,Math.max(yc,1e-3),true), ia=stArc(1.0,b,Math.max(yc,1e-3),false);
+  const xol=oa[0][0], xor=oa[oa.length-1][0], xir=ia[0][0], xil=ia[ia.length-1][0];
+  let ymin=Infinity; for(const p of oa) if(p[1]<ymin) ymin=p[1]; const foot=Math.min(ymin,-b);
+  let e=oa.concat([[xor,yc],[xor,foot],[xir,foot],[xir,yc]], ia, [[xil,yc],[xil,foot],[xol,foot],[xol,yc]]);
+  let ymn=Infinity; for(const p of e) if(p[1]<ymn) ymn=p[1]; return e.map(p=>[p[0],p[1]-ymn]); }
+function stPlateU(ow,lw,H){ const o=ow/2, iw=Math.max(o-lw,0.5);
+  return [[-o,0],[-o,H],[o,H],[o,0],[iw,0],[iw,H-lw],[-iw,H-lw],[-iw,0]]; }
+function stRoseExt(h,M){ M=M||90; const nf=sbSpec.roseFlutes||12, fd=sbSpec.roseDepth!=null?sbSpec.roseDepth:0.4;
+  const P=[]; for(let k=0;k<M;k++){ const th=2*Math.PI*k/M, fl=(3+fd*Math.sin(nf*th))/(3+fd); P.push([(h/2)*fl*Math.cos(th), h/2+(h/2)*fl*Math.sin(th)]); } return P; }
+function stRoseBore(h,c,M){ M=M||90; const P=[]; for(let k=0;k<M;k++){ const th=2*Math.PI*k/M; P.push([(c/2)*Math.cos(th), h/2+(c/2)*Math.sin(th)]); } return P; }
+// composite section properties (rings[0]=outer +area, rings[1:]=holes)
+function stSecProps(rings){
+  let M0=0,M1x=0,M1y=0,M2xx=0,M2yy=0,M2xy=0;
+  rings.forEach((R,k)=>{ let x=R.map(p=>p[0]), y=R.map(p=>p[1]); const sgn=(k===0)?1:-1;
+    let a=0; for(let i=0;i<x.length;i++){ const j=(i+1)%x.length; a+=x[i]*y[j]-x[j]*y[i]; } a*=0.5;
+    if((a>0)!==(sgn>0)){ x=x.slice().reverse(); y=y.slice().reverse(); }
+    for(let i=0;i<x.length;i++){ const j=(i+1)%x.length; const cr=x[i]*y[j]-x[j]*y[i];
+      M0+=0.5*cr; M1x+=(1/6)*(x[i]+x[j])*cr; M1y+=(1/6)*(y[i]+y[j])*cr;
+      M2xx+=(1/12)*(x[i]*x[i]+x[i]*x[j]+x[j]*x[j])*cr; M2yy+=(1/12)*(y[i]*y[i]+y[i]*y[j]+y[j]*y[j])*cr;
+      M2xy+=(1/24)*(x[i]*y[j]+2*x[i]*y[i]+2*x[j]*y[j]+x[j]*y[i])*cr; } });
+  const A=M0, cx=M1x/A, cy=M1y/A;
+  const Iyy=M2xx-A*cx*cx, Ixx=M2yy-A*cy*cy, Ixy=M2xy-A*cx*cy;
+  const avg=0.5*(Ixx+Iyy), d=Math.hypot(0.5*(Ixx-Iyy),Ixy);
+  return { A, cx, cy, Ixx, Iyy, Ixy, Imax:avg+d, Imin:avg-d }; }
+// min wall = min distance from each inner-ring vertex to the outer ring
+function stMinWall(outer,inner){ if(!inner) return 0;
+  const O=sbResample(outer,180), I=sbResample(inner,120); let mn=Infinity;
+  for(const p of I){ let d=Infinity; for(const q of O){ const dd=Math.hypot(p[0]-q[0],p[1]-q[1]); if(dd<d) d=dd; } if(d<mn) mn=d; }
+  return mn; }
+// far fiber distance c from centroid to the outer ring (for section modulus)
+function stFiber(outer,cx,cy){ let c=0; for(const p of outer){ const d=Math.hypot(p[0]-cx,p[1]-cy); if(d>c) c=d; } return c; }
+function stFullProps(outer,inner,openWall){
+  const rings=inner?[outer,inner]:[outer]; const pr=stSecProps(rings);
+  const c=stFiber(outer,pr.cx,pr.cy);
+  const valid=pr.A>1e-6 && pr.Imin>0;
+  const Zmin=valid?pr.Imin/(c||1):0, Zmax=valid?pr.Imax/(c||1):0;
+  const r=valid?Math.sqrt(pr.Imin/pr.A):0;
+  const wall=inner?stMinWall(outer,inner):(openWall||0);
+  return Object.assign(pr, { c, Zmin, Zmax, rgyr:r, wall, valid }); }
+
+// ---- build sections for the whole spine, classified by piece ----
+function stBuildBody(){
+  const b=sbBuild();                       // gives spine, N, h(all S), us, arc1, stations
+  const sp=sbSpec, S=sp.S, spine=b.spine, us=b.us, h=b.h;
+  const snap=a=>{ let si=0,sd=Infinity; for(let i=0;i<S;i++){ const dd=Math.hypot(spine[i][0]-a.x,spine[i][1]-a.y); if(dd<sd){sd=dd;si=i;} } return si; };
+  const iArc1=snap(sp.sh_in), iArc3=snap(sp.sh_out), iCrOut=snap(sp.cr_out), iCrIn=snap(sp.cr_in);
+  const arc1=us[iArc1], arc3=us[iArc3], crownI=iCrOut, crownWin=Math.max(crownI-iCrIn,1);
+  // per-station family + section
+  const secs=[];
+  for(let i=0;i<S;i++){
+    const s=us[i], hh=h[i], bb=hh/sp.bDiv; let fam, outer, inner=null;
+    if(s<arc1){ fam="soundbox"; const st=b.stations.find(z=>z.i===i);
+      if(st){ outer=st.outer; inner=st.bore; } else { outer=sbOuter(sp,bb); const w=sp; const tau=0.5;
+        inner=sbVariableBore(outer,sp,sp.tSpine0,sp.tWing,sp.tShell0); } }
+    else if(s<=arc3){ fam="shoulder"; outer=stOpened(0.7,bb); inner=stInwardU(outer,2*0.7*bb); }
+    else if(i<crownI-crownWin){ fam="neck"; outer=stPlateU(sp.plateOut,sp.plateLeg,hh); inner=null; }   // U-channel: open section
+    else if(i<crownI){ fam="crown"; outer=stRoseExt(hh); inner=stRoseBore(hh,sp.roseBoreD); }
+    else { fam="pillar"; outer=stRoseExt(hh); inner=stRoseBore(hh,sp.roseBoreD); }
+    const pr=stFullProps(outer,inner,fam==="neck"?sp.plateLeg:0);
+    secs.push(Object.assign({ i, s, z:SWEEP_FLOOR-spine[i][1], fam, h:hh,
+      ring:outer, bore:inner, sx:spine[i][0], sy:spine[i][1], nx:b.N[i][0], ny:b.N[i][1] }, pr));
+  }
+  // base: base.svg footprint (constant section, the merged root)
+  const bro=sbFlatten(ST_BASE_RED), bbo=sbFlatten(ST_BASE_BLUE);
+  const basePr=stFullProps(bro,bbo);
+  // Authored pillar foot: base.svg rose R=47.07 (Ø94.14) + constant Ø60.9 bore (HANDOFF §1).
+  // The frame-driven pillar sections narrow to ~Ø68 where the Ø60.9 bore no longer fits — the
+  // unresolved HANDOFF §6.2 conflict; report it rather than silently produce negative walls.
+  const pillarAuthored=stFullProps(stRoseExt(94.14), stRoseBore(94.14,sp.roseBoreD));
+  const pilSecs=secs.filter(z=>z.fam==="pillar"), pilInvalid=pilSecs.filter(z=>!z.valid).length;
+  const pilH=pilSecs.length?pilSecs.map(z=>z.h).sort((a,b)=>a-b)[pilSecs.length>>1]:0;
+  const pillarConflict = pilInvalid>0 ? { frameDia:pilH, boreDia:sp.roseBoreD, nInvalid:pilInvalid, nTotal:pilSecs.length } : null;
+  return { secs, base:basePr, pillarAuthored, pillarConflict, arc1, arc3, crownI, crownWin, iArc1, iArc3, armLen:b.armLen };
+}
+// inward offset for the U-beam shoulder (approx; shrink-to-centroid fallback)
+function stInwardU(ext,t){ const e=sbResample(ext,240), C=sbCentroid(e), N=e.length, inn=[];
+  for(let i=0;i<N;i++){ const a=e[(i-1+N)%N], c=e[(i+1)%N];
+    let nx=(c[1]-a[1]), ny=-(c[0]-a[0]); const nl=Math.hypot(nx,ny)+1e-12; nx/=nl; ny/=nl;
+    if(nx*(C[0]-e[i][0])+ny*(C[1]-e[i][1])<0){ nx=-nx; ny=-ny; } inn.push([e[i][0]+nx*t, e[i][1]+ny*t]); }
+  const aOut=sbPolyArea(e), aIn=sbPolyArea(inn);
+  if(!(aIn>1e-6)||aIn>=aOut) return e.map(p=>[C[0]+0.6*(p[0]-C[0]), C[1]+0.6*(p[1]-C[1])]);
+  return inn; }
+
+// ---- the analysis: per-piece section properties, buckling, deflection stiffness ----
+function stAnalyze(){
+  const body=stBuildBody(), load=stStringLoad(), E=ST_MAT.E, sAllow=ST_MAT.FPF;
+  const byFam={}; for(const s of body.secs){ (byFam[s.fam]=byFam[s.fam]||[]).push(s); }
+  const pieceLen=fam=>{ const g=byFam[fam]; if(!g||g.length<2) return 0; return Math.abs(g[g.length-1].s-g[0].s); };
+  const critByZ=fam=>{ const g=(byFam[fam]||[]).filter(s=>s.valid); if(!g.length) return null;
+    return g.reduce((m,s)=>(!m||s.Zmin<m.Zmin)?s:m, null); };
+  const nValid=fam=>{ const g=byFam[fam]||[]; return { valid:g.filter(s=>s.valid).length, total:g.length }; };
+  const Ncap=crit=>sAllow*crit.Zmin;
+  const results=[];
+  { let crit=critByZ("pillar"); const vc=nValid("pillar"); let note=null;
+    const L=pieceLen("pillar")||body.armLen;
+    if(!crit || crit.A<=0){ crit=body.pillarAuthored; note="frame column narrows below the Ø60.9 bore — using the authored Ø94 foot section (HANDOFF §6.2)"; }
+    if(crit){ const P=load.closing, K=1.0;
+      const Pcr=Math.PI*Math.PI*E*crit.Imin/Math.pow(K*L,2), sigma=P/crit.A;
+      results.push({ piece:"Pillar (rose column)", mode:"compression + buckling", crit, L, valid:vc, note,
+        primaryLabel:"Euler buckling FoS", primaryFoS:Pcr/P, primaryVal:"P_cr="+(Pcr/1000).toFixed(1)+" kN vs P="+(P/1000).toFixed(1)+" kN",
+        sigma, stressFoS:sAllow/sigma, EI:E*crit.Imin, Mcap:Ncap(crit) }); } }
+  { const crit=critByZ("neck"), L=pieceLen("neck"), vc=nValid("neck");
+    if(crit) results.push({ piece:"Neck (U-beam)", mode:"bending (deflection-governed)", crit, L, valid:vc,
+      primaryLabel:"bending stiffness EI", primaryFoS:null, primaryVal:"EI="+(E*crit.Imin/1e9).toFixed(1)+"e9 N·mm²",
+      sigma:null, stressFoS:null, EI:E*crit.Imin, Mcap:Ncap(crit) }); }
+  { const crit=critByZ("soundbox"), L=pieceLen("soundbox"), vc=nValid("soundbox");
+    if(crit) results.push({ piece:"Soundbox (limaçon)", mode:"bending + resonance", crit, L, valid:vc,
+      primaryLabel:"bending stiffness EI", primaryFoS:null, primaryVal:"EI="+(E*crit.Imin/1e9).toFixed(1)+"e9 N·mm²",
+      sigma:null, stressFoS:null, EI:E*crit.Imin, Mcap:Ncap(crit) }); }
+  { const b=body.base, P=load.total, sigma=P/b.A;
+    results.push({ piece:"Base (merged root)", mode:"bearing / combined reaction", crit:b, L:0, valid:{valid:1,total:1},
+      primaryLabel:"bearing FoS", primaryFoS:sAllow/sigma, primaryVal:"sigma="+sigma.toFixed(1)+" MPa vs "+sAllow+" MPa",
+      sigma, stressFoS:sAllow/sigma, EI:E*b.Imin, Mcap:Ncap(b) }); }
+  const zmin=fam=>{ const c=critByZ(fam); return c?c.Zmin:null; };
+  const morph=(fam,before,after,label)=>{ const g=(byFam[fam]||[]); if(!g.length) return null;
+    const wallVals=g.filter(s=>s.valid&&s.wall>0).map(s=>s.wall);
+    const minWall=wallVals.length?Math.min.apply(null,wallVals):null;
+    const zb=zmin(before), za=zmin(after), step=(zb&&za)?Math.max(zb,za)/Math.min(zb,za):null;
+    return { piece:label, n:g.length, minWall, zBefore:zb, zAfter:za, step, thin:(minWall!=null&&minWall<ST_MAT.wallMin) }; };
+  const morphs=[ morph("shoulder","soundbox","neck","Shoulder (soundbox->U-beam)"),
+                 morph("crown","neck","pillar","Crown (U-beam->rose)") ].filter(Boolean);
+  return { body, load, results, morphs, pillarConflict:body.pillarConflict };
+}
+
+// ---- structural report modal ------------------------------------------------
+const STP={ w:520, h:220, ml:46, mr:14, mt:16, mb:26 };
+const ST_FAMCOL={ soundbox:"#6ea8fe", shoulder:"#c792ea", neck:"#ffb454", crown:"#f78c6c", pillar:"#e06666" };
+function stRenderReport(){
+  let A; try { A=stAnalyze(); } catch(e){ const ro=document.getElementById("struct-readout"); if(ro) ro.textContent="Build failed: "+e.message; return; }
+  // along-spine stiffness plot (EI per station), colored by family
+  const svg=document.getElementById("struct-plot"); if(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild);
+    const mk=(t,at,tx)=>{ const e=document.createElementNS(SVGNS,t); for(const k in at) e.setAttribute(k,at[k]); if(tx!=null) e.textContent=tx; svg.appendChild(e); return e; };
+    const secs=A.body.secs.filter(s=>s.valid && s.Imin>0);
+    const EIs=secs.map(s=>ST_MAT.E*s.Imin), emax=Math.max.apply(null,EIs.concat([1]));
+    const smax=Math.max.apply(null,A.body.secs.map(s=>s.s))||1;
+    const px=s=>STP.ml+(STP.w-STP.ml-STP.mr)*s/smax, py=v=>STP.h-STP.mb-(v/emax)*(STP.h-STP.mt-STP.mb);
+    mk("line",{x1:STP.ml,y1:STP.h-STP.mb,x2:STP.w-STP.mr,y2:STP.h-STP.mb,stroke:"#3a3d4d","stroke-width":1});
+    mk("line",{x1:STP.ml,y1:STP.mt,x2:STP.ml,y2:STP.h-STP.mb,stroke:"#3a3d4d","stroke-width":1});
+    mk("text",{x:4,y:STP.mt+8,fill:"#9aa0b4","font-size":9},"EI");
+    mk("text",{x:STP.ml,y:STP.h-6,fill:"#9aa0b4","font-size":9},"floor / base");
+    mk("text",{x:STP.w-STP.mr-58,y:STP.h-6,fill:"#9aa0b4","font-size":9},"→ pillar foot");
+    // family bands + dots
+    for(const s of secs) mk("circle",{cx:px(s.s).toFixed(1),cy:py(ST_MAT.E*s.Imin).toFixed(1),r:1.7,fill:ST_FAMCOL[s.fam]||"#888"});
+    // morph markers
+    [A.body.arc1,A.body.arc3,A.body.crownI!=null?A.body.secs[A.body.crownI]?.s:null].forEach((sv,k)=>{ if(sv==null) return;
+      mk("line",{x1:px(sv),y1:STP.mt,x2:px(sv),y2:STP.h-STP.mb,stroke:"#556","stroke-dasharray":"2 3","stroke-width":1}); });
+    // legend
+    let lx=STP.ml+6; Object.keys(ST_FAMCOL).forEach(f=>{ mk("circle",{cx:lx,cy:STP.mt+2,r:3,fill:ST_FAMCOL[f]}); mk("text",{x:lx+6,y:STP.mt+5,fill:"#9aa0b4","font-size":9},f); lx+=Math.max(48,f.length*6+16); });
+  }
+  // table + summary
+  const ro=document.getElementById("struct-readout"); if(!ro) return;
+  const L=A.load, m=ST_MAT;
+  const fmt2=(v,d)=>v==null?"—":(+v).toFixed(d==null?1:d);
+  let h="";
+  h+=`<div style="margin-bottom:6px"><b>Material:</b> ${m.name} · E=${(m.E/1000).toFixed(0)} GPa · UTS ${m.UTS} MPa · allowable(FPF) ${m.FPF} MPa · min wall ${m.wallMin} mm`;
+  h+=`<br><b>String load:</b> ΣT=${L.total.toFixed(0)} N (${L.n} strings, ${L.src}) · closing ${L.closing.toFixed(0)} N · lateral ${L.lateral.toFixed(0)} N @ ${L.rakeDeg}° rake</div>`;
+  h+=`<table style="width:100%;border-collapse:collapse;font-size:10.5px">`;
+  h+=`<tr style="color:#9aa0b4;text-align:left"><th>piece</th><th>A mm²</th><th>I_min mm⁴</th><th>Z_min mm³</th><th>wall</th><th>governing check</th></tr>`;
+  for(const r of A.results){ const c=r.crit; const thin=(c.wall>0&&c.wall<m.wallMin);
+    h+=`<tr style="border-top:1px solid #2a2d3a">`+
+       `<td><b>${r.piece}</b><br><span style="color:#9aa0b4">${r.mode}</span></td>`+
+       `<td>${c.A.toFixed(0)}</td><td>${(c.Imin/1e6).toFixed(2)}e6</td><td>${c.Zmin.toFixed(0)}</td>`+
+       `<td style="color:${thin?'#e06666':'#cdd'}">${fmt2(c.wall)}${thin?' ⚠':''}</td>`+
+       `<td>${r.primaryLabel}${r.primaryFoS!=null?' = <b>'+r.primaryFoS.toFixed(1)+'</b>':''}<br><span style="color:#9aa0b4">${r.primaryVal}${r.Mcap?' · M_cap '+(r.Mcap/1000).toFixed(0)+' N·m':''}</span>${r.note?'<br><span style="color:#f7b955">⚠ '+r.note+'</span>':''}</td>`+
+       `</tr>`;
+  }
+  h+=`</table>`;
+  if(A.morphs.length){ h+=`<div style="margin-top:6px"><b>Morphs (stress risers):</b><br>`;
+    for(const mo of A.morphs){ h+=`&nbsp;${mo.piece}: min wall ${mo.minWall!=null?mo.minWall.toFixed(1)+' mm':'n/a'}${mo.thin?' <span style="color:#e06666">⚠ &lt;'+m.wallMin+'</span>':''} · stiffness step ${mo.step?mo.step.toFixed(1)+'×':'n/a'}<br>`; }
+    h+=`</div>`; }
+  if(A.pillarConflict){ const pc=A.pillarConflict;
+    h+=`<div style="margin-top:6px;color:#f7b955">⚠ Pillar geometry conflict (HANDOFF §6.2): the frame column narrows to ≈Ø${pc.frameDia.toFixed(0)} mm but the authored bore is Ø${pc.boreDia} mm — ${pc.nInvalid}/${pc.nTotal} frame-driven pillar sections have no positive wall. Buckling above uses the authored Ø94 foot; the mid-column needs re-authoring or a smaller bore.</div>`; }
+  h+=`<div style="margin-top:6px;color:#9aa0b4">Note: this body is deflection- and buckling-governed (stress is trivial, per clements47_cf). Applied bending moments need the frame FE solve (hardcoded in the source, not ported); M_cap is the section's capacity at first-ply-failure. Neck bore & shoulder wall are approximate (non-convex offset).</div>`;
+  ro.innerHTML=h;
+}
+function openStruct(){ document.getElementById("struct-modal").hidden=false; stRenderReport(); setStatus("Structural analysis — section properties, buckling, deflection stiffness across all pieces + morphs."); }
+function closeStruct(){ document.getElementById("struct-modal").hidden=true; }
+// =====================================================================
+// MORPH PICKER (drag the four transition anchors on the green spine) +
+// HARP LANES 3D (whole-body rotating view — LANES ONLY, never ring hoops).
+// In-hedit ports of sweep2/morph_picker.html and sweep2/lanes.html; the
+// anchors write straight into sbSpec.windows so the soundbox tuner,
+// structural report, and Export spec all follow immediately.
+// =====================================================================
+const SWEEP_FRAME_BLUE = "m 224.974,1920.618 c 0.135,-45.056 -6.974,-73.854 19.08,-109.167 132.092,-227.631 677.327,-1171.653 722.968,-1251.43 11.41558,-18.90101 15.93025,-73.88709 -3.961,-78.222 -18.19386,-3.96499 -38.486,-10.158 -67.653,14.904 C 828.067,554.565 784.34,600.369 713.429,574.395 621.504,529.495 607.446,417.276 567.054,333.143 529.146,251.664 497.779,157.245 420.781,104.192 370.032,75.275 275.704,44.958 229.428,71.675 183.151,98.393 182.491,287.532 183.125,368.2 V 1811 c 1.876,37.848 1.905,74.838 1.905,110.749";
+const PK_NAMES=["sh_in","sh_out","cr_in","cr_out"];
+const PK_COL={sh_in:"#a855f7",sh_out:"#a855f7",cr_in:"#ef4444",cr_out:"#ef4444"};
+const PK_LBL={sh_in:"shoulder morph START",sh_out:"shoulder morph STOP",cr_in:"crown morph START",cr_out:"crown morph STOP = rose start"};
+let pkSpine=null, pkSpineD=null, pkDrag=null, pkPan=null, pkV=null;
+function pkEnsure(){ if(!pkSpine){ pkSpine=sbFlatten(SWEEP_FRAME_GREEN);
+  pkSpineD="M "+pkSpine.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" L "); } }
+function pkNearest(x,y){ pkEnsure(); let bi=0,bd=Infinity;
+  for(let i=0;i<pkSpine.length;i++){ const dx=pkSpine[i][0]-x,dy=pkSpine[i][1]-y,d=dx*dx+dy*dy; if(d<bd){bd=d;bi=i;} } return bi; }
+function pkApplyView(){ document.getElementById("picker-svg").setAttribute("viewBox",pkV.x+" "+pkV.y+" "+pkV.w+" "+pkV.h); }
+function pkToSvg(e){ const s=document.getElementById("picker-svg"); const p=s.createSVGPoint(); p.x=e.clientX; p.y=e.clientY;
+  const u=p.matrixTransform(s.getScreenCTM().inverse()); return [u.x,u.y]; }
+function pkUpdate(recompute){
+  pkEnsure();
+  const g=document.getElementById("picker-marks"); while(g.firstChild) g.removeChild(g.firstChild);
+  const mk=(t,at,tx)=>{ const e=document.createElementNS(SVGNS,t); for(const k in at) e.setAttribute(k,at[k]); if(tx!=null) e.textContent=tx; g.appendChild(e); return e; };
+  const idx={}; PK_NAMES.forEach(n=>{ idx[n]=pkNearest(sbSpec[n].x, sbSpec[n].y); });
+  const seg=(a,b2)=>{ const i0=Math.min(idx[a],idx[b2]), i1=Math.max(idx[a],idx[b2]);
+    let d="M "+pkSpine[i0][0].toFixed(1)+","+pkSpine[i0][1].toFixed(1);
+    for(let i=i0+1;i<=i1;i++) d+=" L "+pkSpine[i][0].toFixed(1)+","+pkSpine[i][1].toFixed(1); return d; };
+  document.getElementById("picker-shseg").setAttribute("d",seg("sh_in","sh_out"));
+  document.getElementById("picker-crseg").setAttribute("d",seg("cr_in","cr_out"));
+  let rows="";
+  PK_NAMES.forEach(n=>{ const p=pkSpine[idx[n]];
+    const c=mk("circle",{cx:p[0],cy:p[1],r:14,fill:PK_COL[n],stroke:"#fff","stroke-width":3,cursor:"grab"}); c.dataset.pk=n;
+    mk("text",{x:p[0]+20,y:p[1]-14,fill:"#fff","font-size":26,"font-weight":"700"},n);
+    rows+='<tr><td style="color:'+PK_COL[n]+';font-weight:700">'+n+'</td><td>('+p[0].toFixed(1)+', '+p[1].toFixed(1)+')</td><td style="color:#9aa0b4">'+PK_LBL[n]+'</td></tr>';
+  });
+  const ro=document.getElementById("picker-readout");
+  if(ro) ro.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px">'+rows+'</table>';
+  if(recompute){ sbInvalidate();
+    try { const b=sbBuild();
+      const sl=document.getElementById("sweep-station");
+      if(sl){ sl.max=Math.max(0,b.stations.length-1); if(+sl.value>+sl.max){ sl.value=sl.max; sbStation=+sl.max; } }
+      if(!document.getElementById("sweep-modal").hidden) sbRenderPlot();
+      if(!document.getElementById("struct-modal").hidden) stRenderReport();
+      setStatus("Anchors moved — soundbox now "+b.stations.length+" stations. Save (Ctrl+S) keeps them; Export spec hands them to sweep2.");
+    } catch(e){ setStatus("Anchor rebuild failed: "+e.message); }
+  }
+}
+function openPicker(){
+  pkEnsure();
+  document.getElementById("picker-rrail").setAttribute("d",SWEEP_FRAME_RED);
+  document.getElementById("picker-brail").setAttribute("d",SWEEP_FRAME_BLUE);
+  document.getElementById("picker-gspine").setAttribute("d",pkSpineD);
+  pkV={x:-20,y:-20,w:1370,h:1966}; pkApplyView();
+  document.getElementById("picker-modal").hidden=false; pkUpdate(false);
+  setStatus("Morph picker — drag the four anchors; wheel zoom, drag background to pan.");
+}
+function closePicker(){ document.getElementById("picker-modal").hidden=true; }
+(function wirePicker(){
+  const svg=document.getElementById("picker-svg"); if(!svg) return;
+  svg.addEventListener("pointerdown", e => {
+    if(e.target.dataset && e.target.dataset.pk){ pkDrag=e.target.dataset.pk; svg.setPointerCapture(e.pointerId); }
+    else pkPan={x:e.clientX,y:e.clientY};
+    e.preventDefault();
+  });
+  svg.addEventListener("pointermove", e => {
+    if(pkDrag){ const u=pkToSvg(e); const p=pkSpine[pkNearest(u[0],u[1])];
+      sbSpec[pkDrag]={x:+p[0].toFixed(1), y:+p[1].toFixed(1)}; pkUpdate(false); }
+    else if(pkPan){ const r=svg.getBoundingClientRect(); const sc=Math.min(r.width/pkV.w,r.height/pkV.h)||1;
+      pkV.x-=(e.clientX-pkPan.x)/sc; pkV.y-=(e.clientY-pkPan.y)/sc; pkPan={x:e.clientX,y:e.clientY}; pkApplyView(); }
+  });
+  addEventListener("pointerup", () => { const was=pkDrag; pkDrag=null; pkPan=null; if(was) pkUpdate(true); });
+  svg.addEventListener("wheel", e => { e.preventDefault(); const u=pkToSvg(e), f=e.deltaY<0?0.87:1.15;
+    pkV.x=u[0]-(u[0]-pkV.x)*f; pkV.y=u[1]-(u[1]-pkV.y)*f; pkV.w*=f; pkV.h*=f; pkApplyView(); }, {passive:false});
+})();
+
+// ---- whole-harp rotating lanes view -----------------------------------------
+let spin3dOn=false;
+function spin3dStart(){ if(spin3dOn) return; spin3dOn=true;
+  (function tick(){ if(!spin3dOn||!view3d.on){ spin3dOn=false; return; }
+    view3d.yaw+=0.008; render3d(); requestAnimationFrame(tick); })(); }
+function spin3dStop(){ spin3dOn=false; }
+// =====================================================================
+// ISO 128 DRAWING SHEET  (A3 landscape, first-angle projection)
+// Native multiview drawing generated from the live spec: silhouettes of the
+// swept body in front / left / plan views with ISO line conventions
+// (continuous thick = visible, dashed thin = hidden bore, chain thin =
+// centerline), dimensions with oblique ticks, ISO 7200-style title block.
+// Kernel-exact profiles (true projections from the OCC solid) come from the
+// cad/replicad or cad/build123d downstream — see cad/README.md.
+// =====================================================================
+function dwWorldRings(){
+  const body=stBuildBody(), M=72;
+  const rings=[], bores=[], spineW=[];
+  const secs=body.secs.filter(z=>z.ring&&z.ring.length>3);
+  const world=(sec,q)=>[sec.sx+q[1]*sec.nx, q[0], (SWEEP_FLOOR-sec.sy)+q[1]*(-sec.ny)];
+  const prep=(ring,sec)=>{ let P=ring,k=0,bv=-Infinity;
+    for(let i=0;i<P.length;i++){ const v=P[i][1]*1e4-Math.abs(P[i][0]); if(v>bv){bv=v;k=i;} }
+    P=P.slice(k).concat(P.slice(0,k));
+    return sbResample(P,M).map(q=>world(sec,q)); };
+  for(const sec of secs){ rings.push(prep(sec.ring,sec));
+    bores.push((sec.bore&&sec.valid)?prep(sec.bore,sec):null);
+    spineW.push([sec.sx,0,SWEEP_FLOOR-sec.sy]); }
+  return { rings, bores, spineW, secs, body };
+}
+function dwSilhouette(rings, proj){
+  const P=rings.map(r=>r.map(proj));
+  const cen=P.map(Q=>{ let u=0,v=0; for(const p of Q){ u+=p[0]; v+=p[1]; } return [u/Q.length,v/Q.length]; });
+  const L=[],R=[];
+  for(let k=0;k<P.length;k++){
+    const a=cen[Math.max(k-1,0)], b=cen[Math.min(k+1,P.length-1)];
+    let dx=b[0]-a[0], dy=b[1]-a[1]; const n=Math.hypot(dx,dy)||1; dx/=n; dy/=n;
+    const nx=-dy, ny=dx;
+    let lo=0,hi=0,lov=Infinity,hiv=-Infinity;
+    for(let i=0;i<P[k].length;i++){ const d=P[k][i][0]*nx+P[k][i][1]*ny;
+      if(d<lov){lov=d;lo=i;} if(d>hiv){hiv=d;hi=i;} }
+    L.push(P[k][lo]); R.push(P[k][hi]);
+  }
+  return { L, R, first:P[0], last:P[P.length-1] };
+}
+const DW_LINE={ vis:{stroke:"#111","stroke-width":0.5,fill:"none"},
+                hid:{stroke:"#111","stroke-width":0.25,fill:"none","stroke-dasharray":"2 1"},
+                cen:{stroke:"#111","stroke-width":0.18,fill:"none","stroke-dasharray":"7 1.2 1.2 1.2"},
+                thin:{stroke:"#111","stroke-width":0.18,fill:"none"} };
+function dwRenderSheet(){
+  const svg=document.getElementById("drawing-sheet"); while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const mk=(t,at,tx)=>{ const e=document.createElementNS(SVGNS,t); for(const k in at) e.setAttribute(k,at[k]); if(tx!=null) e.textContent=tx; svg.appendChild(e); return e; };
+  let W; try { W=dwWorldRings(); } catch(e){ mk("text",{x:20,y:30,fill:"#a00","font-size":6},"Build failed: "+e.message); return; }
+  // sheet frame + centering marks (ISO 5457)
+  mk("rect",{x:10,y:10,width:400,height:277,fill:"none",stroke:"#111","stroke-width":0.7});
+  [[210,10,210,5],[210,287,210,292],[10,148.5,5,148.5],[410,148.5,415,148.5]].forEach(m=>mk("line",{x1:m[0],y1:m[1],x2:m[2],y2:m[3],stroke:"#111","stroke-width":0.7}));
+  // world extents
+  let xmin=1e9,xmax=-1e9,ymin=1e9,ymax=-1e9,zmin=1e9,zmax=-1e9;
+  for(const r of W.rings) for(const p of r){ if(p[0]<xmin)xmin=p[0]; if(p[0]>xmax)xmax=p[0];
+    if(p[1]<ymin)ymin=p[1]; if(p[1]>ymax)ymax=p[1]; if(p[2]<zmin)zmin=p[2]; if(p[2]>zmax)zmax=p[2]; }
+  zmin=Math.min(zmin,0);
+  const xw=xmax-xmin, yw=ymax-ymin, zh=zmax-zmin;
+  // standard scale: front 170x205 region + side + top must fit
+  let SC=[5,10,20,50].find(sc=> xw/sc<=180 && zh/sc<=214 && (xw/sc+yw/sc+56)<=400 && (zh/sc+yw/sc+40)<=274 ) || 50;
+  const s=1/SC;
+  const fx0=28, fy0=16;                                    // front view origin (sheet mm)
+  const projF=p=>[fx0+(p[0]-xmin)*s, fy0+(zmax-p[2])*s];    // front: x-z (z up)
+  const sx0=fx0+xw*s+28;
+  const projS=p=>[sx0+(p[1]-ymin)*s, fy0+(zmax-p[2])*s];    // left view (first angle: placed right)
+  const ty0=fy0+zh*s+16;
+  const projT=p=>[fx0+(p[0]-xmin)*s, ty0+(p[1]-ymin)*s];    // plan (first angle: below)
+  const pl=(pts,st)=>{ let d="M "+pts[0].map(v=>v.toFixed(2)).join(" ");
+    for(let i=1;i<pts.length;i++) d+=" L "+pts[i].map(v=>v.toFixed(2)).join(" ");
+    mk("path",Object.assign({d},st)); };
+  const ring=(pts,st)=>{ pl(pts.concat([pts[0]]),st); };
+  const view=(proj,label,lx,ly)=>{
+    const sil=dwSilhouette(W.rings,proj);
+    pl(sil.L,DW_LINE.vis); pl(sil.R,DW_LINE.vis); ring(sil.first,DW_LINE.vis); ring(sil.last,DW_LINE.vis);
+    const bores=W.rings.map((r,i)=>W.bores[i]).filter(Boolean);
+    if(bores.length>2){ const bs=dwSilhouette(bores,proj); pl(bs.L,DW_LINE.hid); pl(bs.R,DW_LINE.hid); }
+    pl(W.spineW.map(proj),DW_LINE.cen);
+    mk("text",{x:lx,y:ly,fill:"#111","font-size":3.5,"font-family":"sans-serif"},label);
+  };
+  view(projF,"FRONT",fx0,fy0+zh*s+6);
+  view(projS,"VIEW FROM LEFT",sx0,fy0+zh*s+6);
+  view(projT,"PLAN",fx0,ty0+yw*s+6);
+  // dimensions (ISO 129: thin lines, oblique ticks)
+  const tick=(x,y)=>mk("line",{x1:x-1,y1:y+1,x2:x+1,y2:y-1,stroke:"#111","stroke-width":0.25});
+  const dimV=(x,z0,z1,txt)=>{ const y0=fy0+(zmax-z1)*s, y1=fy0+(zmax-z0)*s;
+    mk("line",{x1:x,y1:y0,x2:x,y2:y1,stroke:"#111","stroke-width":0.18});
+    tick(x,y0); tick(x,y1);
+    const t=mk("text",{x:x-1.4,y:(y0+y1)/2,fill:"#111","font-size":3.2,"font-family":"sans-serif","text-anchor":"middle"},txt);
+    t.setAttribute("transform","rotate(-90 "+(x-1.4)+" "+((y0+y1)/2)+")"); };
+  const dimH=(y,x0,x1,txt)=>{ const u0=fx0+(x0-xmin)*s, u1=fx0+(x1-xmin)*s;
+    mk("line",{x1:u0,y1:y,x2:u1,y2:y,stroke:"#111","stroke-width":0.18});
+    tick(u0,y); tick(u1,y);
+    mk("text",{x:(u0+u1)/2,y:y-1.2,fill:"#111","font-size":3.2,"font-family":"sans-serif","text-anchor":"middle"},txt); };
+  dimV(fx0-8, 0, zmax, String(Math.round(zh)));
+  dimH(ty0+yw*s+11, xmin, xmax, String(Math.round(xw)));
+  // notes + title block (ISO 7200-lite)
+  const bx=252, by=252;
+  mk("rect",{x:bx,y:by,width:158,height:35,fill:"none",stroke:"#111","stroke-width":0.5});
+  [[bx,by+9,bx+158,by+9],[bx,by+18,bx+158,by+18],[bx+79,by+18,bx+79,by+35],[bx+52,by,bx+52,by+18],[bx+105,by,bx+105,by+18]].forEach(l=>mk("line",{x1:l[0],y1:l[1],x2:l[2],y2:l[3],stroke:"#111","stroke-width":0.25}));
+  const tt=(x,y,txt,size,bold)=>mk("text",{x,y,fill:"#111","font-size":size||2.8,"font-family":"sans-serif","font-weight":bold?"700":"400"},txt);
+  tt(bx+2,by+6,"Scale 1:"+SC); tt(bx+54,by+6,"Units: mm"); tt(bx+107,by+6,"Projection: first angle ⊕");
+  tt(bx+2,by+15,"Drawn: hedit"); tt(bx+54,by+15,new Date().toISOString().slice(0,10)); tt(bx+107,by+15,"Sheet A3 · ISO 128");
+  tt(bx+2,by+27,"CLEMENTS 49 — HARP BODY",4.2,true); tt(bx+2,by+32,"wishbone: base · sound-box (limaçon) · pillar (rose) · U-beam neck",2.6);
+  tt(bx+81,by+23,"NOTES:",2.8,true);
+  tt(bx+81,by+27,"1. PILLAR BORE Ø"+sbSpec.roseBoreD+" THRU · MIN WALL "+ST_MAT.wallMin+" mm",2.6);
+  tt(bx+81,by+31,"2. MATERIAL: "+ST_MAT.name+" · base/launch by sweep2 build",2.6);
+}
+function openDrawing(){ document.getElementById("drawing-modal").hidden=false; dwRenderSheet();
+  setStatus("ISO 128 sheet — first-angle front/left/plan from the live spec. Export SVG for the file; cad/replicad for kernel-exact profiles."); }
+function closeDrawing(){ document.getElementById("drawing-modal").hidden=true; }
+function dwExportSVG(){
+  dwRenderSheet();
+  const svg=document.getElementById("drawing-sheet");
+  const txt='<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="420mm" height="297mm">'+svg.innerHTML+"</svg>";
+  const blob=new Blob([txt],{type:"image/svg+xml"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="clements49_iso128.svg"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  setStatus("Exported clements49_iso128.svg (A3, 1 sheet).");
+}
+function sbShowHarp3D(){
+  const body=stBuildBody();
+  if(typeof enter3d!=="function") return;
+  enter3d();
+  const M=90;
+  const world=(sec,q)=>[sec.sx+q[1]*sec.nx, q[0], (SWEEP_FLOOR-sec.sy)+q[1]*(-sec.ny)];
+  const prep=(ring,sec)=>{ let P=ring,k=0,bv=-Infinity;   // roll to apex (core._roll) for lane-index continuity
+    for(let i=0;i<P.length;i++){ const v=P[i][1]*1e4-Math.abs(P[i][0]); if(v>bv){bv=v;k=i;} }
+    P=P.slice(k).concat(P.slice(0,k));
+    return sbResample(P,M).map(q=>world(sec,q)); };
+  const secs=body.secs.filter(s2=>s2.ring&&s2.ring.length>3);
+  const W=secs.map(s2=>prep(s2.ring,s2));
+  const B=secs.map(s2=>(s2.bore&&s2.valid)?prep(s2.bore,s2):null);
+  const lane=(arr,j,col)=>{ let cur=null,fam=null;
+    const flush=()=>{ if(cur&&cur.length>1) view3d.scene.polylines.push({pts:cur,stroke:col||ST_FAMCOL[fam]||"#888"}); };
+    for(let k=0;k<arr.length;k++){
+      if(!arr[k]){ flush(); cur=null; fam=null; continue; }
+      const f=secs[k].fam;
+      if(f!==fam){ const last=cur&&cur.length?cur[cur.length-1]:null; flush(); cur=last?[last]:[]; fam=f; }
+      cur.push(arr[k][j]); }
+    flush(); };
+  for(let j=0;j<M;j+=6) lane(W,j,null);          // outer lanes, family-colored
+  for(let j=0;j<M;j+=12) lane(B,j,"#39d47a");    // bore lanes
+  fit3d(); render3d(); spin3dStart();
+  setStatus("Harp lanes ("+secs.length+" stations) — spinning; click/drag the view to stop and orbit yourself.");
+}
 
 
 // =====================================================================

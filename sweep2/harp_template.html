@@ -1,0 +1,151 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clements 49 — animated isometric sweep proof</title><style>
+html,body{margin:0;height:100%;background:#101014;font:12px system-ui,-apple-system,sans-serif;color:#ddd;overflow:hidden}
+#c3d{position:absolute;inset:0;cursor:grab}#c3d.drag{cursor:grabbing}
+#t{position:fixed;top:8px;left:12px;font-weight:700;color:#eee;line-height:1.35;pointer-events:none}
+#t small{display:block;font-weight:400;color:#9a9aa2}
+#bar{position:fixed;top:8px;right:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
+button{background:#232329;color:#eee;border:1px solid #4a4a52;border-radius:6px;padding:4px 10px;cursor:pointer}
+button.on{background:#3a5a3a;border-color:#6a9a6a}
+input[type=range]{width:90px}
+#hud{position:fixed;left:12px;bottom:12px;background:#1a1a20cc;border:1px solid #3a3a42;border-radius:8px;padding:8px 10px;width:250px;backdrop-filter:blur(3px)}
+#hud b{font-size:12px;color:#fff}#hud p,#hud div{margin:3px 0 0;color:#bbb;font-size:11px;line-height:1.45}
+#sect{position:fixed;right:12px;bottom:12px;background:#1a1a20cc;border:1px solid #3a3a42;border-radius:8px;padding:6px;backdrop-filter:blur(3px)}
+#sect .cap{font-size:11px;color:#bbb;text-align:center;margin-top:2px}
+#audit{position:fixed;right:12px;bottom:266px;background:#1a1a20cc;border:1px solid #3a3a42;border-radius:8px;padding:8px 10px;width:236px;backdrop-filter:blur(3px);font-size:11px;line-height:1.45;color:#bbb;display:none}
+#audit b{color:#fff}#audit .ok{color:#7fd08a}#audit .warn{color:#e0a24a}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+</style></head><body>
+<canvas id="c3d"></canvas>
+<div id="t">Clements 49 — wishbone sweep, animated isometric
+<small>outer skin + inner bore, all 160 stations · drag = orbit · wheel = zoom</small></div>
+<div id="bar">
+<label>speed <input id="spd" type="range" min="0.1" max="3" step="0.1" value="1"></label>
+<button id="pp">pause</button><button id="all">show all</button>
+<button id="spin" class="on">spin</button>
+<button id="tIso" class="on">swimlanes</button>
+<button id="tBore" class="on">bores</button>
+<button id="tRing" class="on">rings</button>
+<button id="tAud">audit</button>
+<button id="rst">reset</button></div>
+<div id="hud"><b id="hSt">station —</b><div id="hFam"></div><div id="hZ"></div><div id="hStep"></div><div id="hLegend"></div></div>
+<div id="audit"><b>Correspondence audit (numpy, this build)</b>
+<p class="ok">✓ 160 rings × 90 pts, closed; bore at 160/160 stations</p>
+<p class="ok">✓ 159/159 ring pairs index-aligned; only +1-index rolls inside the rose = the authored 0.5-turn helix (1 index / ~4.5 st)</p>
+<p class="ok">✓ U-legs open toward green (inner) at every U station</p>
+<p class="ok">✓ rose flutes + circle bore phase-locked (same spin)</p>
+<p class="warn">⚠ shoulder morph is st58–60 only — the deliberate 2-station L-corner bracket; skin is C⁰, not C¹ there</p>
+<p class="warn">⚠ st59: offset bore locally pokes outside the outer (mid-morph buffer artifact)</p>
+<p class="warn">⚠ st72–75: section planes fan/converge in the tight neck bend (known pinch wall)</p></div>
+<div id="sect"><canvas id="c2d" width="228" height="200"></canvas><div class="cap" id="sCap">cross-section</div></div>
+<script>
+var D=__DATA__;
+var FAMC=["#22c55e","#a855f7","#f59e0b","#ef4444","#3b82f6"];
+var S=D.S,M=D.M;
+/* model bounds/center */
+var mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];
+D.outer.forEach(function(rg){rg.forEach(function(p){for(var k=0;k<3;k++){if(p[k]<mn[k])mn[k]=p[k];if(p[k]>mx[k])mx[k]=p[k];}});});
+var C=[(mn[0]+mx[0])/2,(mn[1]+mx[1])/2,(mn[2]+mx[2])/2];
+var cv=document.getElementById('c3d'),cx=cv.getContext('2d');
+var W,H,DPR=Math.min(devicePixelRatio||1,2);
+function rs(){W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';cx.setTransform(DPR,0,0,DPR,0,0);}
+rs();onresize=rs;
+var az=Math.PI/4, el=Math.PI/6, zoom=0.42*Math.min(innerWidth/ (mx[0]-mn[0]), innerHeight/(mx[2]-mn[2])), panX=0,panY=20;
+var az0=az,el0=el,zoom0=zoom;
+var spinOn=true, playing=true, speed=1, cursor=0, showIso=true, showBore=true, showRing=true;
+function P3(p,o){ /* orthographic: azimuth az, elevation el */
+  var x=p[0]-C[0],y=p[1]-C[1],z=p[2]-C[2];
+  var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+  o[0]=W/2+panX+zoom*(-x*sa+y*ca);
+  o[1]=H/2+panY-zoom*(x*se*ca+y*se*sa+z*ce);
+}
+var q=[0,0];
+function drawRing(rg,col,lw,alpha,closed){
+  cx.strokeStyle=col;cx.lineWidth=lw;cx.globalAlpha=alpha;cx.beginPath();
+  for(var j=0;j<rg.length;j++){P3(rg[j],q);if(j)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1]);}
+  if(closed){P3(rg[0],q);cx.lineTo(q[0],q[1]);}
+  cx.stroke();cx.globalAlpha=1;
+}
+var ISO_EVERY=5;
+function drawIso(upTo){
+  cx.lineWidth=0.7;
+  for(var j=0;j<M;j+=ISO_EVERY){
+    cx.strokeStyle=(j===0)?'#ffffff':'#8a8a96';cx.globalAlpha=(j===0)?0.95:0.4;
+    if(j===0)cx.lineWidth=1.4;else cx.lineWidth=0.7;
+    cx.beginPath();
+    for(var i=0;i<=upTo;i++){P3(D.outer[i][j],q);if(i)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1]);}
+    cx.stroke();
+  }
+  cx.globalAlpha=1;
+}
+/* 2D section inset */
+var c2=document.getElementById('c2d'),x2=c2.getContext('2d');var prevV=[1,0];
+function localise(rg){
+  var n=rg.length,cxm=0,cym=0,czm=0,i;
+  for(i=0;i<n;i++){cxm+=rg[i][0];cym+=rg[i][1];czm+=rg[i][2];}
+  cxm/=n;cym/=n;czm/=n;
+  var bx=0,bz=0,br=-1;
+  for(i=0;i<n;i++){var dx=rg[i][0]-cxm,dz=rg[i][2]-czm,rr=dx*dx+dz*dz;if(rr>br){br=rr;bx=dx;bz=dz;}}
+  var L=Math.sqrt(bx*bx+bz*bz)||1;var vx=bx/L,vz=bz/L;
+  if(vx*prevV[0]+vz*prevV[1]<0){vx=-vx;vz=-vz;}
+  prevV=[vx,vz];
+  var out=[];for(i=0;i<n;i++){out.push([rg[i][1]-cym,(rg[i][0]-cxm)*vx+(rg[i][2]-czm)*vz]);}
+  return out;
+}
+function drawSect(i){
+  x2.clearRect(0,0,228,200);
+  var O=localise(D.outer[i]);var B=D.bore[i]?localise(D.bore[i]):null;
+  var mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+  O.forEach(function(p){if(p[0]<mnx)mnx=p[0];if(p[0]>mxx)mxx=p[0];if(p[1]<mny)mny=p[1];if(p[1]>mxy)mxy=p[1];});
+  var sc=Math.min(200/(mxx-mnx+8),172/(mxy-mny+8));
+  function T(p){return [114+sc*(p[0]-(mnx+mxx)/2),100-sc*(p[1]-(mny+mxy)/2)];}
+  function poly(P,col,lw){x2.strokeStyle=col;x2.lineWidth=lw;x2.beginPath();P.forEach(function(p,k){var t=T(p);if(k)x2.lineTo(t[0],t[1]);else x2.moveTo(t[0],t[1]);});var t0=T(P[0]);x2.lineTo(t0[0],t0[1]);x2.stroke();}
+  poly(O,FAMC[D.fam[i]],2);
+  if(B)poly(B,'#7dd3fc',1.2);
+  x2.fillStyle='#666';x2.font='10px system-ui';x2.fillText((Math.round((mxx-mnx)*10)/10)+' × '+(Math.round((mxy-mny)*10)/10)+' mm',6,194);
+}
+var hSt=document.getElementById('hSt'),hFam=document.getElementById('hFam'),hZ=document.getElementById('hZ'),hStep=document.getElementById('hStep'),sCap=document.getElementById('sCap');
+document.getElementById('hLegend').innerHTML=D.famNames.map(function(n,k){return '<span class="sw" style="background:'+FAMC[k]+'"></span>'+n;}).join('<br>');
+function frame(now){
+  if(!frame.last)frame.last=now;var dt=(now-frame.last)/1000;frame.last=now;
+  if(playing)cursor=Math.min(cursor+dt*speed*22,S-1);
+  if(spinOn)az+=dt*0.25;
+  var ci=Math.floor(cursor);
+  cx.clearRect(0,0,W,H);
+  /* ghost of full frame */
+  cx.globalAlpha=0.10;cx.strokeStyle='#666';cx.lineWidth=0.5;
+  for(var i=0;i<S;i+=4)drawRing(D.outer[i],'#666',0.5,0.08,true);
+  if(showIso)drawIso(ci);
+  if(showRing)for(i=0;i<=ci;i++)drawRing(D.outer[i],FAMC[D.fam[i]],i===ci?2.4:0.8,i===ci?1:0.55,true);
+  if(showBore)for(i=0;i<=ci;i++){if(D.bore[i])drawRing(D.bore[i],'#7dd3fc',i===ci?1.6:0.6,i===ci?0.95:0.35,true);}
+  drawSect(ci);
+  hSt.textContent='station '+ci+' / '+(S-1);
+  hFam.innerHTML='<span class="sw" style="background:'+FAMC[D.fam[ci]]+'"></span>'+D.famNames[D.fam[ci]]+(ci>=D.crown_i?'  · spin '+(0.5*(ci-D.crown_i)/(S-1-D.crown_i)*360).toFixed(0)+'°':'');
+  var zz=0;D.outer[ci].forEach(function(p){zz+=p[2];});zz/=M;
+  hZ.textContent='ring z̄ '+zz.toFixed(0)+' mm · bore '+(D.bore[ci]?'✓':'—');
+  hStep.textContent='centroid step '+D.stepc[ci]+' mm · max vertex step '+D.vmax[ci]+' mm';
+  sCap.textContent='true cross-section · st'+ci;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+/* controls */
+function tog(id,fn){var b=document.getElementById(id);b.onclick=function(){b.classList.toggle('on');fn(b.classList.contains('on'));};}
+document.getElementById('pp').onclick=function(){playing=!playing;this.textContent=playing?'pause':'play';};
+document.getElementById('all').onclick=function(){cursor=S-1;};
+document.getElementById('spd').oninput=function(){speed=parseFloat(this.value);};
+tog('spin',function(v){spinOn=v;});
+tog('tIso',function(v){showIso=v;});
+tog('tBore',function(v){showBore=v;});
+tog('tRing',function(v){showRing=v;});
+document.getElementById('tAud').onclick=function(){var a=document.getElementById('audit');a.style.display=a.style.display==='block'?'none':'block';this.classList.toggle('on');};
+document.getElementById('rst').onclick=function(){az=az0;el=el0;zoom=zoom0;panX=0;panY=20;cursor=0;};
+var drag=0,px,py,mode=0;
+cv.onmousedown=function(e){drag=1;px=e.clientX;py=e.clientY;mode=e.shiftKey?1:0;cv.classList.add('drag');};
+onmouseup=function(){drag=0;cv.classList.remove('drag');};
+onmousemove=function(e){if(!drag)return;var dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;
+  if(mode){panX+=dx;panY+=dy;}else{az+=dx*0.008;el=Math.max(0.06,Math.min(1.5,el+dy*0.008));}};
+cv.addEventListener('wheel',function(e){e.preventDefault();zoom*=e.deltaY<0?1.12:0.89;},{passive:false});
+cv.addEventListener('touchstart',function(e){if(e.touches.length===1){drag=1;px=e.touches[0].clientX;py=e.touches[0].clientY;}},{passive:true});
+cv.addEventListener('touchmove',function(e){if(!drag)return;var t=e.touches[0],dx=t.clientX-px,dy=t.clientY-py;px=t.clientX;py=t.clientY;az+=dx*0.008;el=Math.max(0.06,Math.min(1.5,el+dy*0.008));},{passive:true});
+</script></body></html>

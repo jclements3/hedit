@@ -1,0 +1,136 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clements 49 — swimlanes only</title><style>
+html,body{margin:0;height:100%;background:#101014;font:12px system-ui,-apple-system,sans-serif;color:#ddd;overflow:hidden}
+#c3d{position:absolute;inset:0;cursor:grab}#c3d.drag{cursor:grabbing}
+#t{position:fixed;top:8px;left:12px;font-weight:700;color:#eee;pointer-events:none;line-height:1.35}
+#t small{display:block;font-weight:400;color:#9a9aa2}
+#bar{position:fixed;top:8px;right:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+button{background:#232329;color:#eee;border:1px solid #4a4a52;border-radius:6px;padding:4px 10px;cursor:pointer}
+button.on{background:#3a5a3a;border-color:#6a9a6a}
+input[type=range]{width:90px}
+#hud{position:fixed;left:12px;bottom:12px;background:#1a1a20cc;border:1px solid #3a3a42;border-radius:8px;padding:8px 10px;width:240px;font-size:11px;line-height:1.5;color:#bbb}
+#hud b{color:#fff}
+</style></head><body>
+<canvas id="c3d"></canvas>
+<div id="t">Clements 49 — wishbone · red + blue systems from base.svg
+<small>every lane = one lamination lane, floor → shoulder → neck → crown → base · cars = plies · drag orbit · wheel zoom</small></div>
+<div id="bar">
+<label>lanes <input id="den" type="range" min="1" max="6" step="1" value="2"></label>
+<label>speed <input id="spd" type="range" min="0" max="2.5" step="0.05" value="0.5"></label>
+<button id="vTop">top</button><button id="vSide">side</button><button id="vRear">rear</button><button id="vBot">bottom</button>
+<button id="bore" class="on">bore</button>
+<button id="spin" class="on">spin</button>
+<button id="cars" class="on">cars</button>
+<button id="rst">reset</button></div>
+<div id="hud"><b>outer (red system) + bore (blue system) lanes</b>
+<div>mouths are annuli straight from base.svg: red_outer → outer wall (full rose + full limaçon, boolean join), blue_outer → inner wall (rose bore = plain circle Ø60.9, inner limaçon). Cyan lanes = the blue system riding inside the shell.</div></div>
+<script>
+var D=__DATA__;
+var S=D.S,M=D.M;
+var mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];
+D.outer.forEach(function(rg){rg.forEach(function(p){for(var k=0;k<3;k++){if(p[k]<mn[k])mn[k]=p[k];if(p[k]>mx[k])mx[k]=p[k];}});});
+var C=[(mn[0]+mx[0])/2,(mn[1]+mx[1])/2,(mn[2]+mx[2])/2];
+/* lanes[j] = 3D polyline over stations at surface index j */
+var LN=[],LB=[];
+for(var j=0;j<M;j++){var L=new Float32Array(S*3);
+  for(var i=0;i<S;i++){var p=D.outer[i][j];L[i*3]=p[0];L[i*3+1]=p[1];L[i*3+2]=p[2];}
+  LN.push(L);
+  if(D.bore){var Lb=new Float32Array(S*3);
+    for(i=0;i<S;i++){var q2=D.bore[i][j];Lb[i*3]=q2[0];Lb[i*3+1]=q2[1];Lb[i*3+2]=q2[2];}
+    LB.push(Lb);}}
+var COLS=["#dd3b3b","#e08a00","#e6c229","#0a9d4e","#138a8a","#1769c8","#8b3fd0","#c2478f"];
+function laneCol(j){return j===0?'#ffffff':COLS[Math.floor(j/M*COLS.length)%COLS.length];}
+var cv=document.getElementById('c3d'),cx=cv.getContext('2d');
+var W,H,DPR=Math.min(devicePixelRatio||1,2);
+function rs(){W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';cx.setTransform(DPR,0,0,DPR,0,0);}
+rs();onresize=rs;
+var az=Math.PI/4,el=Math.PI/6,zoom=0.42*Math.min(innerWidth/(mx[0]-mn[0]),innerHeight/(mx[2]-mn[2])),panX=0,panY=20;
+var az0=az,el0=el,zoom0=zoom;
+var spinOn=true,showCars=true,showBore=true,speed=0.5,every=2,phase=0;
+function proj(x,y,z,o){x-=C[0];y-=C[1];z-=C[2];
+  var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+  o[0]=W/2+panX+zoom*(-x*sa+y*ca);
+  o[1]=H/2+panY-zoom*(x*se*ca+y*se*sa+z*ce);}
+var q=[0,0];
+var CAR_EVERY=5, CAR_PER=2;
+function frame(now){
+  if(!frame.last)frame.last=now;var dt=(now-frame.last)/1000;frame.last=now;
+  if(spinOn)az+=dt*0.25;
+  phase=(phase+dt*speed*0.12)%1;
+  cx.clearRect(0,0,W,H);
+  for(var j=0;j<M;j+=every){
+    var L=LN[j];
+    cx.strokeStyle=laneCol(j);cx.lineWidth=j===0?1.8:0.9;cx.globalAlpha=j===0?1:0.75;
+    cx.beginPath();
+    for(var i=0;i<S;i++){proj(L[i*3],L[i*3+1],L[i*3+2],q);if(i)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1]);}
+    cx.stroke();
+  }
+  cx.globalAlpha=1;
+  if(D.base_o){
+    for(j=0;j<M;j+=every){
+      cx.strokeStyle=laneCol(j);cx.lineWidth=0.9;cx.globalAlpha=0.8;
+      cx.beginPath();
+      for(i=0;i<D.base_o.length;i++){var pp=D.base_o[i][j];proj(pp[0],pp[1],pp[2],q);if(i)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1]);}
+      cx.stroke();
+    }
+    if(showBore){
+      cx.strokeStyle='#7dd3fc';cx.lineWidth=0.5;cx.globalAlpha=0.5;
+      for(j=0;j<M;j+=every*2){
+        cx.beginPath();
+        for(i=0;i<D.base_i.length;i++){var pp2=D.base_i[i][j];proj(pp2[0],pp2[1],pp2[2],q);if(i)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1]);}
+        cx.stroke();
+      }
+    }
+    // the authored floor ring (base.svg red_outer + blue_outer, exact)
+    cx.globalAlpha=1;
+    [['#e63030',D.base_o],['#3b82f6',D.base_i]].forEach(function(pair){
+      cx.strokeStyle=pair[0];cx.lineWidth=1.6;cx.beginPath();
+      for(j=0;j<M;j++){var pp3=pair[1][0][j];proj(pp3[0],pp3[1],pp3[2],q);if(j)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1]);}
+      cx.closePath();cx.stroke();
+    });
+  }
+  if(showBore&&LB.length){
+    cx.strokeStyle='#7dd3fc';cx.lineWidth=0.55;cx.globalAlpha=0.5;
+    for(j=0;j<M;j+=every*2){
+      var Lb=LB[j];cx.beginPath();
+      for(i=0;i<S;i++){proj(Lb[i*3],Lb[i*3+1],Lb[i*3+2],q);if(i)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1]);}
+      cx.stroke();}
+    cx.globalAlpha=1;
+  }
+  if(showCars){
+    for(j=0;j<M;j+=CAR_EVERY){
+      var L2=LN[j];
+      for(var c=0;c<CAR_PER;c++){
+        var f=(phase+c/CAR_PER+j/M*0.13)%1, fi=f*(S-1), i0=Math.floor(fi), t=fi-i0, i1=Math.min(i0+1,S-1);
+        var x=L2[i0*3]*(1-t)+L2[i1*3]*t, y=L2[i0*3+1]*(1-t)+L2[i1*3+1]*t, z=L2[i0*3+2]*(1-t)+L2[i1*3+2]*t;
+        proj(x,y,z,q);
+        cx.fillStyle=laneCol(j);cx.strokeStyle='#111';cx.lineWidth=1;
+        cx.beginPath();cx.arc(q[0],q[1],4.4,0,6.2832);cx.fill();cx.stroke();
+      }
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+document.getElementById('den').oninput=function(){every=7-parseInt(this.value);};
+document.getElementById('spd').oninput=function(){speed=parseFloat(this.value);};
+function tog(id,fn){var b=document.getElementById(id);b.onclick=function(){b.classList.toggle('on');fn(b.classList.contains('on'));};}
+tog('spin',function(v){spinOn=v;});
+tog('bore',function(v){showBore=v;});
+tog('cars',function(v){showCars=v;});
+document.getElementById('rst').onclick=function(){az=az0;el=el0;zoom=zoom0;panX=0;panY=20;};
+function setView(a,e){az=a;el=e;spinOn=false;document.getElementById('spin').classList.remove('on');panX=0;panY=20;}
+document.getElementById('vTop').onclick=function(){setView(0,1.5707);};
+document.getElementById('vSide').onclick=function(){setView(Math.PI/2,0);};
+document.getElementById('vRear').onclick=function(){setView(0,0);};
+document.getElementById('vBot').onclick=function(){setView(0,-1.5707);};
+var drag=0,px,py,mode=0;
+cv.onmousedown=function(e){drag=1;px=e.clientX;py=e.clientY;mode=e.shiftKey?1:0;cv.classList.add('drag');};
+onmouseup=function(){drag=0;cv.classList.remove('drag');};
+onmousemove=function(e){if(!drag)return;var dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;
+  if(mode){panX+=dx;panY+=dy;}else{az+=dx*0.008;el=Math.max(-1.5707,Math.min(1.5707,el+dy*0.008));}};
+cv.addEventListener('wheel',function(e){e.preventDefault();zoom*=e.deltaY<0?1.12:0.89;},{passive:false});
+cv.addEventListener('touchstart',function(e){if(e.touches.length===1){drag=1;px=e.touches[0].clientX;py=e.touches[0].clientY;}},{passive:true});
+cv.addEventListener('touchmove',function(e){if(!drag)return;var t=e.touches[0],dx=t.clientX-px,dy=t.clientY-py;px=t.clientX;py=t.clientY;az+=dx*0.008;el=Math.max(-1.5707,Math.min(1.5707,el+dy*0.008));},{passive:true});
+</script></body></html>
